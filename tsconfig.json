@@ -1,0 +1,11 @@
+{
+  "//": "Solution file for editors. Each workspace owns its own compiler settings; see docs/setup/project-structure.md.",
+  "files": [],
+  "references": [
+    { "path": "./packages/config" },
+    { "path": "./packages/shared" },
+    { "path": "./apps/api" },
+    { "path": "./apps/web" },
+    { "path": "./apps/admin" }
+  ]
+}

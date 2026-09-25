@@ -1,0 +1,9 @@
+{
+  "extends": "@garba-partner/config/tsconfig/library.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "tsBuildInfoFile": "./dist/.tsbuildinfo"
+  },
+  "include": ["src"]
+}

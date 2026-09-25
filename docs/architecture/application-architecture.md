@@ -18,7 +18,7 @@
 
 ## 1. Monorepo structure
 
-Tooling: **npm workspaces** (no extra monorepo tool in the MVP). Node.js **24 LTS**. TypeScript `strict`. All packages are ESM (`"type": "module"`).
+Tooling: **npm workspaces** (no extra monorepo tool in the MVP). Node.js **22.12+** (22 or 24 LTS; `engines` in the root `package.json`). TypeScript `strict`. All packages are ESM (`"type": "module"`).
 
 ```text
 garba-partner/

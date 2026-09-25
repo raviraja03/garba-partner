@@ -1,0 +1,25 @@
+{
+  "name": "@garba-partner/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Isomorphic types, constants and contracts shared by the Garba Partner web, admin and API apps.",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "devDependencies": {
+    "@garba-partner/config": "*"
+  }
+}

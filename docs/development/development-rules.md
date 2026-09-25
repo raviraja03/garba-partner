@@ -100,7 +100,7 @@ Answer these for every feature that touches members. Put the answers in the PR d
 
 ### 4.1 Prerequisites (to be finalised in Phase 0)
 
-- Node.js 24 LTS, npm 10+
+- Node.js 22.12+ (22 or 24 LTS), npm 10+
 - PostgreSQL 16+ running locally (or via Docker if the team opts in, which isn't required)
 - A Cloudinary dev account (or the mocked `MediaStorage` for offline work)
 

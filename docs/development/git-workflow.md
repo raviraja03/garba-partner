@@ -148,7 +148,7 @@ Use `blocking:` / `nit:` / `question:` prefixes in review comments.
 
 Workflow `ci.yml` on `pull_request` and `push` to `main`:
 
-1. Checkout, set up Node 24 with npm cache.
+1. Checkout, set up Node 22 (the `.nvmrc` version) with npm cache.
 2. `npm ci`
 3. `npm run format:check`
 4. `npm run lint`

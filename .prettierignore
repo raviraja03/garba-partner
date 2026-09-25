@@ -1,0 +1,8 @@
+node_modules/
+dist/
+coverage/
+package-lock.json
+*.tsbuildinfo
+.kilo/
+# Markdown is hand-formatted (tables); keep Prettier out of docs.
+*.md

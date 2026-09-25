@@ -1,0 +1,47 @@
+{
+  "name": "garba-partner",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Garba Partner — find Garba partners and events safely.",
+  "type": "module",
+  "workspaces": [
+    "packages/config",
+    "packages/shared",
+    "apps/api",
+    "apps/web",
+    "apps/admin"
+  ],
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10.0.0"
+  },
+  "prettier": "@garba-partner/config/prettier",
+  "scripts": {
+    "prepare": "npm run build:packages",
+    "build:packages": "npm run build -w @garba-partner/config -w @garba-partner/shared",
+    "dev": "npm run build:packages && concurrently --kill-others-on-fail --names packages,api,web,admin --prefix-colors gray,blue,magenta,yellow \"npm:dev:packages\" \"npm:dev:api\" \"npm:dev:web\" \"npm:dev:admin\"",
+    "dev:packages": "tsc -b --watch --preserveWatchOutput packages/config packages/shared",
+    "dev:api": "npm run dev -w @garba-partner/api",
+    "dev:web": "npm run dev -w @garba-partner/web",
+    "dev:admin": "npm run dev -w @garba-partner/admin",
+    "build": "npm run build --workspaces --if-present",
+    "start:api": "npm run start -w @garba-partner/api",
+    "preview:web": "npm run preview -w @garba-partner/web",
+    "preview:admin": "npm run preview -w @garba-partner/admin",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
+    "clean": "npm run clean --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@garba-partner/config": "*",
+    "concurrently": "^10.0.5",
+    "eslint": "^9.39.5",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3"
+  }
+}

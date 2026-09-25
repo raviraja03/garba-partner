@@ -1,0 +1,12 @@
+@import 'tailwindcss';
+@import '@garba-partner/config/tailwind/theme.css';
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-surface font-sans text-ink antialiased;
+  }
+}

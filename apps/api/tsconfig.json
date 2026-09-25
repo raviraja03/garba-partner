@@ -1,0 +1,7 @@
+{
+  "extends": "@garba-partner/config/tsconfig/node.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src", "vitest.config.ts"]
+}

@@ -1,0 +1,37 @@
+/*
+ * Garba Partner design tokens (Tailwind CSS v4).
+ * Import after `@import 'tailwindcss';` in each app's stylesheet.
+ */
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'Noto Sans', sans-serif;
+
+  /* Marigold — primary brand colour */
+  --color-brand-50: #fff8eb;
+  --color-brand-100: #ffebc6;
+  --color-brand-200: #ffd488;
+  --color-brand-300: #ffb84a;
+  --color-brand-400: #ff9d20;
+  --color-brand-500: #f97a07;
+  --color-brand-600: #dd5602;
+  --color-brand-700: #b73a06;
+  --color-brand-800: #942c0c;
+  --color-brand-900: #7a260d;
+
+  /* Kumkum — accent colour */
+  --color-accent-50: #fdf2f6;
+  --color-accent-100: #fce7ef;
+  --color-accent-500: #d6336c;
+  --color-accent-600: #c2255c;
+  --color-accent-700: #a61e4d;
+
+  /* Semantic */
+  --color-surface: #fffdf9;
+  --color-ink: #1f1a17;
+  --color-muted: #6b625c;
+  --color-success: #2f9e44;
+  --color-danger: #e03131;
+
+  --radius-card: 1rem;
+}

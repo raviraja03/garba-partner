@@ -91,7 +91,7 @@ Domain placeholder: `garbapartner.example`. Replace it when decided.
 | | `/api/` | `http://127.0.0.1:4000` |
 | | `/socket.io/` | `http://127.0.0.1:4000` with WebSocket upgrade headers |
 | `admin.garbapartner.example` | `/` | Admin SPA |
-| | `/api/v1/admin/` | `http://127.0.0.1:4000` (**only** the admin API prefix is proxied on this host) |
+| | `/api/v1/admin/`, `/api/v1/health` | `http://127.0.0.1:4000` (**only** the admin API prefix and the health check are proxied on this host) |
 
 **Why same-origin API?** The web app and API share an origin, and so do the admin app and the admin API. Refresh-token cookies can then be host-only with `SameSite=Strict`, CORS is not needed in production, and CSRF exposure is minimal. The API still has a strict CORS allow-list for local development.
 
@@ -155,7 +155,7 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 
 | Variable | Used by | Example / notes |
 |---|---|---|
-| `NODE_ENV` | api | `development` \| `test` \| `production` |
+| `NODE_ENV` | api | `development` \| `test` \| `production`. **Set by the runtime (PM2, test runner), never in `.env`**, because Vite reads `.env` files and would otherwise produce development React builds. The API defaults to `development` |
 | `APP_ENV` | api | `development` \| `staging` \| `production` (controls feature guards such as test OTP) |
 | `API_PORT` | api | `4000` |
 | `API_HOST` | api | `127.0.0.1` |
