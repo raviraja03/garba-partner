@@ -214,7 +214,7 @@ flowchart LR
 `safetyService.assertCanInteract(actorId, targetId, { action })`. **Every** service method where one member affects or sees another must call it:
 
 1. The actor is `active` and onboarded (already guaranteed by `requireMember` for REST. Sockets check it again).
-2. The target exists, is `active`, onboarded and not `pending_deletion`/`deleted`.
+2. The target exists, is `active`, onboarded, not `pending_deletion` and not soft-deleted (`deleted_at`).
 3. There's no block in either direction.
 4. Action-specific rules (e.g. `send_interest` also checks discovery eligibility, daily limit and cooldown. `send_message` checks the active match).
 

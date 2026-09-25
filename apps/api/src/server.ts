@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import type { ServerEnv } from '@garba-partner/config/server';
 import { API_PREFIX } from '@garba-partner/shared';
 import { createApp } from './app.js';
+import { createSequelize, databaseConfigFromEnv, pingDatabase } from './config/database.js';
 import { readEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
 
@@ -18,7 +19,21 @@ function start(): void {
   }
 
   const logger = createLogger(env);
-  const server = createServer(createApp({ env, logger }));
+  const sequelize = createSequelize(databaseConfigFromEnv(env));
+
+  // The API starts even if the database is down; /health reports 503 until it recovers.
+  sequelize.authenticate().then(
+    () => {
+      logger.info('Database connection established');
+    },
+    (err: unknown) => {
+      logger.error({ err }, 'Database connection failed; /health will report 503');
+    },
+  );
+
+  const server = createServer(
+    createApp({ env, logger, dependencies: { pingDatabase: () => pingDatabase(sequelize) } }),
+  );
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     const message =
@@ -27,6 +42,7 @@ function start(): void {
         : 'HTTP server error';
     logger.fatal({ err }, message);
     process.exitCode = 1;
+    void sequelize.close();
   });
 
   server.listen(env.API_PORT, env.API_HOST, () => {
@@ -52,6 +68,10 @@ function start(): void {
         logger.error({ err }, 'Error while closing HTTP server');
         process.exitCode = 1;
       }
+      sequelize.close().catch((closeErr: unknown) => {
+        logger.error({ err: closeErr }, 'Error while closing database connections');
+        process.exitCode = 1;
+      });
     });
     server.closeIdleConnections();
   };

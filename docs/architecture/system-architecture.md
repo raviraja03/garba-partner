@@ -196,8 +196,8 @@ All jobs are **idempotent**, process rows in batches (≤ 500 per run) and log c
 |---|---|---|
 | `expire-interests` | every 15 min | `pending` interests past `expires_at` → `expired` |
 | `lift-suspensions` | every 5 min | Suspensions with `ends_at < now()` and no other active sanction → user `status = active` |
-| `expire-verification-requests` | hourly | `pending` > 7 days → `expired`. `awaiting_selfie` > 24 h → `expired` |
-| `purge-verification-selfies` | daily 03:00 IST | Delete Cloudinary selfie assets where the decision is > 30 days old. Set `selfie_deleted_at` and null the asset ID |
+| `expire-verification-requests` | hourly | `pending` > 7 days → `expired`. `initiated` > 24 h → `expired` |
+| `purge-verification-selfies` | daily 03:00 IST | Delete Cloudinary selfie assets where the decision is > 30 days old. Set `user_verifications.evidence_deleted_at` and null `evidence_reference` |
 | `purge-otp-requests` | hourly | Delete `otp_requests` older than 24 h |
 | `purge-sessions` | daily | Delete sessions expired or revoked > 7 days ago |
 | `purge-ended-match-messages` | daily | Delete messages of matches ended > 90 days ago, **except** messages referenced by report snapshots (snapshots are copies, so the originals can go) |

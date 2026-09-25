@@ -171,13 +171,14 @@ apps/api/src/
 ├── worker.ts                  # scheduled jobs bootstrap
 ├── app.ts                     # express app factory (used by server.ts and tests)
 ├── config/
-│   └── env.ts                 # export const env = loadServerEnv()
-├── db/
-│   ├── sequelize.ts           # Sequelize instance, model registration
-│   ├── migrate.ts             # Umzug CLI entry (up/down/pending)
-│   ├── migrations/            # 2026XXXXHHMM-create-users.ts ...
-│   └── seeders/               # cities/areas, dev-only fixtures
-├── models/                    # one file per table (User.model.ts, Profile.model.ts, ...)
+│   ├── env.ts                 # readEnv() → loadServerEnv() from @garba-partner/config
+│   ├── database.ts            # Sequelize instance, model registration, pingDatabase()
+│   └── umzug.ts               # migrator + seeder factories
+├── migrations/                # 20260925100000-create-users.ts ... (raw SQL, transactional)
+├── seeders/                   # development seeders (+ production-safe reference seeders later)
+├── scripts/
+│   └── db.ts                  # db CLI: migrate / undo / status / seed / reset
+├── models/                    # one file per table (user.model.ts, user-profile.model.ts, ...)
 ├── modules/
 │   ├── auth/                  # otp, sessions, tokens
 │   │   ├── auth.routes.ts

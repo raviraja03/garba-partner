@@ -2,7 +2,7 @@
 
 > Related: [Application architecture](../architecture/application-architecture.md), [Local development](local-development.md), [Coding standards](../development/coding-standards.md)
 
-Garba Partner is an **npm workspaces** monorepo. This page describes what exists **now** (foundation phase). The target structure for later phases is in [application architecture](../architecture/application-architecture.md).
+Garba Partner is an **npm workspaces** monorepo. This page describes what exists **now** (foundation + database layer). The target structure for later phases is in [application architecture](../architecture/application-architecture.md).
 
 ## 1. Tree
 
@@ -11,14 +11,21 @@ garba-partner/
 ├── apps/
 │   ├── api/                         @garba-partner/api — Express 5 REST API
 │   │   ├── src/
-│   │   │   ├── server.ts            HTTP bootstrap, env loading, graceful shutdown
-│   │   │   ├── app.ts               createApp(): middleware pipeline (used by server + tests)
+│   │   │   ├── server.ts            HTTP bootstrap, env loading, DB connection, graceful shutdown
+│   │   │   ├── app.ts               createApp(): middleware pipeline, injected dependencies (used by server + tests)
 │   │   │   ├── routes.ts            /api/v1 router
 │   │   │   ├── app.test.ts          Vitest + Supertest tests
-│   │   │   ├── config/env.ts        loads root .env via @garba-partner/config/server
-│   │   │   ├── lib/                 app-error, response envelope, logger (pino + redaction), request-id
+│   │   │   ├── config/
+│   │   │   │   ├── env.ts           loads root .env via @garba-partner/config/server
+│   │   │   │   ├── database.ts      Sequelize instance (sequelize-typescript), pingDatabase()
+│   │   │   │   └── umzug.ts         migration + seeder runners
+│   │   │   ├── models/              User, UserProfile, UserPreference, UserSession, UserVerification (+ integration tests)
+│   │   │   ├── migrations/          timestamped, transactional SQL migrations
+│   │   │   ├── seeders/             development seed data
+│   │   │   ├── scripts/db.ts        db CLI (migrate, undo, status, seed, reset)
+│   │   │   ├── lib/                 app-error, response, logger, request-id, crypto, pii-guards, migration-helpers
 │   │   │   ├── middlewares/         not-found, error-handler
-│   │   │   └── modules/health/      GET /api/v1/health (routes + controller)
+│   │   │   └── modules/health/      GET /api/v1/health (API + database)
 │   │   ├── tsconfig.json            type-check config (src + tests, no emit)
 │   │   ├── tsconfig.build.json      build config (src → dist, tests excluded)
 │   │   └── vitest.config.ts
@@ -46,6 +53,8 @@ garba-partner/
 │   └── shared/                      @garba-partner/shared — isomorphic contracts
 │       └── src/
 │           ├── constants/app.ts     APP_NAME, API_PREFIX, ADMIN_API_PREFIX, REQUEST_ID_HEADER
+│           ├── constants/enums.ts   domain enumerations (statuses, genders, verification types, ...)
+│           ├── constants/limits.ts  LIMITS (ages, name/bio lengths)
 │           ├── errors/error-codes.ts ERROR_CODES (+ HTTP status, default message)
 │           └── types/               ApiResponse envelope types, HealthDto
 ├── docs/                            product, architecture, development, setup docs
@@ -64,7 +73,7 @@ garba-partner/
 |---|---|---|
 | `@garba-partner/config` | zod, ESLint plugins | all workspaces (tsconfig presets, ESLint, Prettier), api (`/server`), web + admin (`/client`, `/tailwind/theme.css`) |
 | `@garba-partner/shared` | — (no runtime deps) | api, web, admin |
-| `@garba-partner/api` | config, shared, express, helmet, cors, pino | — |
+| `@garba-partner/api` | config, shared, express, helmet, cors, pino, sequelize, sequelize-typescript, pg, umzug, reflect-metadata | — |
 | `@garba-partner/web` | config, shared, react | — |
 | `@garba-partner/admin` | config, shared, react | — |
 
@@ -95,6 +104,8 @@ Rules (enforced by ESLint `no-restricted-imports`):
 TypeScript is pinned to `~6.0` because `typescript-eslint` doesn't support newer compilers yet.
 
 Node-side code (api, packages) uses ESM with **explicit `.js` extensions** in relative imports (`import { ok } from './lib/response.js'`), as NodeNext requires. Frontend code uses extensionless imports (Bundler resolution).
+
+`apps/api/tsconfig.json` additionally enables `experimentalDecorators` (sequelize-typescript) and sets `useDefineForClassFields: false`, so decorated model fields don't shadow Sequelize's attribute accessors. Every `@Column` declares its `DataType` explicitly, so `emitDecoratorMetadata` isn't needed. That keeps tsx (dev), Vitest and tsc (build) behaving the same.
 
 ## 5. Linting and formatting
 

@@ -4,17 +4,41 @@ import { describe, expect, it } from 'vitest';
 import { loadServerEnv } from '@garba-partner/config/server';
 import { createApp } from './app.js';
 
-const env = loadServerEnv({ source: { NODE_ENV: 'test' } });
-const app = createApp({ env, logger: pino({ level: 'silent' }) });
+const env = loadServerEnv({
+  source: { NODE_ENV: 'test', DATABASE_URL: 'postgres://unused@127.0.0.1:5432/unused' },
+});
+const logger = pino({ level: 'silent' });
+const app = createApp({ env, logger, dependencies: { pingDatabase: () => Promise.resolve(true) } });
 
 describe('GET /api/v1/health', () => {
   it('returns the success envelope with status ok', async () => {
     const res = await request(app).get('/api/v1/health');
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ success: true, message: 'OK', data: { status: 'ok' } });
+    expect(res.body).toMatchObject({
+      success: true,
+      message: 'OK',
+      data: { status: 'ok', database: 'ok' },
+    });
     expect(res.body).toHaveProperty('data.timestamp', expect.any(String));
     expect(res.headers['cache-control']).toBe('no-store');
+  });
+
+  it('returns 503 SERVICE_UNAVAILABLE when the database is down, without internal details', async () => {
+    const appWithoutDb = createApp({
+      env,
+      logger,
+      dependencies: { pingDatabase: () => Promise.resolve(false) },
+    });
+
+    const res = await request(appWithoutDb).get('/api/v1/health');
+
+    expect(res.status).toBe(503);
+    expect(res.body).toEqual({
+      success: false,
+      message: 'Database is unavailable.',
+      error: { code: 'SERVICE_UNAVAILABLE', details: null },
+    });
   });
 
   it('generates a request id, and reuses a well-formed incoming one', async () => {

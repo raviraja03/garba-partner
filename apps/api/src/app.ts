@@ -8,17 +8,19 @@ import { API_PREFIX } from '@garba-partner/shared';
 import { resolveRequestId } from './lib/request-id.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFound } from './middlewares/not-found.js';
-import { createApiRouter } from './routes.js';
+import { createApiRouter, type ApiDependencies } from './routes.js';
 
 export interface CreateAppOptions {
   env: ServerEnv;
   logger: Logger;
+  /** External dependencies (database, ...), injected so tests can replace them. */
+  dependencies: ApiDependencies;
 }
 
 const HEALTH_PATH = `${API_PREFIX}/health`;
 
 /** Builds the Express application. Kept free of side effects so tests can create instances. */
-export function createApp({ env, logger }: CreateAppOptions): Express {
+export function createApp({ env, logger, dependencies }: CreateAppOptions): Express {
   const app = express();
 
   app.disable('x-powered-by');
@@ -41,7 +43,7 @@ export function createApp({ env, logger }: CreateAppOptions): Express {
   app.use(cors({ origin: [env.WEB_ORIGIN, env.ADMIN_ORIGIN], credentials: true }));
   app.use(express.json({ limit: '100kb' }));
 
-  app.use(API_PREFIX, createApiRouter());
+  app.use(API_PREFIX, createApiRouter(dependencies));
 
   app.use(notFound);
   app.use(errorHandler);

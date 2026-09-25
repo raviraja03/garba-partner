@@ -32,6 +32,28 @@
 | `WEB_ORIGIN` | no | `http://localhost:5173` | api (CORS) | Origin of the member web app. Must be `https://` when `APP_ENV=production` |
 | `ADMIN_ORIGIN` | no | `http://localhost:5174` | api (CORS) | Origin of the admin panel. Must be `https://` when `APP_ENV=production` |
 
+### Database
+
+Setup guide: [docs/database/database-setup.md](../database/database-setup.md).
+
+| Variable | Required | Default | Used by | Notes |
+|---|---|---|---|---|
+| `DATABASE_URL` | **yes** | — | api, db CLI | `postgres://user:password@host:5432/db`. The API refuses to start without it. URL-encode special characters in the password |
+| `DATABASE_MIGRATION_URL` | no | `DATABASE_URL` | db CLI | Owner role for migrations in production (least privilege: the API uses a DML-only role) |
+| `DATABASE_SSL` | no | `false` | api, db CLI | `true` for managed databases that require TLS (certificate verified) |
+| `DATABASE_POOL_MAX` | no | `10` | api | 1–100 |
+| `TEST_DATABASE_URL` | no | — | integration tests | **Disposable** database (tests migrate it down/up and truncate tables). Must differ from `DATABASE_URL`. Integration tests are skipped when unset |
+
+### Phone number protection
+
+| Variable | Required | Default | Used by | Notes |
+|---|---|---|---|---|
+| `PHONE_HASH_SECRET` | production, and to create users | — | api, seeders | ≥ 32 characters (e.g. 32 random bytes, base64). HMAC key for `users.phone_hash`. **Long-lived: rotating it requires a re-hash migration** |
+| `PHONE_ENCRYPTION_KEY` | production, and to create users | — | api, seeders | 32 bytes, base64-encoded. AES-256-GCM key for `users.phone_encrypted` |
+| `PHONE_ENCRYPTION_KEY_VERSION` | no | `1` | api, seeders | Stored with each ciphertext to support key rotation |
+
+Empty values (`KEY=`) count as "not set".
+
 ### Web & Admin (public, `VITE_*`)
 
 | Variable | Required | Default | Used by | Notes |
@@ -44,8 +66,7 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 
 | Phase | Variables |
 |---|---|
-| Database | `DATABASE_URL`, `DATABASE_SSL`, `DATABASE_POOL_MAX` |
-| Member auth | `JWT_ACCESS_SECRET`, `ACCESS_TOKEN_TTL_SECONDS`, `REFRESH_TOKEN_TTL_DAYS`, `OTP_HMAC_SECRET`, `PHONE_HASH_SECRET`, `PHONE_ENCRYPTION_KEY`, `PHONE_ENCRYPTION_KEY_VERSION`, `SMS_PROVIDER`, `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID`, `TEST_OTP_PHONES`, `TEST_OTP_CODE` |
+| Member auth | `JWT_ACCESS_SECRET`, `ACCESS_TOKEN_TTL_SECONDS`, `REFRESH_TOKEN_TTL_DAYS`, `OTP_HMAC_SECRET`, `SMS_PROVIDER`, `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID`, `TEST_OTP_PHONES`, `TEST_OTP_CODE` |
 | Admin auth | `JWT_ADMIN_ACCESS_SECRET`, `ADMIN_REFRESH_TOKEN_TTL_HOURS`, `TOTP_ENCRYPTION_KEY` |
 | Media | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER_PREFIX`, `VITE_CLOUDINARY_CLOUD_NAME` |
 | Realtime | `VITE_SOCKET_URL` |

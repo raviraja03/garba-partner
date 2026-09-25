@@ -11,8 +11,9 @@ This guide gets the Garba Partner monorepo running on your machine: the API, the
 | Node.js | **22.12 or newer** (22 LTS or 24 LTS). `.nvmrc` pins 22 | `node -v` |
 | npm | 10 or newer (ships with Node) | `npm -v` |
 | Git | any recent version | `git --version` |
+| PostgreSQL | **16 or newer**, listening on `127.0.0.1:5432` | `psql --version` |
 
-Not needed yet: PostgreSQL, Cloudinary and an SMS provider. They come in with the phases that use them.
+Not needed yet: Cloudinary and an SMS provider. They come in with the phases that use them.
 
 > **Windows:** the repo uses LF line endings (`.gitattributes`). Any editor works. Git Bash, PowerShell and cmd can all run the npm scripts.
 
@@ -27,9 +28,17 @@ npm install
 
 # 2. Create your local environment file (git-ignored — never commit it)
 cp .env.example .env          # PowerShell: Copy-Item .env.example .env
+
+# 3. Create the database role + databases and fill DATABASE_URL, TEST_DATABASE_URL,
+#    PHONE_HASH_SECRET and PHONE_ENCRYPTION_KEY in .env
+#    → docs/database/database-setup.md
+
+# 4. Create the schema and load fictional development data
+npm run db:migrate
+npm run db:seed
 ```
 
-The defaults in `.env.example` work out of the box for local development. See [environment-variables.md](environment-variables.md) before changing anything.
+Everything else in `.env.example` works as-is for local development. See [environment-variables.md](environment-variables.md) before changing anything.
 
 ## 3. Running the apps
 
@@ -66,8 +75,22 @@ Changes to `packages/shared` or `packages/config` need a rebuild before a single
 
 ```bash
 curl http://127.0.0.1:4000/api/v1/health
-# {"success":true,"message":"OK","data":{"status":"ok","timestamp":"2026-09-25T10:22:22.894Z"}}
+# {"success":true,"message":"OK","data":{"status":"ok","database":"ok","timestamp":"..."}}
 ```
+
+If PostgreSQL is down, the API keeps running and `/health` returns `503 SERVICE_UNAVAILABLE`.
+
+### Database commands
+
+| Command | What it does |
+|---|---|
+| `npm run db:migrate` | Apply pending migrations |
+| `npm run db:migrate:undo` | Revert the last migration |
+| `npm run db:migrate:status` | Show executed/pending migrations |
+| `npm run db:seed` / `db:seed:undo` | Load / remove the fictional development users |
+| `npm run db:reset` | Rebuild the development database from scratch (migrations + seeds) |
+
+Details: [migration guide](../database/migration-guide.md).
 
 ## 4. Quality checks
 
@@ -80,7 +103,7 @@ Run these before every push. CI will run the same commands.
 | `npm run lint:fix` | ESLint with auto-fix |
 | `npm run format:check` | Prettier check (Markdown is excluded on purpose) |
 | `npm run format` | Prettier write |
-| `npm run test` | Vitest (currently the API tests) |
+| `npm run test` | Vitest (API unit tests + database integration tests when `TEST_DATABASE_URL` is set) |
 | `npm run build` | Production build of every workspace |
 | `npm run check` | All of the above, in order: format → lint → typecheck → test → build |
 
@@ -106,6 +129,7 @@ To see production JSON logs instead of pretty logs, set `NODE_ENV=production` in
 | Web page says "API offline — Unable to reach the server." | The API isn't running, or `API_HOST`/`API_PORT` don't match the running API |
 | Production web bundle is unexpectedly large (~450 kB) | `NODE_ENV=development` got into `.env`. Remove it |
 | ESLint: "file not found in any project" | New TS files must be inside a tsconfig `include` (e.g. `src/`) |
+| Database errors (`password authentication failed`, `database does not exist`, `/health` 503, …) | See [database setup §5](../database/database-setup.md#5-troubleshooting) |
 
 ## 7. Editor setup (recommended)
 

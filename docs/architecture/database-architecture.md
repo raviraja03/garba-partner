@@ -1,6 +1,8 @@
 # Database Architecture — Garba Partner
 
 > Related: [Application architecture](application-architecture.md), [Security architecture](security-architecture.md), [User flows](../product/user-flows.md)
+>
+> This is the **target design** for the whole MVP. Tables that are already implemented are documented exactly in [docs/database/schema.md](../database/schema.md), which wins wherever the two differ: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`.
 
 ## 1. Principles
 
@@ -19,9 +21,10 @@
 
 ```mermaid
 erDiagram
-    users ||--o| profiles : has
+    users ||--o| user_profiles : has
+    users ||--o| user_preferences : has
     users ||--o{ profile_photos : uploads
-    users ||--o{ verification_requests : submits
+    users ||--o{ user_verifications : submits
     users ||--o{ user_sessions : has
     users ||--o{ event_attendances : marks
     users ||--o{ interests : "sends / receives"
@@ -32,7 +35,7 @@ erDiagram
     users ||--o{ user_sanctions : receives
     users ||--o{ notifications : receives
     cities ||--o{ areas : contains
-    cities ||--o{ profiles : "home city"
+    cities ||--o{ user_profiles : "home city"
     cities ||--o{ events : hosts
     events ||--o{ event_attendances : has
     events ||--o{ interests : "context of"
@@ -60,7 +63,7 @@ Columns are `NOT NULL` unless marked `null`. Every table has `created_at` and, w
 | `phone_hash` | char(64) null | HMAC-SHA256(`PHONE_HASH_SECRET`, E.164) hex. **Unique where not null.** Null after anonymisation |
 | `phone_encrypted` | text null | AES-256-GCM `base64(iv‖tag‖ciphertext)`. Read only by the audited super-admin reveal |
 | `phone_key_version` | smallint null | Encryption key version, for rotation |
-| `status` | varchar(20) | `active` \| `suspended` \| `banned` \| `pending_deletion` \| `deleted`. Default `active` |
+| `status` | varchar(20) | `active` \| `suspended` \| `banned` \| `pending_deletion`. Default `active`. Erased accounts are soft-deleted via `deleted_at` |
 | `onboarding_completed_at` | timestamptz null | Set when a profile and ≥ 1 photo exist |
 | `underage_rejected_at` | timestamptz null | Locks DOB submission ([user flows §3.2](../product/user-flows.md#32-underage-handling)) |
 | `photo_verified_at` | timestamptz null | Non-null = badge shown |
@@ -70,6 +73,7 @@ Columns are `NOT NULL` unless marked `null`. Every table has `created_at` and, w
 | `terms_accepted_at` | timestamptz null | |
 | `last_active_at` | timestamptz null | Updated at most once per hour per user (cheap write). Only exposed as day-bucketed ordering |
 | `deletion_requested_at` | timestamptz null | Start of the 30-day grace period |
+| `deleted_at` | timestamptz null | Soft delete (Sequelize `paranoid`). The phone columns must be nulled in the same update (CHECK `users_phone_lifecycle_check`) |
 
 Indexes: `UNIQUE (phone_hash) WHERE phone_hash IS NOT NULL`, `(status)`, `(deletion_requested_at) WHERE status = 'pending_deletion'`.
 
@@ -175,26 +179,12 @@ Indexes: `(created_at DESC)`, `(admin_id, created_at DESC)`, `(target_type, targ
 
 `id` uuid PK, `city_id` FK → cities `ON DELETE RESTRICT`, `name` varchar(80), `slug` varchar(100), `is_active` boolean. `UNIQUE (city_id, slug)`. Areas are **neighbourhood-level** only (e.g. "Navrangpura", "Kothrud"). Never street level.
 
-#### `profiles` (1:1 with users)
+#### `user_profiles` and `user_preferences` (1:1 with users) — ✅ implemented
 
-| Column | Type | Notes |
-|---|---|---|
-| `user_id` | uuid PK, FK → users `ON DELETE CASCADE` | |
-| `display_name` | varchar(30) | |
-| `date_of_birth` | date | Immutable through the API. **Never** sent to other users |
-| `gender` | varchar(20) | `woman` \| `man` \| `non_binary` |
-| `city_id` | uuid FK → cities `ON DELETE RESTRICT` | |
-| `area_id` | uuid null FK → areas `ON DELETE SET NULL` | |
-| `show_area` | boolean | Default `false` |
-| `bio` | varchar(300) null | |
-| `experience` | varchar(20) | `beginner` \| `intermediate` \| `advanced` |
-| `styles` | varchar(20)[] | Subset of `garba`, `dandiya_raas`. CHECK `cardinality(styles) >= 1` |
-| `partner_gender_preference` | varchar(20) | `women` \| `men` \| `everyone` |
-| `age_pref_min` | smallint | CHECK `>= 18` |
-| `age_pref_max` | smallint | CHECK `<= 80 AND age_pref_max >= age_pref_min` |
-| `discovery_enabled` | boolean | Explicit choice at onboarding. The "pause profile" switch |
+The profile is split into two tables. See [schema.md §4.2–4.3](../database/schema.md#42-user_profiles) for the exact columns.
 
-Indexes: `(city_id, gender) WHERE discovery_enabled`, `(date_of_birth)`.
+- **`user_profiles`**: `display_name`, `date_of_birth` (immutable through the API, **never** sent to other users), `gender`, `bio`, `experience`, `styles`. The locations migration will add `city_id` (FK → cities `ON DELETE RESTRICT`) and `area_id` (FK → areas `ON DELETE SET NULL`), plus the index `(city_id, gender)`.
+- **`user_preferences`**: `partner_gender_preference`, `age_min`/`age_max` (18–80, ordered), `discovery_enabled` (explicit opt-in, default `false`, the "pause profile" switch), `show_area` (default `false`).
 
 #### `profile_photos`
 
@@ -212,23 +202,13 @@ Indexes: `(city_id, gender) WHERE discovery_enabled`, `(date_of_birth)`.
 
 Indexes: `(user_id, position)`, `(status, created_at) WHERE status = 'pending_review'` (review queue).
 
-#### `verification_requests`
+#### `user_verifications` — ✅ implemented
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `user_id` | uuid FK → users `ON DELETE CASCADE` | |
-| `type` | varchar(20) | `photo` (MVP). `id_document` reserved for the future provider flow |
-| `status` | varchar(20) | `awaiting_selfie` \| `pending` \| `approved` \| `rejected` \| `expired` \| `revoked` |
-| `gesture_code` | varchar(30) | From the fixed gesture set in shared constants |
-| `selfie_public_id` | varchar(255) null | Private (`authenticated`) Cloudinary asset. Nulled on purge |
-| `selfie_deleted_at` | timestamptz null | |
-| `submitted_at` | timestamptz null | |
-| `reviewed_by_admin_id` | uuid null FK → admin_users | |
-| `reviewed_at` | timestamptz null | |
-| `rejection_reason` | varchar(30) null | |
+Provider/reference/status metadata only. See [schema.md §4.5](../database/schema.md#45-user_verifications). Summary:
 
-Indexes: `(status, submitted_at) WHERE status = 'pending'`, `(user_id, created_at DESC)`, `UNIQUE (user_id) WHERE status IN ('awaiting_selfie','pending')` (one open request per user), `(reviewed_at) WHERE selfie_public_id IS NOT NULL` (purge job).
+- `type` (`photo`; `government_id` reserved), `provider` (`internal_review`), `provider_reference`, `status` (`initiated` → `pending` → `approved` / `rejected` / `expired` / `revoked`), `challenge_code` (the gesture code), `evidence_reference` (opaque pointer to the **private** selfie asset, nulled on purge), `evidence_deleted_at`, `failure_reason`, `submitted_at`, `decided_at`, `expires_at`, `reviewed_by_admin_id` (FK → admin_users added in the admin phase).
+- One open request per user and type (partial unique index). Review-queue and purge-job indexes.
+- The database rejects Aadhaar-like numbers in reference columns (`contains_aadhaar_like_number()` CHECK).
 
 ### 3.3 Events
 
@@ -392,23 +372,25 @@ Indexes: `(user_id, created_at DESC)`, `(user_id) WHERE read_at IS NULL`.
 The query lives in `apps/api/src/modules/discovery/discovery.queries.ts` as parameterised SQL (`sequelize.query` with `replacements`). It never uses string interpolation of user input.
 
 ```sql
-SELECT p.user_id, p.display_name, p.gender, p.date_of_birth, p.city_id, p.area_id, p.show_area,
+SELECT p.user_id, p.display_name, p.gender, p.date_of_birth, p.city_id, p.area_id, pref.show_area,
        p.bio, p.experience, p.styles, u.photo_verified_at, u.last_active_at
-FROM profiles p
+FROM user_profiles p
+JOIN user_preferences pref ON pref.user_id = p.user_id
 JOIN users u ON u.id = p.user_id
 WHERE p.city_id = :cityId
   AND p.user_id <> :viewerId
   AND u.status = 'active'
+  AND u.deleted_at IS NULL
   AND u.onboarding_completed_at IS NOT NULL
   AND u.hidden_from_discovery = false
-  AND p.discovery_enabled = true
+  AND pref.discovery_enabled = true
   -- mutual gender preference
   AND p.gender = ANY(:viewerAcceptedGenders)            -- derived from viewer.partner_gender_preference
-  AND (p.partner_gender_preference = 'everyone'
-       OR p.partner_gender_preference = :viewerGenderAsPreference)
+  AND (pref.partner_gender_preference = 'everyone'
+       OR pref.partner_gender_preference = :viewerGenderAsPreference)
   -- mutual age preference (ages computed in Asia/Kolkata)
   AND p.date_of_birth BETWEEN :dobFromViewerMaxAge AND :dobFromViewerMinAge
-  AND :viewerAge BETWEEN p.age_pref_min AND p.age_pref_max
+  AND :viewerAge BETWEEN pref.age_min AND pref.age_max
   -- has a visible photo
   AND EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.user_id = p.user_id AND ph.status <> 'rejected')
   -- blocks in either direction
@@ -442,13 +424,15 @@ The date-of-birth window is computed in the service, which keeps the predicate i
 
 ## 5. Migrations
 
-- Location: `apps/api/src/db/migrations/`. File name `YYYYMMDDHHmm-<kebab-description>.ts`. Each exports `up` and `down` (Umzug `MigrationFn<QueryInterface>`).
-- Runner: `apps/api/src/db/migrate.ts` (Umzug + `SequelizeStorage`, table `schema_migrations`). Scripts: `db:migrate`, `db:migrate:down`, `db:migrate:status`.
-- Use `queryInterface` helpers for tables and columns. Use **raw SQL for partial indexes, CHECK constraints, deferrable constraints and grants** (Sequelize helpers don't cover them all).
+The full, current procedure is in the [migration guide](../database/migration-guide.md). In short:
+
+- Location: `apps/api/src/migrations/` (seeders in `apps/api/src/seeders/`). File name `YYYYMMDDHHmmss-<kebab-description>.ts`. Each exports `up` and `down` (Umzug `MigrationFn<MigrationContext>`).
+- Runner: `apps/api/src/config/umzug.ts` + CLI `apps/api/src/scripts/db.ts` (tables `schema_migrations`, `schema_seeders`). Scripts: `db:migrate`, `db:migrate:undo`, `db:migrate:status`, `db:seed`, `db:seed:undo`, `db:reset`.
+- Migrations are written as **raw SQL executed in one transaction** (`runInTransaction`). That covers partial indexes, CHECK constraints, deferrable constraints, functions and grants uniformly. Values are hard-coded (no imports from shared constants).
 - **Never edit a migration that has run in any shared environment.** Add a new one.
 - **Expand → migrate → contract** for breaking changes. The previous release must keep working against the new schema for one deploy (rollback safety).
 - Large-table index creation in production uses `CREATE INDEX CONCURRENTLY` in its own migration, with the transaction disabled.
-- The first migration enables `pgcrypto` (only if the PG version needs it for `gen_random_uuid()`) and `citext` is **not** used (we index `lower(email)` instead).
+- `gen_random_uuid()` is built into PostgreSQL 13+, so no extension is needed. `citext` is **not** used (we index `lower(email)` instead).
 - A migration PR must include: the migration, the model change, a `down` that works, and an update to this document.
 
 ## 6. Seeding
@@ -457,7 +441,8 @@ The date-of-birth window is computed in the service, which keeps the predicate i
 |---|---|---|
 | `reference` | all (idempotent upsert by slug) | Launch cities and areas, gesture set if stored in the DB (MVP: gestures are shared constants, not DB rows) |
 | `bootstrap-admin` | all, one-time | Creates the first `super_admin` from CLI prompts/env (`must_change_password = true`). Refuses to run if a super admin exists |
-| `dev-fixtures` | development only (**throws if `APP_ENV=production`**) | Fake members with generated names and placeholder images, events, interests and matches for local work |
+| `dev-users` ✅ (`20260925110000-dev-users`) | development only (**throws if `APP_ENV=production`**) | 8 fictional members covering the main account states ([database setup §2](../database/database-setup.md#2-development-seed-data)) |
+| `dev-fixtures` | development only | Placeholder images, events, interests and matches, added with their phases |
 
 **Production data is never copied into development or staging.**
 
@@ -481,7 +466,7 @@ Rules: amounts are integers in paise. An order is marked paid **only** after ser
 
 ### 7.2 ID/age verification (licensed provider)
 
-`verification_requests.type = 'id_document'` plus a new `id_verification_results` table: `verification_request_id`, `provider`, `provider_reference_id`, `result`, `is_over_18` boolean, `name_matches_profile` boolean, `verified_at`. **No Aadhaar number (full or masked), no document images, no XML/QR payloads.**
+`user_verifications.type = 'government_id'` with a newly approved `provider` (added to the CHECK constraint by migration after legal review). Outcome booleans go in a new `id_verification_results` table: `user_verification_id`, `is_over_18` boolean, `name_matches_profile` boolean. **No Aadhaar number (full or masked), no document images, no XML/QR payloads.**
 
 ### 7.3 Web push
 

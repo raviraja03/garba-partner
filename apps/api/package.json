@@ -10,6 +10,14 @@
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "db:migrate": "tsx src/scripts/db.ts migrate",
+    "db:migrate:undo": "tsx src/scripts/db.ts migrate:undo",
+    "db:migrate:undo:all": "tsx src/scripts/db.ts migrate:undo:all",
+    "db:migrate:status": "tsx src/scripts/db.ts migrate:status",
+    "db:seed": "tsx src/scripts/db.ts seed",
+    "db:seed:undo": "tsx src/scripts/db.ts seed:undo",
+    "db:reset": "tsx src/scripts/db.ts reset",
+    "db:migrate:prod": "node dist/scripts/db.js migrate",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
@@ -20,8 +28,13 @@
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "helmet": "^8.3.0",
+    "pg": "^8.23.0",
     "pino": "^10.3.1",
-    "pino-http": "^11.0.0"
+    "pino-http": "^11.0.0",
+    "reflect-metadata": "^0.2.2",
+    "sequelize": "^6.37.8",
+    "sequelize-typescript": "^2.1.6",
+    "umzug": "^3.8.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

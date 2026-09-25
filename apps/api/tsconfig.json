@@ -1,7 +1,12 @@
 {
   "extends": "@garba-partner/config/tsconfig/node.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    // sequelize-typescript uses legacy decorators. Class fields must not be emitted as own
+    // properties, otherwise they would shadow Sequelize's attribute getters/setters.
+    // Column types are always declared explicitly, so emitDecoratorMetadata is not needed.
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false
   },
   "include": ["src", "vitest.config.ts"]
 }

@@ -179,7 +179,7 @@ stateDiagram-v2
 **Steps**
 
 1. Member taps **Get photo verified** (Profile → Verification).
-2. `POST /api/v1/me/verification` creates a `verification_requests` row with `status = awaiting_selfie` and a random **gesture code** from a fixed set (e.g. "thumbs up with left hand", "touch your right ear", "three fingers up"). The response includes the gesture instruction and an example illustration.
+2. `POST /api/v1/me/verification` creates a `user_verifications` row (`type = photo`, `provider = internal_review`) with `status = initiated` and a random **gesture code** from a fixed set (e.g. "thumbs up with left hand", "touch your right ear", "three fingers up"). The response includes the gesture instruction and an example illustration.
 3. The member takes a live selfie with the camera (`<input capture="user">`) and uploads it: `POST /api/v1/me/verification/:requestId/selfie`. The request moves to `pending`.
 4. The selfie is stored as a **private (authenticated) Cloudinary asset**. Only admins can view it, through a short-lived signed URL.
 5. A moderator compares the selfie with the gesture and the profile photos, then approves or rejects with a reason (`gesture_mismatch`, `face_not_visible`, `does_not_match_photos`, `inappropriate`, `other`).
@@ -242,7 +242,7 @@ Discovery shows a paginated list of profile cards. There are two modes.
 A candidate appears only if **all** of the following hold:
 
 1. `users.status = 'active'`, onboarding complete, not `hidden_from_discovery` (auto-hide after reports, §10.3).
-2. `profiles.discovery_enabled = true`.
+2. `user_preferences.discovery_enabled = true`.
 3. Has at least one photo not in `rejected` status.
 4. Not the viewer.
 5. **No block in either direction** between viewer and candidate.

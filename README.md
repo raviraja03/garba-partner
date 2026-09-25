@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation complete. The monorepo, tooling, shared packages, API skeleton with `GET /api/v1/health`, and web/admin shells run. No product features yet (auth, profiles, events, matching, chat and payments come in later phases). See the [roadmap](#development-roadmap).
+> **Status:** Foundation and database layer complete. The monorepo, tooling, shared packages, API with `GET /api/v1/health` (API + database), PostgreSQL schema for users/profiles/preferences/sessions/verifications with migrations and seeders, and the web/admin shells are in place. No product features yet (OTP login, profiles UI, events, matching, chat and payments come in later phases). See the [roadmap](#development-roadmap).
 
 ---
 
@@ -38,8 +38,8 @@ See [Product overview](docs/product/product-overview.md) for the full vision, ro
 | Web app | React 19 + Vite 8 + TypeScript + Tailwind CSS 4 |
 | Admin panel | React 19 + Vite 8 + TypeScript + Tailwind CSS 4 |
 | API | Node.js + Express 5 + TypeScript, pino logging, helmet, Vitest + Supertest |
-| Database | PostgreSQL *(from the database phase)* |
-| ORM | Sequelize / sequelize-typescript with Umzug migrations *(from the database phase)* |
+| Database | PostgreSQL 16+ |
+| ORM | Sequelize 6 / sequelize-typescript, Umzug TypeScript migrations and seeders |
 | Realtime | Socket.IO *(chat phase)* |
 | Image storage | Cloudinary *(profile phase)* |
 | Authentication | Mobile OTP + JWT access token + rotating refresh-token sessions *(auth phase)* |
@@ -55,8 +55,9 @@ See [Product overview](docs/product/product-overview.md) for the full vision, ro
 | Node.js | **22.12+** (22 or 24 LTS; `.nvmrc` pins 22) |
 | npm | 10+ |
 | Git | any recent version |
+| PostgreSQL | **16+** (local server on `127.0.0.1:5432`) |
 
-PostgreSQL, Cloudinary and an SMS provider are **not** needed yet.
+Cloudinary and an SMS provider are **not** needed yet.
 
 ## Installation
 
@@ -73,11 +74,21 @@ cp .env.example .env          # PowerShell: Copy-Item .env.example .env
 ```
 
 - `.env` lives at the repo root and is **git-ignored. Never commit it.** `.env.example` documents every variable.
-- The defaults work for local development. The API validates its environment at startup and refuses to start if anything is invalid.
+- Fill in the database and phone-protection values: create the role and databases, then set `DATABASE_URL`, `TEST_DATABASE_URL`, `PHONE_HASH_SECRET` and `PHONE_ENCRYPTION_KEY` as described in [docs/database/database-setup.md](docs/database/database-setup.md). Everything else works as-is locally.
+- The API validates its environment at startup and refuses to start if anything is invalid.
 - Only `VITE_*` variables reach the browser. Never put secrets in them.
 - Don't set `NODE_ENV` in `.env` (it would make Vite build development React bundles).
 
 Full reference: [docs/setup/environment-variables.md](docs/setup/environment-variables.md).
+
+## Database setup
+
+```bash
+npm run db:migrate    # create the schema
+npm run db:seed       # fictional development users (never runs in production)
+```
+
+Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-setup.md](docs/database/database-setup.md).
 
 ## Development commands
 
@@ -94,6 +105,9 @@ Run from the repository root:
 | `npm run test` | Run tests (Vitest) |
 | `npm run build` | Production build of all workspaces |
 | `npm run check` | format:check → lint → typecheck → test → build |
+| `npm run db:migrate` / `db:migrate:undo` / `db:migrate:status` | Apply / revert last / list migrations |
+| `npm run db:seed` / `db:seed:undo` | Load / remove fictional development data |
+| `npm run db:reset` | Rebuild the development database (undo all → migrate → seed) |
 | `npm run start:api` | Run the built API (`apps/api/dist`) |
 | `npm run preview:web` / `preview:admin` | Serve the built web/admin apps |
 
@@ -103,7 +117,7 @@ Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/s
 
 | App | Workspace | Dev URL | Description |
 |---|---|---|---|
-| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API. Currently: `GET /api/v1/health` |
+| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: `GET /api/v1/health` (reports API and database status) |
 | **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: landing shell with an API status indicator |
 | **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: console shell with an API status indicator |
 
@@ -111,7 +125,7 @@ Both Vite dev servers proxy `/api` to the API, so the apps use same-origin reque
 
 ```bash
 curl http://127.0.0.1:4000/api/v1/health
-# {"success":true,"message":"OK","data":{"status":"ok","timestamp":"..."}}
+# {"success":true,"message":"OK","data":{"status":"ok","database":"ok","timestamp":"..."}}
 ```
 
 ## Project structure
@@ -119,7 +133,7 @@ curl http://127.0.0.1:4000/api/v1/health
 ```text
 garba-partner/
 ├── apps/
-│   ├── api/          # @garba-partner/api   — Express REST API (/api/v1)
+│   ├── api/          # @garba-partner/api   — Express REST API (/api/v1), models, migrations, seeders
 │   ├── web/          # @garba-partner/web   — member web app (React + Vite + Tailwind)
 │   └── admin/        # @garba-partner/admin — admin panel (React + Vite + Tailwind)
 ├── packages/
@@ -147,6 +161,15 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Local development](docs/setup/local-development.md) | Prerequisites, install, running apps, quality checks, troubleshooting |
 | [Environment variables](docs/setup/environment-variables.md) | Every variable, validation, planned variables, rules for adding new ones |
 | [Project structure](docs/setup/project-structure.md) | Workspaces, dependency rules, TypeScript/ESLint configuration |
+
+### Database
+
+| Document | Contents |
+|---|---|
+| [Database setup](docs/database/database-setup.md) | Local PostgreSQL setup, seed data, health check, production roles, troubleshooting |
+| [Schema](docs/database/schema.md) | Mermaid ERD, every table/column/constraint/index, soft-delete strategy, privacy summary |
+| [Relationships](docs/database/relationships.md) | Associations, FK actions, deletion behaviour, transactions |
+| [Migration guide](docs/database/migration-guide.md) | Commands, writing migrations and seeders, testing, production procedure |
 
 ### Product
 
@@ -185,8 +208,8 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | Phase | Name | Scope | Status |
 |---|---|---|---|
 | — | Architecture & docs | Product, architecture and development documentation | ✅ Done |
-| **0** | Foundation | Monorepo, `packages/config` & `packages/shared`, TypeScript/ESLint/Prettier, API skeleton (health, envelope, error handling, redacted logging, tests), web/admin shells, setup docs | ✅ Done. Still open from the planned scope: CI workflow, PR template, DB connection + migration runner (moved to Phase 1) |
-| **1** | Member auth & profile | PostgreSQL + migrations, OTP login, sessions, onboarding with 18+ gate, profile, photo upload with EXIF stripping, cities/areas, settings, account deletion | ⏳ Next |
+| **0** | Foundation | Monorepo, `packages/config` & `packages/shared`, TypeScript/ESLint/Prettier, API skeleton (health, envelope, error handling, redacted logging, tests), web/admin shells, setup docs | ✅ Done. Still open from the planned scope: CI workflow, PR template |
+| **1** | Member auth & profile | ✅ **Database layer:** PostgreSQL connection, Umzug migrations/seeders, `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, DB health check. ⏳ **Remaining:** OTP login, sessions/JWT, onboarding with 18+ gate, profile API, photo upload with EXIF stripping, cities/areas, settings, account deletion | 🟡 In progress |
 | **2** | Admin foundation & events | Admin auth + TOTP, roles, audit log, admin management, cities/areas CRUD, events CRUD/publish/cancel, member events & attendance, in-app notifications | Planned |
 | **3** | Discovery, interests, matches & safety core | Event & city discovery, interests, matches, unmatch, block, report user, auto-hide, report queue, sanctions, user management | Planned |
 | **4** | Chat | Socket.IO chat, history, read receipts, message reports, contact-sharing nudge, realtime enforcement of blocks/sanctions | Planned |

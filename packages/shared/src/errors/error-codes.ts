@@ -12,6 +12,7 @@ export const ERROR_CODES = {
   PAYLOAD_TOO_LARGE: { httpStatus: 413, message: 'The request is too large.' },
   RATE_LIMITED: { httpStatus: 429, message: 'Too many requests. Please try again later.' },
   INTERNAL_ERROR: { httpStatus: 500, message: 'Something went wrong. Please try again.' },
+  SERVICE_UNAVAILABLE: { httpStatus: 503, message: 'The service is temporarily unavailable.' },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;
