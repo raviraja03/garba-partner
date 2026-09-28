@@ -110,6 +110,10 @@ export class UserVerification extends Model<
   @Column({ type: DataType.DATE, allowNull: true })
   decidedAt!: CreationOptional<Date | null>;
 
+  /** When approved. Kept after revocation for audit. */
+  @Column({ type: DataType.DATE, allowNull: true })
+  verifiedAt!: CreationOptional<Date | null>;
+
   @Column({ type: DataType.DATE, allowNull: true })
   expiresAt!: CreationOptional<Date | null>;
 

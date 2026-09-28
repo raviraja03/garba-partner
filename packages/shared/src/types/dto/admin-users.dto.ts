@@ -27,6 +27,9 @@ export interface AdminUserDetailDto {
   profileStatus: ProfileStatus;
   completion: ProfileCompletionDto;
   photoVerified: boolean;
+  identityVerified: boolean;
+  /** Open or in-review reports against this member. */
+  openReportCount: number;
   hiddenFromDiscovery: boolean;
   termsVersion: string | null;
   createdAt: string;

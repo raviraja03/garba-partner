@@ -39,6 +39,10 @@ export const ERROR_CODES = {
   UNDERAGE: { httpStatus: 403, message: 'Garba Partner is only for adults (18+).' },
   ONBOARDING_REQUIRED: { httpStatus: 403, message: 'Please complete your profile first.' },
   PROFILE_NOT_STARTED: { httpStatus: 409, message: 'Please create your profile first.' },
+  VERIFICATION_UNAVAILABLE: {
+    httpStatus: 503,
+    message: 'Identity verification is not available right now.',
+  },
   INVALID_IMAGE: {
     httpStatus: 400,
     message: 'Please upload a JPEG, PNG or WebP photo of at least 400×400 pixels.',

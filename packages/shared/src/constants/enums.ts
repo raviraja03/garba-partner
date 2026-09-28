@@ -51,10 +51,11 @@ export const VERIFICATION_TYPES = ['photo', 'government_id'] as const;
 export type VerificationType = (typeof VERIFICATION_TYPES)[number];
 
 /**
- * Who performed a verification. New external providers require legal review and a migration
- * that extends the database CHECK constraint.
+ * Who performed a verification. `internal_review` = moderator photo check; `mock_kyc` =
+ * development-only simulated identity provider. Real identity providers require legal review and
+ * a migration that extends the database CHECK constraint (docs/safety/identity-verification.md).
  */
-export const VERIFICATION_PROVIDERS = ['internal_review'] as const;
+export const VERIFICATION_PROVIDERS = ['internal_review', 'mock_kyc'] as const;
 export type VerificationProvider = (typeof VERIFICATION_PROVIDERS)[number];
 
 export const VERIFICATION_STATUSES = [
@@ -74,11 +75,73 @@ export const OPEN_VERIFICATION_STATUSES = [
 ] as const satisfies readonly VerificationStatus[];
 
 export const VERIFICATION_FAILURE_REASONS = [
+  // Photo verification (moderator review)
   'gesture_mismatch',
   'face_not_visible',
   'does_not_match_photos',
   'inappropriate',
+  // Identity verification (provider result)
+  'age_below_18',
+  'document_invalid',
+  'name_mismatch',
+  'user_cancelled',
   'provider_failed',
   'other',
 ] as const;
 export type VerificationFailureReason = (typeof VERIFICATION_FAILURE_REASONS)[number];
+
+// --- Safety ---------------------------------------------------------------------------------
+
+/** Report reasons, in the order shown to members. */
+export const REPORT_REASONS = [
+  'underage',
+  'safety_threat',
+  'harassment',
+  'sexual_content',
+  'hate_speech',
+  'scam_spam',
+  'fake_profile',
+  'other',
+] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+/** 0 = P0 (most urgent). See docs/safety/reporting.md. */
+export const REPORT_PRIORITY_BY_REASON: Readonly<Record<ReportReason, 0 | 1 | 2>> = {
+  underage: 0,
+  safety_threat: 0,
+  harassment: 1,
+  sexual_content: 1,
+  hate_speech: 1,
+  scam_spam: 1,
+  fake_profile: 2,
+  other: 2,
+};
+
+export const REPORT_STATUSES = ['open', 'in_review', 'resolved', 'dismissed'] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+export const REPORT_SOURCES = ['member', 'system'] as const;
+export type ReportSource = (typeof REPORT_SOURCES)[number];
+
+export const REPORT_RESOLUTION_ACTIONS = ['dismiss', 'warn', 'suspend', 'ban'] as const;
+export type ReportResolutionAction = (typeof REPORT_RESOLUTION_ACTIONS)[number];
+
+export const SAFETY_SEVERITIES = ['info', 'warning', 'critical'] as const;
+export type SafetySeverity = (typeof SAFETY_SEVERITIES)[number];
+
+/** Suspicious-activity and safety events recorded in `safety_logs`. */
+export const SAFETY_EVENT_TYPES = [
+  'auth.otp_rate_limited',
+  'auth.otp_attempts_exceeded',
+  'auth.refresh_token_reuse',
+  'admin.account_locked',
+  'rate_limit.exceeded',
+  'safety.block_created',
+  'safety.report_created',
+  'safety.report_limit_reached',
+  'safety.auto_hidden',
+  'verification.start_limit_reached',
+  'verification.webhook_rejected',
+  'verification.underage_detected',
+] as const;
+export type SafetyEventType = (typeof SAFETY_EVENT_TYPES)[number];

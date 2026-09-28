@@ -15,12 +15,19 @@ export const SMS_PROVIDERS = ['dev'] as const;
  * it is only accepted when APP_ENV=development (docs/users/cloudinary.md).
  */
 export const MEDIA_STORAGES = ['cloudinary', 'local'] as const;
+/**
+ * Identity verification provider (docs/safety/identity-verification.md). `disabled` turns the
+ * feature off (the status endpoint reports it unavailable). `mock` simulates a licensed KYC
+ * provider and is only accepted when APP_ENV=development. Real providers are added by adapter.
+ */
+export const IDENTITY_PROVIDERS = ['disabled', 'mock'] as const;
 
 export type NodeEnv = (typeof NODE_ENVS)[number];
 export type AppEnv = (typeof APP_ENVS)[number];
 export type LogLevel = (typeof LOG_LEVELS)[number];
 export type SmsProvider = (typeof SMS_PROVIDERS)[number];
 export type MediaStorageKind = (typeof MEDIA_STORAGES)[number];
+export type IdentityProviderKind = (typeof IDENTITY_PROVIDERS)[number];
 
 /** Normalises an origin such as `https://example.com/` to `https://example.com`. */
 const originSchema = z.url({ protocol: /^https?$/ }).transform((value) => new URL(value).origin);
@@ -89,8 +96,28 @@ export const serverEnvSchema = z
       .string()
       .regex(/^[a-z0-9-]+$/, 'lowercase letters, digits and hyphens only')
       .default('garba-partner'),
+
+    IDENTITY_PROVIDER: z.enum(IDENTITY_PROVIDERS).default('disabled'),
+    /** HMAC key the provider uses to sign webhooks. Required unless IDENTITY_PROVIDER=disabled. */
+    IDENTITY_WEBHOOK_SECRET: secretSchema.optional(),
   })
   .superRefine((env, ctx) => {
+    if (env.IDENTITY_PROVIDER !== 'disabled' && env.IDENTITY_WEBHOOK_SECRET === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['IDENTITY_WEBHOOK_SECRET'],
+        message: 'is required when IDENTITY_PROVIDER is enabled',
+      });
+    }
+    // The mock provider lets anyone mark themselves verified: never outside local development.
+    if (env.IDENTITY_PROVIDER === 'mock' && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['IDENTITY_PROVIDER'],
+        message: '"mock" is only allowed when APP_ENV=development; configure a licensed provider',
+      });
+    }
+
     if (env.TEST_DATABASE_URL !== undefined && env.TEST_DATABASE_URL === env.DATABASE_URL) {
       ctx.addIssue({
         code: 'custom',

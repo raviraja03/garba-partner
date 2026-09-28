@@ -6,6 +6,7 @@ export {
   LOG_LEVELS,
   SMS_PROVIDERS,
   MEDIA_STORAGES,
+  IDENTITY_PROVIDERS,
 } from './env.js';
 export type {
   ServerEnv,
@@ -15,4 +16,5 @@ export type {
   LogLevel,
   SmsProvider,
   MediaStorageKind,
+  IdentityProviderKind,
 } from './env.js';

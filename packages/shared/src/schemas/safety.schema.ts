@@ -1,0 +1,107 @@
+import * as z from 'zod/mini';
+import {
+  REPORT_REASONS,
+  REPORT_RESOLUTION_ACTIONS,
+  REPORT_STATUSES,
+  SAFETY_EVENT_TYPES,
+  SAFETY_SEVERITIES,
+  VERIFICATION_STATUSES,
+  VERIFICATION_TYPES,
+} from '../constants/enums.js';
+import { LIMITS } from '../constants/limits.js';
+import { stripInvisible } from '../utils/text.js';
+
+// --- Member ---------------------------------------------------------------------------------
+
+/** `POST /api/v1/blocks` */
+export const createBlockSchema = z.strictObject({
+  userId: z.uuid('Invalid member.'),
+});
+export type CreateBlockInput = z.input<typeof createBlockSchema>;
+
+/** `POST /api/v1/reports` */
+export const createReportSchema = z.strictObject({
+  reportedUserId: z.uuid('Invalid member.'),
+  reason: z.enum(REPORT_REASONS, 'Choose a reason.'),
+  details: z.optional(
+    z.nullable(
+      z.pipe(
+        z
+          .string()
+          .check(
+            z.maxLength(
+              LIMITS.REPORT_DETAILS_MAX_LENGTH,
+              `Please keep details under ${String(LIMITS.REPORT_DETAILS_MAX_LENGTH)} characters.`,
+            ),
+          ),
+        z.transform((value) => {
+          const details = stripInvisible(value).trim();
+          return details === '' ? null : details;
+        }),
+      ),
+    ),
+  ),
+  /** Also block the member (default true in the app). */
+  alsoBlock: z.optional(z.boolean()),
+});
+export type CreateReportInput = z.input<typeof createReportSchema>;
+
+/** Development-only simulated provider completion (IDENTITY_PROVIDER=mock). */
+export const simulateVerificationSchema = z.strictObject({
+  reference: z.string().check(z.minLength(1), z.maxLength(100)),
+  outcome: z.enum(['approved', 'pending', 'rejected', 'underage', 'cancelled']),
+});
+export type SimulateVerificationInput = z.input<typeof simulateVerificationSchema>;
+
+// --- Admin ----------------------------------------------------------------------------------
+
+const cursor = z.optional(z.string().check(z.maxLength(300)));
+const limit = z.optional(
+  z.pipe(z.string().check(z.regex(/^\d{1,3}$/, 'limit must be a number')), z.transform(Number)),
+);
+
+/** `GET /api/v1/admin/reports` */
+export const adminReportListQuerySchema = z.strictObject({
+  status: z.optional(z.enum(REPORT_STATUSES)),
+  priority: z.optional(z.enum(['0', '1', '2'])),
+  cursor,
+  limit,
+});
+export type AdminReportListQueryData = z.output<typeof adminReportListQuerySchema>;
+
+/** `POST /api/v1/admin/reports/:id/resolve` */
+export const adminResolveReportSchema = z.strictObject({
+  action: z.enum(REPORT_RESOLUTION_ACTIONS),
+  note: z
+    .string()
+    .check(
+      z.trim(),
+      z.minLength(
+        LIMITS.ADMIN_RESOLUTION_NOTE_MIN,
+        `Note must be at least ${String(LIMITS.ADMIN_RESOLUTION_NOTE_MIN)} characters.`,
+      ),
+      z.maxLength(LIMITS.ADMIN_RESOLUTION_NOTE_MAX),
+    ),
+  /** Remove the automatic "hidden from discovery" flag set by reports. */
+  clearAutoHide: z.optional(z.boolean()),
+});
+export type AdminResolveReportInput = z.input<typeof adminResolveReportSchema>;
+
+/** `GET /api/v1/admin/verifications` */
+export const adminVerificationListQuerySchema = z.strictObject({
+  status: z.optional(z.enum(VERIFICATION_STATUSES)),
+  type: z.optional(z.enum(VERIFICATION_TYPES)),
+  cursor,
+  limit,
+});
+export type AdminVerificationListQueryData = z.output<typeof adminVerificationListQuerySchema>;
+
+/** `GET /api/v1/admin/safety-logs` */
+export const adminSafetyLogQuerySchema = z.strictObject({
+  eventType: z.optional(z.enum(SAFETY_EVENT_TYPES)),
+  severity: z.optional(z.enum(SAFETY_SEVERITIES)),
+  userId: z.optional(z.uuid()),
+  cursor,
+  limit,
+});
+export type AdminSafetyLogQueryData = z.output<typeof adminSafetyLogQuerySchema>;

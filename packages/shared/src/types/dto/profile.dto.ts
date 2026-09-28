@@ -66,6 +66,7 @@ export interface MyProfileDto {
   completion: ProfileCompletionDto;
   accountStatus: UserStatus;
   photoVerified: boolean;
+  identityVerified: boolean;
   profile: OwnProfileDto | null;
   preferences: PreferencesDto | null;
 }
@@ -86,5 +87,11 @@ export interface PublicProfileDto {
   garbaLevel: GarbaLevel;
   availableDates: string[];
   image: ProfileImageDto | null;
+  /**
+   * Verification badges. They describe what was checked (mobile number via OTP; identity via a
+   * licensed provider; selfie matches photo) — never that a person is safe.
+   */
+  phoneVerified: true;
+  identityVerified: boolean;
   photoVerified: boolean;
 }

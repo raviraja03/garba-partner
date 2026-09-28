@@ -73,6 +73,10 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   @Column({ type: DataType.DATE, allowNull: true })
   photoVerifiedAt!: CreationOptional<Date | null>;
 
+  /** Cached projection of an approved identity verification (badge). */
+  @Column({ type: DataType.DATE, allowNull: true })
+  identityVerifiedAt!: CreationOptional<Date | null>;
+
   @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
   hiddenFromDiscovery!: CreationOptional<boolean>;
 
