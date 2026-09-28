@@ -11,7 +11,7 @@ const SECTIONS: readonly { label: string; permission: AdminPermission; path?: st
   { label: 'Reports', permission: 'reports:manage' },
   { label: 'Verifications', permission: 'verifications:review' },
   { label: 'Photo review', permission: 'photos:review' },
-  { label: 'Users', permission: 'users:view' },
+  { label: 'Users', permission: 'users:view', path: '/users' },
   { label: 'Events', permission: 'events:view' },
   { label: 'Cities', permission: 'locations:manage' },
   { label: 'Audit log', permission: 'audit:view' },
@@ -47,7 +47,7 @@ export function AdminLayout() {
                 {section.path ? (
                   <NavLink
                     to={section.path}
-                    end
+                    end={section.path === '/'}
                     className={({ isActive }) =>
                       `block rounded-md px-3 py-2 ${isActive ? 'bg-white/10 text-white' : 'text-white/80 hover:bg-white/5'}`
                     }

@@ -31,3 +31,6 @@ Thumbs.db
 
 # Local tooling
 .kilo/
+
+# Local development image storage (MEDIA_STORAGE=local)
+.local-media/

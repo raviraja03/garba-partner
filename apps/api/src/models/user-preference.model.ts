@@ -69,6 +69,10 @@ export class UserPreference extends Model<
   })
   ageMax!: CreationOptional<number>;
 
+  /** Only show photo-verified members (applied by matching in a later phase). */
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  verifiedOnly!: CreationOptional<boolean>;
+
   /** Whether the member can be found in partner discovery ("pause profile" when false). */
   @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
   discoveryEnabled!: CreationOptional<boolean>;

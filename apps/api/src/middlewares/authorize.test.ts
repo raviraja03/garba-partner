@@ -62,7 +62,7 @@ describe('requirePermission', () => {
 describe('requireActiveMember', () => {
   it.each([
     ['active', true, 200, undefined],
-    ['active', false, 403, 'FORBIDDEN'],
+    ['active', false, 403, 'ONBOARDING_REQUIRED'],
     ['suspended', true, 403, 'ACCOUNT_SUSPENDED'],
     ['pending_deletion', true, 403, 'ACCOUNT_PENDING_DELETION'],
     ['banned', true, 403, 'ACCOUNT_BANNED'],

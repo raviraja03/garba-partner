@@ -183,8 +183,8 @@ Indexes: `(created_at DESC)`, `(admin_id, created_at DESC)`, `(target_type, targ
 
 The profile is split into two tables. See [schema.md §4.2–4.3](../database/schema.md#42-user_profiles) for the exact columns.
 
-- **`user_profiles`**: `display_name`, `date_of_birth` (immutable through the API, **never** sent to other users), `gender`, `bio`, `experience`, `styles`. The locations migration will add `city_id` (FK → cities `ON DELETE RESTRICT`) and `area_id` (FK → areas `ON DELETE SET NULL`), plus the index `(city_id, gender)`.
-- **`user_preferences`**: `partner_gender_preference`, `age_min`/`age_max` (18–80, ordered), `discovery_enabled` (explicit opt-in, default `false`, the "pause profile" switch), `show_area` (default `false`).
+- **`user_profiles`**: `display_name`, `date_of_birth` (immutable through the API, **never** sent to other users), `gender`, `bio`, `garba_level`, `city_id` (FK → cities), `area_id` (composite FK: must belong to the city), `instagram_handle` (private), `available_dates` (`date[]`), `image_*` (Cloudinary). See [docs/users/user-profile.md](../users/user-profile.md).
+- **`user_preferences`**: `partner_gender_preference`, `age_min`/`age_max` (18–80, ordered), `verified_only`, `discovery_enabled` (explicit opt-in, default `false`, the "pause profile" switch), `show_area` (default `false`).
 
 #### `profile_photos`
 
@@ -373,7 +373,7 @@ The query lives in `apps/api/src/modules/discovery/discovery.queries.ts` as para
 
 ```sql
 SELECT p.user_id, p.display_name, p.gender, p.date_of_birth, p.city_id, p.area_id, pref.show_area,
-       p.bio, p.experience, p.styles, u.photo_verified_at, u.last_active_at
+       p.bio, p.garba_level, p.available_dates, p.image_public_id, u.photo_verified_at, u.last_active_at
 FROM user_profiles p
 JOIN user_preferences pref ON pref.user_id = p.user_id
 JOIN users u ON u.id = p.user_id
@@ -391,8 +391,6 @@ WHERE p.city_id = :cityId
   -- mutual age preference (ages computed in Asia/Kolkata)
   AND p.date_of_birth BETWEEN :dobFromViewerMaxAge AND :dobFromViewerMinAge
   AND :viewerAge BETWEEN pref.age_min AND pref.age_max
-  -- has a visible photo
-  AND EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.user_id = p.user_id AND ph.status <> 'rejected')
   -- blocks in either direction
   AND NOT EXISTS (SELECT 1 FROM blocks b
                   WHERE (b.blocker_id = :viewerId AND b.blocked_id = p.user_id)
@@ -405,7 +403,8 @@ WHERE p.city_id = :cityId
   AND NOT EXISTS (SELECT 1 FROM interests i WHERE i.sender_id = :viewerId AND i.receiver_id = p.user_id
                   AND (i.status = 'pending'
                        OR (i.status = 'declined' AND i.responded_at > now() - interval '30 days')))
-  -- optional filters (:experience, :styles via &&, :verifiedOnly) appended as parameterised clauses
+  -- optional filters (:garbaLevels, :verifiedOnly / viewer pref.verified_only) appended as parameterised clauses
+  -- profile must be complete: p.image_public_id IS NOT NULL
   -- cursor
   AND (/* keyset condition on (verified_rank, active_day, user_id) */ true)
 ORDER BY (u.photo_verified_at IS NOT NULL) DESC,

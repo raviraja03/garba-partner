@@ -3,6 +3,7 @@ import {
   CSRF_HEADER_VALUE,
   type ApiResponse,
   type ErrorCode,
+  type ValidationIssue,
   type AdminSessionDto,
 } from '@garba-partner/shared';
 import { env } from './env';
@@ -14,6 +15,8 @@ export class ApiClientError extends Error {
     message: string,
     readonly code: ApiClientErrorCode,
     readonly status: number,
+    /** Field-level validation issues (VALIDATION_ERROR only). */
+    readonly details: ValidationIssue[] = [],
   ) {
     super(message);
     this.name = 'ApiClientError';
@@ -37,12 +40,16 @@ export function setSessionExpiredHandler(handler: (() => void) | null): void {
 // --- Low-level request ------------------------------------------------------------------------
 
 interface RequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
+  /** Multipart body (file uploads). The browser sets the Content-Type boundary itself. */
+  formData?: FormData;
   signal?: AbortSignal;
   headers?: Record<string, string>;
   /** Attach the access token and retry once after a silent refresh on 401. */
   authenticated?: boolean;
+  /** Return the whole success envelope (e.g. to read pagination `meta`) instead of `data`. */
+  envelope?: boolean;
 }
 
 async function send<TData>(path: string, options: RequestOptions): Promise<TData> {
@@ -57,6 +64,7 @@ async function send<TData>(path: string, options: RequestOptions): Promise<TData
       headers,
       credentials: 'same-origin',
       ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
+      ...(options.formData ? { body: options.formData } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
     });
   } catch (error) {
@@ -72,8 +80,15 @@ async function send<TData>(path: string, options: RequestOptions): Promise<TData
       response.status,
     );
   }
-  if (!body.success) throw new ApiClientError(body.message, body.error.code, response.status);
-  return body.data;
+  if (!body.success) {
+    throw new ApiClientError(
+      body.message,
+      body.error.code,
+      response.status,
+      body.error.details ?? [],
+    );
+  }
+  return options.envelope ? (body as unknown as TData) : body.data;
 }
 
 // --- Session refresh (single flight, serialised across tabs) --------------------------------

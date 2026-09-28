@@ -13,6 +13,11 @@ import { User, UserPreference, UserProfile, UserSession, UserVerification } from
 const HASH_SECRET = 'integration-test-secret-at-least-32-characters';
 const ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const CHECK_VIOLATION = '23514';
+const FOREIGN_KEY_VIOLATION = '23503';
+/** Reference data from 20260928100000-create-cities-and-areas. */
+const AHMEDABAD = 'c1000000-0000-4000-8000-000000000001';
+const VADODARA = 'c1000000-0000-4000-8000-000000000002';
+const NAVRANGPURA_AHMEDABAD = 'a2000000-0001-4000-8000-000000000001';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 let phoneCounter = 100;
@@ -58,8 +63,8 @@ describe.skipIf(!hasTestDatabase)('database schema (integration)', () => {
             displayName: 'Test',
             dateOfBirth: '2000-01-01',
             gender: 'woman',
-            experience: 'beginner',
-            styles: ['garba'],
+            garbaLevel: 'beginner',
+            cityId: AHMEDABAD,
           },
           { transaction },
         );
@@ -100,9 +105,9 @@ describe.skipIf(!hasTestDatabase)('database schema (integration)', () => {
         db().transaction(async (transaction) => {
           const user = await User.create(attributes, { transaction });
           await db().query(
-            `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, experience, styles)
-             VALUES (:userId, 'X', '2000-01-01', 'robot', 'beginner', ARRAY['garba'])`,
-            { replacements: { userId: user.id }, transaction },
+            `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, garba_level, city_id)
+             VALUES (:userId, 'X', '2000-01-01', 'robot', 'beginner', :cityId)`,
+            { replacements: { userId: user.id, cityId: AHMEDABAD }, transaction },
           );
         }),
       ).rejects.toThrow();
@@ -145,8 +150,8 @@ describe.skipIf(!hasTestDatabase)('database schema (integration)', () => {
         displayName: 'Test',
         dateOfBirth: '2000-01-01',
         gender: 'man',
-        experience: 'advanced',
-        styles: ['garba', 'dandiya_raas'],
+        garbaLevel: 'advanced',
+        cityId: AHMEDABAD,
       });
       await UserPreference.create({ userId: user.id });
       await UserSession.create({
@@ -177,25 +182,73 @@ describe.skipIf(!hasTestDatabase)('database schema (integration)', () => {
         displayName: 'Test',
         dateOfBirth: '2000-01-01',
         gender: 'woman' as const,
-        experience: 'beginner' as const,
-        styles: ['garba' as const],
+        garbaLevel: 'beginner' as const,
+        cityId: AHMEDABAD,
       };
       await UserProfile.create(profile);
 
       await expect(UserProfile.create(profile)).rejects.toBeInstanceOf(UniqueConstraintError);
     });
 
-    it('rejects unknown dance styles in the database even when model validation is bypassed', async () => {
+    it('rejects an unknown garba level in the database even when model validation is bypassed', async () => {
       const user = await createUser();
 
       const code = await pgErrorCode(
         db().query(
-          `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, experience, styles)
-           VALUES (:userId, 'Test', '2000-01-01', 'woman', 'beginner', ARRAY['salsa'])`,
-          { replacements: { userId: user.id } },
+          `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, garba_level, city_id)
+           VALUES (:userId, 'Test', '2000-01-01', 'woman', 'expert', :cityId)`,
+          { replacements: { userId: user.id, cityId: AHMEDABAD } },
         ),
       );
       expect(code).toBe(CHECK_VIOLATION);
+    });
+
+    it('rejects an area that does not belong to the profile city (composite foreign key)', async () => {
+      const user = await createUser();
+
+      const code = await pgErrorCode(
+        UserProfile.create({
+          userId: user.id,
+          displayName: 'Test',
+          dateOfBirth: '2000-01-01',
+          gender: 'woman',
+          garbaLevel: 'beginner',
+          cityId: VADODARA,
+          areaId: NAVRANGPURA_AHMEDABAD,
+        }),
+      );
+      expect(code).toBe(FOREIGN_KEY_VIOLATION);
+    });
+
+    it('rejects invalid Instagram handles and more than 30 available dates', async () => {
+      const user = await createUser();
+      const base = `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, garba_level, city_id`;
+
+      expect(
+        await pgErrorCode(
+          db().query(
+            `${base}, instagram_handle) VALUES (:userId, 'T', '2000-01-01', 'man', 'beginner', :cityId, 'Bad Handle!')`,
+            {
+              replacements: { userId: user.id, cityId: AHMEDABAD },
+            },
+          ),
+        ),
+      ).toBe(CHECK_VIOLATION);
+
+      const dates = Array.from(
+        { length: 31 },
+        (_, i) => `2030-01-${String((i % 28) + 1).padStart(2, '0')}`,
+      );
+      expect(
+        await pgErrorCode(
+          db().query(
+            `${base}, available_dates) VALUES (:userId, 'T', '2000-01-01', 'man', 'beginner', :cityId, :dates::date[])`,
+            {
+              replacements: { userId: user.id, cityId: AHMEDABAD, dates: `{${dates.join(',')}}` },
+            },
+          ),
+        ),
+      ).toBe(CHECK_VIOLATION);
     });
 
     it('rejects an inverted or under-18 age range', async () => {

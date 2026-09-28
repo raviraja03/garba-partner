@@ -66,7 +66,7 @@ Admin accounts are completely separate from member accounts: different table, di
 | Area | MVP | Post-MVP |
 |---|---|---|
 | Authentication | Mobile OTP login, JWT access token + rotating refresh token | Optional passkeys |
-| Profile | First name, age (from DOB), gender, city/area, bio, experience, styles, 1–6 photos, partner preferences | Prompts, video intro |
+| Profile | First name, age (from DOB), gender, city/area, bio, Garba level, available dates, private Instagram ID, 1 profile photo, partner preferences, completion % ([user profile](../users/user-profile.md)) | Multiple photos, prompts, video intro |
 | Verification | **Photo verification**: a selfie with a random gesture, reviewed by a moderator | **ID/age verification** through a licensed provider (e.g. DigiLocker-based). We store only the outcome, never the Aadhaar number or document image |
 | Events | Admin-curated listings by city, "Going"/"Interested", opt in to "Looking for a partner" | Organiser self-service, pass sales, check-in |
 | Partner discovery | By event (reciprocal) and by city, with filters | Recommendations, groups |

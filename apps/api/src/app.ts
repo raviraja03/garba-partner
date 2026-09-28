@@ -9,6 +9,7 @@ import { API_PREFIX } from '@garba-partner/shared';
 import { resolveRequestId } from './lib/request-id.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFound } from './middlewares/not-found.js';
+import { LOCAL_MEDIA_DIRECTORY, LOCAL_MEDIA_ROUTE } from './providers/media/index.js';
 import { createApiRouter, type ApiDependencies } from './routes.js';
 
 export interface CreateAppOptions {
@@ -45,6 +46,13 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
   app.use(express.json({ limit: '100kb' }));
   app.use(cookieParser());
 
+  if (env.MEDIA_STORAGE === 'local') {
+    // Development only (the env schema forbids local storage elsewhere).
+    app.use(
+      LOCAL_MEDIA_ROUTE,
+      express.static(LOCAL_MEDIA_DIRECTORY, { index: false, dotfiles: 'deny', fallthrough: false }),
+    );
+  }
   app.use(API_PREFIX, createApiRouter({ env, logger, dependencies }));
 
   app.use(notFound);

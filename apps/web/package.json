@@ -14,6 +14,7 @@
   "dependencies": {
     "@garba-partner/config": "*",
     "@garba-partner/shared": "*",
+    "@tanstack/react-query": "^5.104.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-router": "^7.18.4"

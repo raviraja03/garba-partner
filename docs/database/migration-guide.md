@@ -33,7 +33,11 @@ apps/api/src/
 │   ├── 20260925100300-create-user-sessions.ts
 │   ├── 20260925100400-create-user-verifications.ts
 │   ├── 20260925120000-create-otp-requests.ts
-│   └── 20260925120100-create-admin-users-and-sessions.ts
+│   ├── 20260925120100-create-admin-users-and-sessions.ts
+│   ├── 20260928100000-create-cities-and-areas.ts        (incl. launch reference data)
+│   ├── 20260928100100-extend-user-profiles.ts
+│   ├── 20260928100200-add-verified-only-preference.ts
+│   └── 20260928100300-create-admin-audit-logs.ts
 ├── seeders/
 │   ├── 20260925110000-dev-users.ts
 │   └── 20260925120000-dev-admins.ts

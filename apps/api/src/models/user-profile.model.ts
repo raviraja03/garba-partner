@@ -14,22 +14,15 @@ import {
   Table,
   UpdatedAt,
 } from 'sequelize-typescript';
-import {
-  DANCE_STYLES,
-  EXPERIENCE_LEVELS,
-  GENDERS,
-  LIMITS,
-  type DanceStyle,
-  type ExperienceLevel,
-  type Gender,
-} from '@garba-partner/shared';
+import { GARBA_LEVELS, GENDERS, LIMITS, type GarbaLevel, type Gender } from '@garba-partner/shared';
+import { Area } from './area.model.js';
+import { City } from './city.model.js';
 import { User } from './user.model.js';
 
 /**
- * Personal profile shown (partially) to other members. One row per user.
- * Hard-deleted when an account is erased (no soft delete: the data is personal and not needed
- * after erasure). `date_of_birth` is never exposed to other members; only the computed age is.
- * City/area columns are added with the locations migration.
+ * Personal profile (docs/users/user-profile.md). One row per user.
+ * Private fields — `dateOfBirth` (only the age is shown), `instagramHandle` — are never exposed to
+ * other members; see docs/users/privacy-rules.md. Hard-deleted on account erasure.
  */
 @Table({ tableName: 'user_profiles' })
 export class UserProfile extends Model<
@@ -57,6 +50,15 @@ export class UserProfile extends Model<
   @Column({ type: DataType.STRING(20), allowNull: false, validate: { isIn: [[...GENDERS]] } })
   gender!: Gender;
 
+  @ForeignKey(() => City)
+  @Column({ type: DataType.UUID, allowNull: false })
+  cityId!: string;
+
+  /** Must belong to `cityId` (composite foreign key). */
+  @ForeignKey(() => Area)
+  @Column({ type: DataType.UUID, allowNull: true })
+  areaId!: CreationOptional<string | null>;
+
   @Column({
     type: DataType.STRING(LIMITS.BIO_MAX_LENGTH),
     allowNull: true,
@@ -64,31 +66,33 @@ export class UserProfile extends Model<
   })
   bio!: CreationOptional<string | null>;
 
+  /** Private. Lowercase, without `@`. */
+  @Column({ type: DataType.STRING(30), allowNull: true, validate: { is: /^[a-z0-9._]{1,30}$/ } })
+  instagramHandle!: CreationOptional<string | null>;
+
   @Column({
     type: DataType.STRING(20),
     allowNull: false,
-    validate: { isIn: [[...EXPERIENCE_LEVELS]] },
+    validate: { isIn: [[...GARBA_LEVELS]] },
   })
-  experience!: ExperienceLevel;
+  garbaLevel!: GarbaLevel;
 
-  @Column({
-    type: DataType.ARRAY(DataType.STRING(20)),
-    allowNull: false,
-    validate: {
-      isValidStyleList(value: unknown) {
-        const allowed: readonly string[] = DANCE_STYLES;
-        if (
-          !Array.isArray(value) ||
-          value.length === 0 ||
-          new Set(value).size !== value.length ||
-          !value.every((style) => typeof style === 'string' && allowed.includes(style))
-        ) {
-          throw new Error(`styles must be a non-empty list of: ${DANCE_STYLES.join(', ')}`);
-        }
-      },
-    },
-  })
-  styles!: DanceStyle[];
+  /** `YYYY-MM-DD` dates, sorted ascending. */
+  @Column({ type: DataType.ARRAY(DataType.DATEONLY), allowNull: false, defaultValue: [] })
+  availableDates!: CreationOptional<string[]>;
+
+  /** Cloudinary public ID (or local dev key) of the processed image. */
+  @Column({ type: DataType.STRING(255), allowNull: true })
+  imagePublicId!: CreationOptional<string | null>;
+
+  @Column({ type: DataType.INTEGER, allowNull: true })
+  imageWidth!: CreationOptional<number | null>;
+
+  @Column({ type: DataType.INTEGER, allowNull: true })
+  imageHeight!: CreationOptional<number | null>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  imageUploadedAt!: CreationOptional<Date | null>;
 
   @CreatedAt
   override createdAt!: CreationOptional<Date>;
@@ -98,4 +102,10 @@ export class UserProfile extends Model<
 
   @BelongsTo(() => User, { foreignKey: 'userId', onDelete: 'CASCADE' })
   user?: NonAttribute<User>;
+
+  @BelongsTo(() => City, { foreignKey: 'cityId' })
+  city?: NonAttribute<City>;
+
+  @BelongsTo(() => Area, { foreignKey: 'areaId' })
+  area?: NonAttribute<Area | null>;
 }

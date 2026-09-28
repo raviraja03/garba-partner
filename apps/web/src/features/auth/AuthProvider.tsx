@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { MemberSessionDto } from '@garba-partner/shared';
 import { refreshSession, setAccessToken, setSessionExpiredHandler } from '../../lib/api-client';
-import { logout } from './auth-api';
+import { fetchMe, logout } from './auth-api';
 import { AuthContext, type AuthContextValue, type AuthState } from './auth-context';
 
 /**
@@ -46,9 +46,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const user = await fetchMe();
+      setState({ status: 'authenticated', user });
+    } catch {
+      // A failed refresh leaves the current state; a real session loss is handled by the client.
+    }
+  }, []);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ state, signIn, signOut }),
-    [state, signIn, signOut],
+    () => ({ state, signIn, signOut, refreshUser }),
+    [state, signIn, signOut, refreshUser],
   );
   return <AuthContext value={value}>{children}</AuthContext>;
 }

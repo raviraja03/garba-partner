@@ -10,11 +10,17 @@ export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', '
  * APP_ENV=development. Real providers (e.g. MSG91) are added before launch.
  */
 export const SMS_PROVIDERS = ['dev'] as const;
+/**
+ * `cloudinary` for real deployments. `local` stores images on disk and serves them from the API;
+ * it is only accepted when APP_ENV=development (docs/users/cloudinary.md).
+ */
+export const MEDIA_STORAGES = ['cloudinary', 'local'] as const;
 
 export type NodeEnv = (typeof NODE_ENVS)[number];
 export type AppEnv = (typeof APP_ENVS)[number];
 export type LogLevel = (typeof LOG_LEVELS)[number];
 export type SmsProvider = (typeof SMS_PROVIDERS)[number];
+export type MediaStorageKind = (typeof MEDIA_STORAGES)[number];
 
 /** Normalises an origin such as `https://example.com/` to `https://example.com`. */
 const originSchema = z.url({ protocol: /^https?$/ }).transform((value) => new URL(value).origin);
@@ -73,6 +79,16 @@ export const serverEnvSchema = z
     ADMIN_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
     ADMIN_SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(24).default(12),
     ADMIN_SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).max(240).default(30),
+
+    MEDIA_STORAGE: z.enum(MEDIA_STORAGES).default('local'),
+    CLOUDINARY_CLOUD_NAME: z.string().min(1).optional(),
+    CLOUDINARY_API_KEY: z.string().min(1).optional(),
+    CLOUDINARY_API_SECRET: z.string().min(1).optional(),
+    /** Assets go to `<prefix>/<APP_ENV>/…`, keeping environments apart in one Cloudinary account. */
+    CLOUDINARY_FOLDER_PREFIX: z
+      .string()
+      .regex(/^[a-z0-9-]+$/, 'lowercase letters, digits and hyphens only')
+      .default('garba-partner'),
   })
   .superRefine((env, ctx) => {
     if (env.TEST_DATABASE_URL !== undefined && env.TEST_DATABASE_URL === env.DATABASE_URL) {
@@ -97,6 +113,29 @@ export const serverEnvSchema = z
         path: ['SMS_PROVIDER'],
         message: '"dev" is only allowed when APP_ENV=development; configure a real SMS provider',
       });
+    }
+
+    if (env.MEDIA_STORAGE === 'local' && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['MEDIA_STORAGE'],
+        message: '"local" is only allowed when APP_ENV=development; use "cloudinary"',
+      });
+    }
+    if (env.MEDIA_STORAGE === 'cloudinary') {
+      for (const key of [
+        'CLOUDINARY_CLOUD_NAME',
+        'CLOUDINARY_API_KEY',
+        'CLOUDINARY_API_SECRET',
+      ] as const) {
+        if (env[key] === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'is required when MEDIA_STORAGE=cloudinary',
+          });
+        }
+      }
     }
 
     if (env.APP_ENV !== 'production') return;

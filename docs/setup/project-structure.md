@@ -28,8 +28,11 @@ garba-partner/
 │   │   │   ├── modules/
 │   │   │   │   ├── health/          GET /api/v1/health (API + database)
 │   │   │   │   ├── auth/            member OTP auth: routes, controller, service, otp.service, token.service
-│   │   │   │   └── admin/auth/      admin login/refresh/logout/me
+│   │   │   │   ├── profiles/        own profile, preferences, image upload, public profile (allow-list mappers)
+│   │   │   │   ├── locations/       cities and areas (reference data)
+│   │   │   │   └── admin/           auth/ (login…), users/ (list, detail, suspend/reactivate), audit/ (audit log)
 │   │   │   ├── providers/sms/       SmsProvider interface + development provider
+│   │   │   ├── providers/media/     MediaStorage: Cloudinary + local (development only)
 │   │   │   ├── scripts/             db.ts (db CLI), create-admin.ts
 │   │   │   ├── test/                test helpers + global setup (migrates the test DB once)
 │   │   │   └── types/express.d.ts   req.auth / req.admin typings
@@ -42,15 +45,16 @@ garba-partner/
 │   │   ├── src/
 │   │   │   ├── main.tsx             React root
 │   │   │   ├── App.tsx              router (public-only login routes, protected routes)
-│   │   │   ├── pages/               LoginPage, VerifyOtpPage, HomePage, NotFoundPage
+│   │   │   ├── pages/               Login, VerifyOtp, Onboarding, Home, Profile, EditProfile, Preferences, NotFound
 │   │   │   ├── components/          AuthLayout, ApiStatus, FullPageSpinner, ui/ (Button, Alert)
 │   │   │   ├── features/auth/       AuthProvider, auth context, guards, auth API calls
+│   │   │   ├── features/profile/    profile API + TanStack Query hooks, ProfileForm, ImageUpload, PreferencesForm, ProfileCard
 │   │   │   ├── features/system/     useApiHealth hook
 │   │   │   ├── lib/                 env (validated VITE_* vars), api-client (in-memory token, silent refresh)
 │   │   │   └── styles/index.css     Tailwind + shared theme tokens
 │   │   ├── tsconfig.json            references tsconfig.app.json (browser) + tsconfig.node.json (vite.config)
 │   │   └── vite.config.ts           envDir = repo root, /api proxy, port 5173
-│   └── admin/                       @garba-partner/admin — admin SPA (same stack as web, port 5174): login, protected layout, dashboard
+│   └── admin/                       @garba-partner/admin — admin SPA (same stack as web, port 5174): login, dashboard, users list/detail
 ├── packages/
 │   ├── config/                      @garba-partner/config — shared configuration
 │   │   ├── src/server/              loadServerEnv() — Node only
@@ -66,8 +70,11 @@ garba-partner/
 │           ├── constants/limits.ts  LIMITS (ages, name/bio lengths, OTP/session/admin-login limits)
 │           ├── constants/auth.ts    cookie names, CSRF header
 │           ├── constants/admin.ts   ADMIN_ROLES, ADMIN_PERMISSIONS, ROLE_PERMISSIONS
-│           ├── schemas/             zod/mini request schemas (auth)
+│           ├── schemas/             zod/mini request schemas (auth, profile, admin users)
 │           ├── utils/phone.ts       normalizeIndianMobile, maskPhone
+│           ├── utils/dates.ts       IST today, age, available-date rules
+│           ├── utils/profile-completion.ts  completion % and profile status
+│           ├── utils/text.ts        contact-detail detection, text normalisation
 │           ├── errors/error-codes.ts ERROR_CODES (+ HTTP status, default message)
 │           └── types/               ApiResponse envelope types, HealthDto
 ├── docs/                            product, architecture, development, setup docs
@@ -86,9 +93,9 @@ garba-partner/
 |---|---|---|
 | `@garba-partner/config` | zod, ESLint plugins | all workspaces (tsconfig presets, ESLint, Prettier), api (`/server`), web + admin (`/client`, `/tailwind/theme.css`) |
 | `@garba-partner/shared` | zod (`zod/mini` API) | api, web, admin |
-| `@garba-partner/api` | config, shared, express, helmet, cors, cookie-parser, express-rate-limit, pino, sequelize, sequelize-typescript, pg, umzug, reflect-metadata, jose, @node-rs/argon2 | — |
-| `@garba-partner/web` | config, shared, react, react-router | — |
-| `@garba-partner/admin` | config, shared, react, react-router | — |
+| `@garba-partner/api` | config, shared, express, helmet, cors, cookie-parser, express-rate-limit, multer, sharp, cloudinary, pino, sequelize, sequelize-typescript, pg, umzug, reflect-metadata, jose, @node-rs/argon2 | — |
+| `@garba-partner/web` | config, shared, react, react-router, @tanstack/react-query | — |
+| `@garba-partner/admin` | config, shared, react, react-router, @tanstack/react-query | — |
 
 Rules (enforced by ESLint `no-restricted-imports`):
 

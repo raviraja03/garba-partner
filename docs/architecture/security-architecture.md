@@ -338,7 +338,7 @@ Memory-store limits reset on restart, which is acceptable because every **securi
 |---|---|:-:|---|---|
 | Phone number | Login, ban enforcement, legal requests | ❌ | Super admin via audited reveal only | Until account purge (hash kept on ban list if banned) |
 | Date of birth | 18+ check, age display | ❌ (age only) | Moderators (age + DOB) | Until account purge |
-| Name, gender, bio, experience, styles | Profile | ✅ | ✅ | Until account purge |
+| Name, gender, bio, Garba level, available dates | Profile | ✅ | ✅ | Until account purge |
 | City / area | Discovery | City ✅, area only if opted in | ✅ | Until account purge |
 | Profile photos | Profile | ✅ (non-rejected) | ✅ | Until deleted or purged. Rejected: 30 days |
 | Verification selfie | Photo verification | ❌ | Reviewers (signed URL) | **30 days after decision** |

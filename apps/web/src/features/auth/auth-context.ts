@@ -10,6 +10,8 @@ export interface AuthContextValue {
   signIn: (session: MemberSessionDto) => void;
   /** Revokes the session on the server and clears local state. */
   signOut: () => Promise<void>;
+  /** Re-reads /auth/me (e.g. after the profile changed). */
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);

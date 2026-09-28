@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { createSequelize, databaseConfigFromEnv, pingDatabase } from './config/database.js';
 import { readEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
+import { createMediaStorage } from './providers/media/index.js';
 import { createSmsProvider } from './providers/sms/index.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
@@ -39,6 +40,7 @@ function start(): void {
       dependencies: {
         sequelize,
         sms: createSmsProvider(env),
+        media: createMediaStorage(env),
         pingDatabase: () => pingDatabase(sequelize),
       },
     }),

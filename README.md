@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation, database layer and **authentication** complete: mobile OTP login for members, email/password login for admins, rotating DB-backed sessions, and protected routes in the web and admin apps. Next: onboarding/profile. Events, matching, chat and payments come in later phases. See the [roadmap](#development-roadmap).
+> **Status:** Foundation, database, authentication and the **user profile system** are complete: OTP login, onboarding with an 18+ gate, profile and preferences, Cloudinary photo upload (EXIF stripped), profile completion and status, public profiles, and admin user management (list, detail, suspend/reactivate). Next: events. Matching, chat and payments come in later phases. See the [roadmap](#development-roadmap).
 
 ---
 
@@ -41,7 +41,7 @@ See [Product overview](docs/product/product-overview.md) for the full vision, ro
 | Database | PostgreSQL 16+ |
 | ORM | Sequelize 6 / sequelize-typescript, Umzug TypeScript migrations and seeders |
 | Realtime | Socket.IO *(chat phase)* |
-| Image storage | Cloudinary *(profile phase)* |
+| Image storage | Cloudinary (server-side signed uploads; images re-encoded with sharp, EXIF/GPS removed). Local disk storage for development |
 | Authentication | Members: mobile OTP. Admins: email + Argon2id password. Short-lived JWT access tokens (`jose`) + rotating refresh tokens in httpOnly cookies, sessions in PostgreSQL |
 | Payments | Razorpay *(post-MVP)* |
 | Deployment | Nginx + PM2 on a VPS |
@@ -127,8 +127,8 @@ Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/s
 | App | Workspace | Dev URL | Description |
 |---|---|---|---|
 | **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: health, member auth (`/auth/send-otp`, `/auth/verify-otp`, `/auth/refresh`, `/auth/logout`, `/auth/me`) and admin auth (`/admin/auth/*`) |
-| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login, OTP verification, protected home, logout |
-| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, protected console with role-based navigation, sign out |
+| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login/OTP, 3-step onboarding, profile preview, edit profile, photo upload, preferences |
+| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, role-based navigation, users list/search, user detail, suspend/reactivate |
 
 Both Vite dev servers proxy `/api` to the API, so the apps use same-origin requests, as they will in production behind Nginx.
 
@@ -180,6 +180,15 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Session management](docs/auth/session-management.md) | JWT + refresh-token strategy, rotation and reuse detection, CSRF, client behaviour |
 | [Authorization](docs/auth/authorization.md) | Middleware, member status matrix, admin permission matrix, user/admin separation |
 
+### Users & profiles
+
+| Document | Contents |
+|---|---|
+| [User profile](docs/users/user-profile.md) | Fields, profile status and completion %, **API reference** (member + admin), web/admin screens, tests |
+| [Profile validation](docs/users/profile-validation.md) | Every field rule, 18+ rules, preferences, image rules, DB backstops |
+| [Cloudinary](docs/users/cloudinary.md) | Image pipeline, EXIF stripping, configuration, local dev storage |
+| [Privacy rules](docs/users/privacy-rules.md) | Who can see what, enforcement, checklist for new features |
+
 ### Database
 
 | Document | Contents |
@@ -227,7 +236,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 |---|---|---|---|
 | — | Architecture & docs | Product, architecture and development documentation | ✅ Done |
 | **0** | Foundation | Monorepo, `packages/config` & `packages/shared`, TypeScript/ESLint/Prettier, API skeleton (health, envelope, error handling, redacted logging, tests), web/admin shells, setup docs | ✅ Done. Still open from the planned scope: CI workflow, PR template |
-| **1** | Member auth & profile | ✅ **Database layer:** PostgreSQL, Umzug migrations/seeders, user tables, DB health check. ✅ **Authentication:** OTP login, rotating sessions, logout, `/auth/me`, auth/authorization middleware, web login/OTP/protected routes, admin login (password) + protected admin routes. ⏳ **Remaining:** onboarding with 18+ gate, profile API, photo upload with EXIF stripping, cities/areas, settings, account deletion | 🟡 In progress |
+| **1** | Member auth & profile | ✅ Database layer. ✅ Authentication (member OTP, admin password, sessions, middleware). ✅ **Profiles:** onboarding with 18+ gate, profile + preferences API, Cloudinary photo upload with EXIF stripping, completion % and status, public profile, cities/areas, admin user list/detail/suspend/reactivate + audit log. ⏳ **Remaining:** account deletion, "log out of all devices" UI | 🟡 Nearly done |
 | **2** | Admin foundation & events | Admin TOTP 2FA + forced password change (login/roles already done), audit log, admin management, cities/areas CRUD, events CRUD/publish/cancel, member events & attendance, in-app notifications | Planned |
 | **3** | Discovery, interests, matches & safety core | Event & city discovery, interests, matches, unmatch, block, report user, auto-hide, report queue, sanctions, user management | Planned |
 | **4** | Chat | Socket.IO chat, history, read receipts, message reports, contact-sharing nudge, realtime enforcement of blocks/sanctions | Planned |

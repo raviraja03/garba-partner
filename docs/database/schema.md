@@ -2,7 +2,7 @@
 
 > **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
 
-Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
 
 ## 1. ERD
 
@@ -14,6 +14,10 @@ erDiagram
     users ||--o{ user_verifications : "has (0..n)"
     admin_users ||--o{ admin_sessions : "has (0..n)"
     admin_users |o--o{ user_verifications : "reviews"
+    admin_users ||--o{ admin_audit_logs : "writes"
+    cities ||--o{ areas : "contains"
+    cities ||--o{ user_profiles : "home city"
+    areas |o--o{ user_profiles : "area (same city)"
 
     users {
         uuid id PK
@@ -42,8 +46,15 @@ erDiagram
         date date_of_birth "never shown to others"
         varchar20 gender "woman|man|non_binary"
         varchar300 bio
-        varchar20 experience "beginner|intermediate|advanced"
-        varchar20_array styles "garba, dandiya_raas"
+        varchar20 garba_level "beginner|intermediate|advanced"
+        uuid city_id FK
+        uuid area_id FK "must belong to city_id"
+        varchar30 instagram_handle "private"
+        date_array available_dates "max 30"
+        varchar255 image_public_id UK "Cloudinary"
+        int image_width
+        int image_height
+        timestamptz image_uploaded_at
         timestamptz created_at
         timestamptz updated_at
     }
@@ -54,10 +65,40 @@ erDiagram
         varchar20 partner_gender_preference "women|men|everyone"
         smallint age_min "18..80"
         smallint age_max "18..80"
+        boolean verified_only "default false"
         boolean discovery_enabled "default false"
         boolean show_area "default false"
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    cities {
+        uuid id PK
+        varchar80 name
+        varchar80 state
+        varchar100 slug UK
+        boolean is_active
+        smallint sort_order
+    }
+
+    areas {
+        uuid id PK
+        uuid city_id FK
+        varchar80 name
+        varchar100 slug "unique per city"
+        boolean is_active
+        smallint sort_order
+    }
+
+    admin_audit_logs {
+        uuid id PK
+        uuid admin_id FK
+        varchar60 action "e.g. user.suspend"
+        varchar30 target_type
+        uuid target_id
+        jsonb metadata "reason, from/to"
+        char64 ip_hash
+        timestamptz created_at "append-only"
     }
 
     user_sessions {
@@ -215,14 +256,279 @@ Model: `User`. The **default scope excludes** `phoneHash`, `phoneEncrypted` and 
 | `display_name` | varchar(30) | no | | 2–30 characters after trimming |
 | `date_of_birth` | date | no | | ≥ 1900-01-01. Immutable through the API. The 18+ rule is enforced in the service (it depends on "today") |
 | `gender` | varchar(20) | no | | `woman`, `man`, `non_binary` |
-| `bio` | varchar(300) | yes | | |
-| `experience` | varchar(20) | no | | `beginner`, `intermediate`, `advanced` |
-| `styles` | varchar(20)[] | no | | Non-empty subset of `garba`, `dandiya_raas` |
+| `bio` | varchar(300) | yes | | No contact details (API rule) |
+| `garba_level` | varchar(20) | no | | `beginner`, `intermediate`, `advanced` |
+| `city_id` | uuid | no | | FK → `cities.id` `ON DELETE RESTRICT` |
+| `area_id` | uuid | yes | | Composite FK `(area_id, city_id)` → `areas (id, city_id)`: the area must belong to the city. Shown to others only with `show_area` |
+| `instagram_handle` | varchar(30) | yes | | **Private**. Lowercase, `^[a-z0-9._]{1,30}# Database Schema
+
+> **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
+
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+
+## 1. ERD
+
+```mermaid
+erDiagram
+    users ||--o| user_profiles : "has (0..1)"
+    users ||--o| user_preferences : "has (0..1)"
+    users ||--o{ user_sessions : "has (0..n)"
+    users ||--o{ user_verifications : "has (0..n)"
+    admin_users ||--o{ admin_sessions : "has (0..n)"
+    admin_users |o--o{ user_verifications : "reviews"
+    admin_users ||--o{ admin_audit_logs : "writes"
+    cities ||--o{ areas : "contains"
+    cities ||--o{ user_profiles : "home city"
+    areas |o--o{ user_profiles : "area (same city)"
+
+    users {
+        uuid id PK
+        char64 phone_hash UK "HMAC-SHA256, null only when erased"
+        text phone_encrypted "AES-256-GCM, null only when erased"
+        smallint phone_key_version
+        varchar20 status "active|suspended|banned|pending_deletion"
+        timestamptz onboarding_completed_at
+        timestamptz underage_rejected_at
+        timestamptz photo_verified_at
+        boolean hidden_from_discovery
+        varchar30 hidden_reason
+        varchar20 terms_version
+        timestamptz terms_accepted_at
+        timestamptz last_active_at
+        timestamptz deletion_requested_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz deleted_at "soft delete"
+    }
+
+    user_profiles {
+        uuid id PK
+        uuid user_id FK, UK
+        varchar30 display_name
+        date date_of_birth "never shown to others"
+        varchar20 gender "woman|man|non_binary"
+        varchar300 bio
+        varchar20 garba_level "beginner|intermediate|advanced"
+        uuid city_id FK
+        uuid area_id FK "must belong to city_id"
+        varchar30 instagram_handle "private"
+        date_array available_dates "max 30"
+        varchar255 image_public_id UK "Cloudinary"
+        int image_width
+        int image_height
+        timestamptz image_uploaded_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    user_preferences {
+        uuid id PK
+        uuid user_id FK, UK
+        varchar20 partner_gender_preference "women|men|everyone"
+        smallint age_min "18..80"
+        smallint age_max "18..80"
+        boolean verified_only "default false"
+        boolean discovery_enabled "default false"
+        boolean show_area "default false"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    cities {
+        uuid id PK
+        varchar80 name
+        varchar80 state
+        varchar100 slug UK
+        boolean is_active
+        smallint sort_order
+    }
+
+    areas {
+        uuid id PK
+        uuid city_id FK
+        varchar80 name
+        varchar100 slug "unique per city"
+        boolean is_active
+        smallint sort_order
+    }
+
+    admin_audit_logs {
+        uuid id PK
+        uuid admin_id FK
+        varchar60 action "e.g. user.suspend"
+        varchar30 target_type
+        uuid target_id
+        jsonb metadata "reason, from/to"
+        char64 ip_hash
+        timestamptz created_at "append-only"
+    }
+
+    user_sessions {
+        uuid id PK
+        uuid user_id FK
+        char64 refresh_token_hash UK "SHA-256 only"
+        char64 previous_refresh_token_hash
+        timestamptz rotated_at
+        varchar255 user_agent
+        char64 ip_hash
+        timestamptz last_used_at
+        timestamptz expires_at
+        timestamptz revoked_at
+        varchar30 revoked_reason
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    user_verifications {
+        uuid id PK
+        uuid user_id FK
+        varchar20 type "photo|government_id"
+        varchar40 provider "internal_review"
+        varchar100 provider_reference
+        varchar20 status "initiated|pending|approved|rejected|expired|revoked"
+        varchar40 challenge_code
+        varchar255 evidence_reference "opaque pointer, purged"
+        timestamptz evidence_deleted_at
+        varchar30 failure_reason
+        timestamptz submitted_at
+        timestamptz decided_at
+        timestamptz expires_at
+        uuid reviewed_by_admin_id FK "admin_users, RESTRICT"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    otp_requests {
+        uuid id PK
+        char64 phone_hash "HMAC, no FK (number may be new)"
+        char64 otp_hash "HMAC of the code"
+        smallint attempts
+        timestamptz expires_at
+        timestamptz consumed_at
+        timestamptz invalidated_at
+        char64 ip_hash
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    admin_users {
+        uuid id PK
+        varchar254 email UK "lowercase"
+        varchar100 name
+        varchar20 role "super_admin|moderator|event_manager"
+        text password_hash "Argon2id"
+        varchar20 status "active|disabled"
+        smallint failed_login_count
+        timestamptz locked_until
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    admin_sessions {
+        uuid id PK
+        uuid admin_id FK
+        char64 refresh_token_hash UK
+        char64 previous_refresh_token_hash
+        timestamptz rotated_at
+        varchar255 user_agent
+        char64 ip_hash
+        timestamptz last_used_at "idle timeout"
+        timestamptz expires_at
+        timestamptz revoked_at
+        varchar30 revoked_reason
+        timestamptz created_at
+        timestamptz updated_at
+    }
+```
+
+## 2. Conventions
+
+| Convention | Rule |
+|---|---|
+| Primary keys | `uuid` with `DEFAULT gen_random_uuid()`. Models also generate UUIDv4 |
+| Naming | `snake_case` tables and columns, plural tables. Models use camelCase attributes (`underscored: true`) |
+| Timestamps | `created_at`/`updated_at` `timestamptz NOT NULL DEFAULT now()` on every table. `updated_at` is also maintained by the `set_updated_at()` trigger, so raw SQL updates stay correct |
+| Enumerations | `varchar` + `CHECK` constraint (not PG enums). Values mirror `packages/shared/src/constants/enums.ts` |
+| Constraint names | `<table>_<column(s)>_<check\|unique\|idx>`, so errors are easy to trace |
+| Foreign keys | Always declared. `ON DELETE CASCADE` from user-owned rows to `users` |
+| Time zone | All timestamps are UTC (`timestamptz`, Sequelize `timezone: '+00:00'`). Only `date_of_birth` is a `date` |
+
+## 3. Soft-delete strategy
+
+| Table | Strategy | Why |
+|---|---|---|
+| `users` | **Soft delete** (`deleted_at`, Sequelize `paranoid`) | The row must survive erasure so that reports and sanctions (later phases) keep a valid FK. The CHECK `users_phone_lifecycle_check` requires phone data to be **nulled in the same update** that sets `deleted_at`, so a soft-deleted account holds no personal data |
+| `user_profiles` | Hard delete during erasure | Pure personal data. Nothing else needs it after erasure |
+| `user_preferences` | Hard delete during erasure | Personal settings |
+| `user_sessions` | Logical revocation (`revoked_at` + reason). Expired/revoked rows are purged by a job | Security records with a short life |
+| `user_verifications` | Kept as an audit trail (status history). Evidence is purged (`evidence_reference` → null, `evidence_deleted_at` set). Rows are removed with the account | Moderation accountability without keeping evidence |
+
+Account deletion (later phase) runs in **one transaction**: set `status = 'pending_deletion'` and revoke sessions. After the grace period: delete the profile and preferences, purge the evidence, then null the phone columns and set `deleted_at` in a single `UPDATE`. A plain `user.destroy()` is rejected by the database on purpose.
+
+## 4. Tables
+
+### 4.1 `users`
+
+Account record. Personal details live in `user_profiles`, and settings in `user_preferences`.
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `phone_hash` | char(64) | yes* | | HMAC-SHA256(`PHONE_HASH_SECRET`, E.164), lowercase hex |
+| `phone_encrypted` | text | yes* | | AES-256-GCM `base64(iv‖tag‖ciphertext)` with `PHONE_ENCRYPTION_KEY` |
+| `phone_key_version` | smallint | yes* | | Key version used for `phone_encrypted` (≥ 1) |
+| `status` | varchar(20) | no | `'active'` | `active`, `suspended`, `banned`, `pending_deletion` |
+| `onboarding_completed_at` | timestamptz | yes | | |
+| `underage_rejected_at` | timestamptz | yes | | Locks DOB submission |
+| `photo_verified_at` | timestamptz | yes | | Cached projection of an approved photo verification |
+| `hidden_from_discovery` | boolean | no | `false` | Auto-hide after reports |
+| `hidden_reason` | varchar(30) | yes | | `p0_report`, `report_threshold`, `no_visible_photo` |
+| `terms_version` / `terms_accepted_at` | varchar(20) / timestamptz | yes | | Both set or both null |
+| `last_active_at` | timestamptz | yes | | Never exposed precisely to other members |
+| `deletion_requested_at` | timestamptz | yes | | Start of the 30-day grace period |
+| `created_at` / `updated_at` | timestamptz | no | `now()` | |
+| `deleted_at` | timestamptz | yes | | Soft delete |
+
+\* Null **only** when the account is erased (see constraint below).
+
+Constraints:
+
+| Name | Rule |
+|---|---|
+| `users_status_check` | status in the allowed set |
+| `users_phone_hash_format_check` | `phone_hash ~ '^[0-9a-f]{64}$'` |
+| `users_phone_key_version_check` | `phone_key_version >= 1` |
+| `users_phone_lifecycle_check` | live row ⇒ all three phone columns set. Soft-deleted row ⇒ all three null |
+| `users_hidden_reason_check` | reason in the allowed set |
+| `users_hidden_consistency_check` | `hidden_from_discovery = (hidden_reason IS NOT NULL)` |
+| `users_terms_consistency_check` | `terms_version` and `terms_accepted_at` set together |
+| `users_pending_deletion_check` | `pending_deletion` ⇒ `deletion_requested_at` set |
+
+Indexes: `users_phone_hash_unique` (UNIQUE, `WHERE phone_hash IS NOT NULL`), `users_status_idx` (`status`, `WHERE deleted_at IS NULL`), `users_deletion_requested_at_idx` (`WHERE status = 'pending_deletion'`).
+
+Model: `User`. The **default scope excludes** `phoneHash`, `phoneEncrypted` and `phoneKeyVersion`. Load them only with `User.scope('withPhone')` (auth and audited phone-reveal code only).
+
+### 4.2 `user_profiles`
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `user_id` | uuid | no | | FK → `users.id` `ON DELETE CASCADE`. **Unique** |
+| `display_name` | varchar(30) | no | | 2–30 characters after trimming |
+| `date_of_birth` | date | no | | ≥ 1900-01-01. Immutable through the API. The 18+ rule is enforced in the service (it depends on "today") |
+| `gender` | varchar(20) | no | | `woman`, `man`, `non_binary` |
+ |
+| `available_dates` | date[] | no | `'{}'` | ≤ 30 dates. Sorted by the API. Past dates hidden on read |
+| `image_public_id` | varchar(255) | yes | | Cloudinary public ID (random) of the processed, EXIF-free image. **Unique** where not null |
+| `image_width` / `image_height` | integer | yes | | Set together with the public ID |
+| `image_uploaded_at` | timestamptz | yes | | |
 | `created_at` / `updated_at` | timestamptz | no | `now()` | |
 
-Constraints: `user_profiles_user_id_unique`, `user_profiles_display_name_check`, `user_profiles_date_of_birth_check`, `user_profiles_gender_check`, `user_profiles_experience_check`, `user_profiles_styles_check`.
+Constraints: `user_profiles_user_id_unique`, `user_profiles_display_name_check`, `user_profiles_date_of_birth_check`, `user_profiles_gender_check`, `user_profiles_garba_level_check`, `user_profiles_area_in_city_fkey`, `user_profiles_instagram_handle_check`, `user_profiles_available_dates_check`, `user_profiles_image_consistency_check`.
+Indexes: `user_profiles_city_id_idx`, `user_profiles_area_id_idx` (partial), `user_profiles_image_public_id_unique` (partial).
 
-City and area columns (`city_id`, `area_id`) are added by the locations migration together with the `cities`/`areas` tables.
+Migration `20260928100100-extend-user-profiles` renamed `experience` → `garba_level`, dropped the unused `styles` column and backfilled pre-existing development rows with the first launch city.
 
 ### 4.3 `user_preferences`
 
@@ -232,6 +538,7 @@ City and area columns (`city_id`, `area_id`) are added by the locations migratio
 | `user_id` | uuid | no | | FK → `users.id` `ON DELETE CASCADE`. **Unique** |
 | `partner_gender_preference` | varchar(20) | no | `'everyone'` | `women`, `men`, `everyone` |
 | `age_min` / `age_max` | smallint | no | 18 / 80 | `18 ≤ age_min ≤ age_max ≤ 80` |
+| `verified_only` | boolean | no | `false` | Only suggest photo-verified members (applied by matching, later phase) |
 | `discovery_enabled` | boolean | no | **`false`** | Explicit opt-in to discovery |
 | `show_area` | boolean | no | **`false`** | Explicit opt-in to showing the area |
 | `created_at` / `updated_at` | timestamptz | no | `now()` | |
@@ -343,7 +650,32 @@ Same shape and rules as [`user_sessions`](#44-user_sessions), with `admin_id` (F
 
 Constraints and indexes mirror `user_sessions` (`admin_sessions_refresh_token_hash_unique`, `admin_sessions_active_admin_id_idx`, …).
 
-### 4.9 Bookkeeping tables
+### 4.9 `cities` and `areas`
+
+Reference data, seeded by migration `20260928100000-create-cities-and-areas` with **fixed IDs** (`c1000000-0000-4000-8000-00000000000N` for cities, `a2000000-000C-4000-8000-0000000000NN` for areas). Deactivated (`is_active = false`), never deleted.
+
+| Table | Columns | Constraints |
+|---|---|---|
+| `cities` | `id`, `name`, `state`, `slug`, `is_active`, `sort_order`, timestamps | `cities_slug_unique`, `cities_name_state_unique`, slug format |
+| `areas` | `id`, `city_id` (FK RESTRICT), `name`, `slug`, `is_active`, `sort_order`, timestamps | `areas_city_id_slug_unique`, `areas_id_city_id_unique` (target of the profile composite FK), slug format |
+
+Areas are **neighbourhoods only**, never street-level.
+
+### 4.10 `admin_audit_logs` (append-only)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid | PK |
+| `admin_id` | uuid | FK → `admin_users.id` `ON DELETE RESTRICT` |
+| `action` | varchar(60) | Dotted, e.g. `user.suspend`, `user.reactivate` |
+| `target_type` / `target_id` | varchar(30) / uuid | e.g. `user` + user ID |
+| `metadata` | jsonb | Reason and before/after. **Never** phone numbers, OTPs, passwords or tokens |
+| `ip_hash` | char(64) | HMAC of the admin's IP |
+| `created_at` | timestamptz | No `updated_at`: rows never change |
+
+The trigger `admin_audit_logs_append_only` rejects every `UPDATE` and `DELETE`. Indexes: `created_at DESC`, `(admin_id, created_at DESC)`, `(target_type, target_id)`.
+
+### 4.11 Bookkeeping tables
 
 | Table | Created by | Content |
 |---|---|---|
@@ -358,6 +690,7 @@ Constraints and indexes mirror `user_sessions` (`admin_sessions_refresh_token_ha
 | `<table>_set_updated_at` triggers | each table's migration | `BEFORE UPDATE` on every table |
 | `is_verhoeff_valid(text)` | `20260925100400-create-user-verifications` | Verhoeff checksum |
 | `contains_aadhaar_like_number(text)` | same | Used by `user_verifications_no_identity_numbers_check` |
+| `reject_audit_log_changes()` + trigger | `20260928100300-create-admin-audit-logs` | Makes `admin_audit_logs` append-only |
 
 ## 6. Privacy summary
 
@@ -365,6 +698,8 @@ Constraints and indexes mirror `user_sessions` (`admin_sessions_refresh_token_ha
 |---|---|---|
 | Phone number | `users` | Only an HMAC hash (lookup) and AES-GCM ciphertext. Excluded from the default model scope. Erased on soft delete |
 | Date of birth | `user_profiles` | Never returned to other members (only age) |
+| Instagram handle | `user_profiles` | Private: never returned to other members |
+| Location | `user_profiles` | City + optional neighbourhood from a fixed list. No address or GPS. Photo EXIF/GPS stripped before storage |
 | Refresh tokens | `user_sessions` | SHA-256 hashes only |
 | IP addresses | `user_sessions`, `admin_sessions`, `otp_requests` | HMAC only |
 | OTP codes | `otp_requests` | HMAC only; never logged |

@@ -34,6 +34,15 @@ export const ERROR_CODES = {
       'This account has been permanently banned. Contact support if you think this is a mistake.',
   },
   ACCOUNT_PENDING_DELETION: { httpStatus: 403, message: 'This account is scheduled for deletion.' },
+
+  // Profiles (docs/users/user-profile.md)
+  UNDERAGE: { httpStatus: 403, message: 'Garba Partner is only for adults (18+).' },
+  ONBOARDING_REQUIRED: { httpStatus: 403, message: 'Please complete your profile first.' },
+  PROFILE_NOT_STARTED: { httpStatus: 409, message: 'Please create your profile first.' },
+  INVALID_IMAGE: {
+    httpStatus: 400,
+    message: 'Please upload a JPEG, PNG or WebP photo of at least 400×400 pixels.',
+  },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

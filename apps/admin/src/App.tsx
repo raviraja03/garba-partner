@@ -1,9 +1,13 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, Link, RouterProvider } from 'react-router';
 import { AdminAuthProvider } from './features/auth/AdminAuthProvider';
 import { PublicOnly, RequireAdmin } from './features/auth/guards';
+import { ApiClientError } from './lib/api-client';
 import { AdminLayout } from './pages/AdminLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { LoginPage } from './pages/LoginPage';
+import { UserDetailPage } from './pages/UserDetailPage';
+import { UsersPage } from './pages/UsersPage';
 
 function NotFoundPage() {
   return (
@@ -15,6 +19,17 @@ function NotFoundPage() {
     </main>
   );
 }
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 15_000,
+      retry: (failureCount, error) =>
+        !(error instanceof ApiClientError && error.status >= 400 && error.status < 500) &&
+        failureCount < 2,
+    },
+  },
+});
 
 const router = createBrowserRouter([
   {
@@ -31,6 +46,13 @@ const router = createBrowserRouter([
             element: <RequireAdmin permission="dashboard:view" />,
             children: [{ path: '/', element: <DashboardPage /> }],
           },
+          {
+            element: <RequireAdmin permission="users:view" />,
+            children: [
+              { path: '/users', element: <UsersPage /> },
+              { path: '/users/:userId', element: <UserDetailPage /> },
+            ],
+          },
         ],
       },
     ],
@@ -40,8 +62,10 @@ const router = createBrowserRouter([
 
 export function App() {
   return (
-    <AdminAuthProvider>
-      <RouterProvider router={router} />
-    </AdminAuthProvider>
+    <QueryClientProvider client={queryClient}>
+      <AdminAuthProvider>
+        <RouterProvider router={router} />
+      </AdminAuthProvider>
+    </QueryClientProvider>
   );
 }

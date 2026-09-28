@@ -18,11 +18,16 @@ export type Gender = (typeof GENDERS)[number];
 export const PARTNER_GENDER_PREFERENCES = ['women', 'men', 'everyone'] as const;
 export type PartnerGenderPreference = (typeof PARTNER_GENDER_PREFERENCES)[number];
 
-export const EXPERIENCE_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
-export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number];
+/** Self-declared Garba skill level. */
+export const GARBA_LEVELS = ['beginner', 'intermediate', 'advanced'] as const;
+export type GarbaLevel = (typeof GARBA_LEVELS)[number];
 
-export const DANCE_STYLES = ['garba', 'dandiya_raas'] as const;
-export type DanceStyle = (typeof DANCE_STYLES)[number];
+/**
+ * Computed from the profile (never stored): `not_started` = no profile yet, `incomplete` = required
+ * fields missing (e.g. no photo), `complete` = ready to be shown to other members.
+ */
+export const PROFILE_STATUSES = ['not_started', 'incomplete', 'complete'] as const;
+export type ProfileStatus = (typeof PROFILE_STATUSES)[number];
 
 export const SESSION_REVOKE_REASONS = [
   'logout',

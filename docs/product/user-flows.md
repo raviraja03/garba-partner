@@ -121,14 +121,14 @@ Onboarding is a single multi-step form. Progress is kept on the client and submi
 | 1. Age gate | Date of birth, plus a checkbox confirming "I am 18 or older" | Age computed server-side in `Asia/Kolkata`. **< 18 → rejected** (see below) |
 | 2. Basics | First name (display name), gender (`woman`, `man`, `non_binary`) | Name: 2–30 characters, letters/spaces/`.`/`'`/`-` only, no digits (discourages phone numbers) |
 | 3. Location | City (from the active list), area (optional, from the city's list) and a "Show my area on my profile" toggle (default **off**) | Only admin-seeded cities/areas. No free text and **no GPS** |
-| 4. Dance | Experience (`beginner`, `intermediate`, `advanced`), styles (multi: `garba`, `dandiya_raas`) | At least one style |
+| 4. Dance | Garba level (`beginner`, `intermediate`, `advanced`), dates free for Garba (optional, up to 30 upcoming dates), Instagram ID (optional, private) | Level required |
 | 5. Partner preferences | Interested in partnering with (`women`, `men`, `everyone`), preferred age range | Age range 18–80, min ≤ max |
 | 6. About | Bio (optional) | ≤ `LIMITS.BIO_MAX_LENGTH` = 300 characters. Phone number/URL/email patterns are rejected with a friendly message |
 | 7. Photos | 1–6 photos, first one is primary | JPEG/PNG/WebP, ≤ 5 MB, ≥ 400×400 px. Server re-encodes and strips EXIF/GPS |
 | 8. Visibility & terms | **Visibility:** an explicit yes/no choice: "Show my profile in partner discovery (adult members in my city, and at events where I turn on 'looking for a partner')". Nothing is pre-selected, and choosing "no" means browsing events only. **Terms:** accept Terms of Service, Privacy Policy and Community Guidelines (current versions) | Visibility choice required (`discoveryEnabled`). Terms required. Version and timestamp are stored |
 | 9. Safety intro | Three-card safety introduction with a link to the safety centre | Informational |
 
-API: `POST /api/v1/me/profile` (steps 1–6 and 8), then `POST /api/v1/me/photos` for each photo. The server sets `onboarding_completed_at` once a profile exists **and** at least one photo is stored.
+API: `POST /api/v1/me/profile` (details), then `POST /api/v1/me/profile/image` (photo), then `PUT /api/v1/me/preferences`. The server sets `onboarding_completed_at` the first time the profile is **complete** (all required fields including the photo). *Implemented as a 3-step web onboarding; see [docs/users/user-profile.md](../users/user-profile.md).*
 
 ### 3.2 Underage handling
 
@@ -151,7 +151,7 @@ API: `POST /api/v1/me/profile` (steps 1–6 and 8), then `POST /api/v1/me/photos
 | First name, age (years), gender | Phone number, date of birth, surname |
 | City, and area only if the member chose to show it | GPS/exact location, home address |
 | Photos (approved or pending review, see §12.5) | Rejected photos, verification selfies |
-| Bio, experience, styles | Other events they're attending (except the shared event in event mode) |
+| Bio, Garba level, upcoming available dates | Instagram ID, other events they're attending (except the shared event in event mode) |
 | "Photo verified" badge (with explanation link) | "Last seen" timestamp, online status |
 | Context: "Also looking for a partner at \<event\>" (event mode only) | Their partner preferences, reports, sanctions |
 

@@ -4,11 +4,22 @@
  */
 export const LIMITS = {
   MIN_AGE: 18,
+  MAX_AGE: 100,
   PREF_AGE_MIN: 18,
   PREF_AGE_MAX: 80,
   DISPLAY_NAME_MIN: 2,
   DISPLAY_NAME_MAX: 30,
   BIO_MAX_LENGTH: 300,
+  INSTAGRAM_HANDLE_MAX: 30,
+  AVAILABLE_DATES_MAX: 30,
+  /** Available dates must be within this many days from today (IST). */
+  AVAILABLE_DATES_HORIZON_DAYS: 365,
+
+  // Profile image (docs/users/cloudinary.md)
+  PROFILE_IMAGE_MAX_BYTES: 5 * 1024 * 1024,
+  PROFILE_IMAGE_MIN_DIMENSION: 400,
+  PROFILE_IMAGE_MAX_DIMENSION: 8000,
+  PROFILE_IMAGE_UPLOADS_PER_HOUR: 20,
 
   // Member OTP login (docs/auth/otp-flow.md)
   OTP_LENGTH: 6,
@@ -26,4 +37,19 @@ export const LIMITS = {
   ADMIN_MAX_FAILED_LOGINS: 5,
   ADMIN_LOCKOUT_MINUTES: 15,
   ADMIN_PASSWORD_MIN_LENGTH: 12,
+
+  // Admin lists
+  ADMIN_PAGE_SIZE_DEFAULT: 20,
+  ADMIN_PAGE_SIZE_MAX: 50,
+  ADMIN_ACTION_REASON_MIN: 5,
+  ADMIN_ACTION_REASON_MAX: 500,
 } as const;
+
+/** Accepted upload types; the server verifies by decoding, not by trusting this header. */
+export const PROFILE_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/** Current Terms of Service / Privacy Policy version accepted during onboarding. */
+export const CURRENT_TERMS_VERSION = '2026-09-01';
+
+/** Business dates (age, "today") are evaluated in India Standard Time. */
+export const BUSINESS_TIME_ZONE = 'Asia/Kolkata';

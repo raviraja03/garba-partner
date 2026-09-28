@@ -364,8 +364,8 @@ All paths are prefixed with `/api/v1`.
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/health` | P | `{ status: 'ok', db: 'ok' }` |
-| GET | `/cities` | P | Active cities |
-| GET | `/cities/:cityId/areas` | P | Active areas of a city |
+| GET | `/cities` ✅ | P | Active cities |
+| GET | `/cities/:cityId/areas` ✅ | P | Active areas of a city |
 | GET | `/legal/versions` | P | Current terms/privacy/guidelines versions |
 
 ### 5.2 Auth
@@ -404,12 +404,14 @@ Example: `POST /api/v1/auth/verify-otp`
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | `/me` | U | `MeDto`: own full profile incl. DOB, preferences, settings, status, sanction info if suspended |
-| POST | `/me/profile` | U | Create profile (onboarding). Body: dob, confirmsAdult, displayName, gender, cityId, areaId?, showArea, experience, styles, partnerGenderPreference, ageMin, ageMax, bio?, discoveryEnabled, acceptedTermsVersion |
-| PATCH | `/me/profile` | M* | Update profile (no DOB). *Also allowed while onboarding is in progress |
-| PATCH | `/me/settings` | U | `{ discoveryEnabled?, showArea? }` |
-| POST | `/me/photos` | U | multipart `photo` → `PhotoDto` (rate limit 20/h) |
-| DELETE | `/me/photos/:photoId` | U | Delete own photo |
-| PUT | `/me/photos/order` | U | `{ photoIds: uuid[] }`: must be exactly the user's non-rejected photos |
+| GET | `/me/profile` ✅ | U* | Own profile + preferences + `profileStatus` + completion |
+| POST | `/me/profile` ✅ | U* | Create profile (onboarding): name, dateOfBirth, gender, cityId, areaId?, bio?, instagramId?, garbaLevel, availableDates?, confirmsAdult, acceptTerms. Full reference: [docs/users/user-profile.md](../users/user-profile.md) |
+| GET | `/me/profile/preview` ✅ | U* | Own profile as other members see it |
+| PUT | `/me/preferences` ✅ | U* | `{ preferredGender?, minAge?, maxAge?, verifiedOnly?, discoveryEnabled?, showArea? }` |
+| POST | `/me/profile/image` ✅ | U* | multipart `image` → Cloudinary (EXIF stripped). 20/h per member |
+| DELETE | `/me/profile/image` ✅ | U* | Remove the photo |
+| PATCH | `/me/profile` ✅ | U* | Update profile (no DOB). *U\* = active or suspended members |
+| POST | `/me/photos`, DELETE `/me/photos/:photoId`, PUT `/me/photos/order` | U | *(planned: multiple photos)* |
 | GET | `/me/verification` | U | Current verification state |
 | POST | `/me/verification` | M | Start → `{ requestId, gesture: { code, instruction } }` |
 | POST | `/me/verification/:requestId/selfie` | M | multipart `selfie` |
@@ -427,8 +429,8 @@ Example: `PublicProfileDto` (what other members receive):
   "city": { "id": "…", "name": "Pune" },
   "area": null,
   "bio": "Dancing since school — two-taali to dodhiyu.",
-  "experience": "advanced",
-  "styles": ["garba", "dandiya_raas"],
+  "garbaLevel": "advanced",
+  "availableDates": ["2026-10-03"],
   "photos": [{ "id": "…", "publicId": "garba-partner/production/profile-photos/…/abc", "width": 1200, "height": 1600 }],
   "photoVerified": true,
   "context": { "sharedEventId": "…" }
@@ -449,8 +451,8 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/discovery` | M | Query: `mode=event\|city`, `eventId` (event mode), `cityId` (city mode, defaults to own), `experience[]`, `styles[]`, `ageMin`, `ageMax`, `verifiedOnly`, `cursor`, `limit` → `PublicProfileDto[]`. Rate limit 60/min |
-| GET | `/users/:userId/profile` | M | `PublicProfileDto`, gated by the interaction gate. `404` if blocked, ineligible or unknown |
+| GET | `/discovery` | M | Query: `mode=event\|city`, `eventId` (event mode), `cityId` (city mode, defaults to own), `garbaLevel[]`, `ageMin`, `ageMax`, `verifiedOnly`, `cursor`, `limit` → `PublicProfileDto[]`. Rate limit 60/min |
+| GET | `/users/:userId/profile` ✅ | M | `PublicProfileDto` (allow-list). `404` if unknown, inactive or incomplete (and, once blocking exists, blocked) |
 
 ### 5.6 Interests, matches, chat
 
@@ -491,7 +493,8 @@ Example: `PublicProfileDto` (what other members receive):
 | POST | `/admin/auth/refresh` ✅, `/admin/auth/logout` ✅ | cookie (+ `X-Requested-With: gp-admin`) / any admin |
 | GET | `/admin/auth/me` ✅ | any admin → `AdminMeDto` (incl. permissions) |
 | GET | `/admin/dashboard` | `dashboard:view` |
-| GET | `/admin/users`, `/admin/users/:id` | `users:view` |
+| GET | `/admin/users` ✅, `/admin/users/:id` ✅ | `users:view` |
+| POST | `/admin/users/:id/suspend` ✅, `/admin/users/:id/reactivate` ✅ | `users:sanction`: `{ reason }`, audited |
 | POST | `/admin/users/:id/sanctions` | `users:sanction` — `{ type: 'warning'\|'suspension'\|'ban', durationDays?, reason, reportId? }` |
 | POST | `/admin/sanctions/:id/revoke` | `users:sanction` — `{ reason }` |
 | POST | `/admin/users/:id/clear-auto-hide` | `users:sanction` |

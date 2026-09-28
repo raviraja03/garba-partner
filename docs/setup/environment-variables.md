@@ -70,6 +70,18 @@ Details: [docs/auth/](../auth/authentication.md).
 
 Empty values (`KEY=`) count as "not set". Generate every secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
 
+### Profile images
+
+Details: [docs/users/cloudinary.md](../users/cloudinary.md).
+
+| Variable | Required | Default | Used by | Notes |
+|---|---|---|---|---|
+| `MEDIA_STORAGE` | no | `local` | api | `cloudinary` \| `local`. **`local` (disk + served by the API) is only accepted when `APP_ENV=development`** |
+| `CLOUDINARY_CLOUD_NAME` | with `cloudinary` | — | api | |
+| `CLOUDINARY_API_KEY` | with `cloudinary` | — | api | |
+| `CLOUDINARY_API_SECRET` | with `cloudinary` | — | api | **Secret**, server only |
+| `CLOUDINARY_FOLDER_PREFIX` | no | `garba-partner` | api | Assets go to `<prefix>/<APP_ENV>/profile-images/` |
+
 ### Web & Admin (public, `VITE_*`)
 
 | Variable | Required | Default | Used by | Notes |
@@ -84,7 +96,6 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 |---|---|
 | Production SMS | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` (with a real `SMS_PROVIDER` value) |
 | Admin 2FA | `TOTP_ENCRYPTION_KEY` |
-| Media | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER_PREFIX`, `VITE_CLOUDINARY_CLOUD_NAME` |
 | Realtime | `VITE_SOCKET_URL` |
 | Payments (post-MVP) | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
 

@@ -1,8 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { MigrationFn } from 'umzug';
 import type {
-  DanceStyle,
-  ExperienceLevel,
+  GarbaLevel,
   Gender,
   PartnerGenderPreference,
   UserStatus,
@@ -21,7 +20,8 @@ import {
 
 /**
  * Safe development data: fictional people, obviously fake phone numbers (no SMS is ever sent
- * in development), no real photos and no identity documents. Never runs in production.
+ * in development), no photos (so every seeded profile is "incomplete"), no Instagram handles and
+ * no identity documents. Only runs when APP_ENV=development.
  */
 
 const TERMS_VERSION = '2026-09-01';
@@ -36,8 +36,9 @@ interface SeedUser {
     dateOfBirth: string;
     gender: Gender;
     bio: string | null;
-    experience: ExperienceLevel;
-    styles: DanceStyle[];
+    garbaLevel: GarbaLevel;
+    cityId: string;
+    areaId: string | null;
   };
   preferences?: {
     partnerGenderPreference: PartnerGenderPreference;
@@ -61,8 +62,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '2000-03-14',
       gender: 'woman',
       bio: 'Dancing since school — two-taali to dodhiyu. Looking for someone who can keep up!',
-      experience: 'advanced',
-      styles: ['garba', 'dandiya_raas'],
+      garbaLevel: 'advanced',
+      cityId: 'c1000000-0000-4000-8000-000000000005',
+      areaId: 'a2000000-0005-4000-8000-000000000001',
     },
     preferences: {
       partnerGenderPreference: 'everyone',
@@ -81,8 +83,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '1997-07-02',
       gender: 'man',
       bio: 'Competition dancer. Need a partner who knows the steps.',
-      experience: 'advanced',
-      styles: ['garba'],
+      garbaLevel: 'advanced',
+      cityId: 'c1000000-0000-4000-8000-000000000001',
+      areaId: 'a2000000-0001-4000-8000-000000000002',
     },
     preferences: {
       partnerGenderPreference: 'women',
@@ -101,8 +104,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '2004-01-20',
       gender: 'woman',
       bio: 'First Navratri in Surat. Happy to meet at the venue.',
-      experience: 'beginner',
-      styles: ['garba'],
+      garbaLevel: 'beginner',
+      cityId: 'c1000000-0000-4000-8000-000000000003',
+      areaId: null,
     },
     preferences: {
       partnerGenderPreference: 'men',
@@ -120,8 +124,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '1992-11-09',
       gender: 'man',
       bio: null,
-      experience: 'intermediate',
-      styles: ['dandiya_raas'],
+      garbaLevel: 'intermediate',
+      cityId: 'c1000000-0000-4000-8000-000000000004',
+      areaId: 'a2000000-0004-4000-8000-000000000001',
     },
     // Browses events only: not discoverable.
     preferences: {
@@ -140,8 +145,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '1999-05-27',
       gender: 'non_binary',
       bio: 'Here for the music and the circle.',
-      experience: 'intermediate',
-      styles: ['garba', 'dandiya_raas'],
+      garbaLevel: 'intermediate',
+      cityId: 'c1000000-0000-4000-8000-000000000001',
+      areaId: null,
     },
     preferences: {
       partnerGenderPreference: 'everyone',
@@ -166,8 +172,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '1995-02-11',
       gender: 'man',
       bio: null,
-      experience: 'beginner',
-      styles: ['garba'],
+      garbaLevel: 'beginner',
+      cityId: 'c1000000-0000-4000-8000-000000000002',
+      areaId: null,
     },
     preferences: {
       partnerGenderPreference: 'women',
@@ -185,8 +192,9 @@ const SEED_USERS: readonly SeedUser[] = [
       dateOfBirth: '1998-09-30',
       gender: 'woman',
       bio: null,
-      experience: 'intermediate',
-      styles: ['garba'],
+      garbaLevel: 'intermediate',
+      cityId: 'c1000000-0000-4000-8000-000000000001',
+      areaId: 'a2000000-0001-4000-8000-000000000001',
     },
     preferences: {
       partnerGenderPreference: 'everyone',
@@ -217,7 +225,7 @@ export const up: MigrationFn<SeederContext> = async ({ context: { sequelize, env
 
   await sequelize.transaction(async (transaction) => {
     for (const seed of SEED_USERS) {
-      const onboarded = seed.profile !== undefined;
+      const hasProfile = seed.profile !== undefined;
       const verified = seed.verification?.status === 'approved';
 
       await User.create(
@@ -227,9 +235,10 @@ export const up: MigrationFn<SeederContext> = async ({ context: { sequelize, env
           phoneEncrypted: encryptString(seed.phone, encryptionKey),
           phoneKeyVersion: env.PHONE_ENCRYPTION_KEY_VERSION,
           status: seed.status,
-          onboardingCompletedAt: onboarded ? new Date(now - 20 * DAY_MS) : null,
-          termsVersion: onboarded ? TERMS_VERSION : null,
-          termsAcceptedAt: onboarded ? new Date(now - 20 * DAY_MS) : null,
+          // Seeded profiles have no photo, so none of them is complete/onboarded.
+          onboardingCompletedAt: null,
+          termsVersion: hasProfile ? TERMS_VERSION : null,
+          termsAcceptedAt: hasProfile ? new Date(now - 20 * DAY_MS) : null,
           photoVerifiedAt: verified ? new Date(now - 10 * DAY_MS) : null,
           lastActiveAt: new Date(now - DAY_MS),
           deletionRequestedAt:

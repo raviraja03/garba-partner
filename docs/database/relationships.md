@@ -24,6 +24,10 @@ flowchart LR
 | `users` | `user_sessions` | 1 : 0..n | `user_sessions.user_id` | FK | `CASCADE` | `User.hasMany(UserSession)` as `sessions` / `belongsTo` as `user` |
 | `users` | `user_verifications` | 1 : 0..n (at most one **open** per type) | `user_verifications.user_id` | FK + partial unique index | `CASCADE` | `User.hasMany(UserVerification)` as `verifications` / `belongsTo` as `user` |
 | `admin_users` | `admin_sessions` | 1 : 0..n | `admin_sessions.admin_id` | FK | `CASCADE` | `AdminUser.hasMany(AdminSession)` as `sessions` / `AdminSession.belongsTo(AdminUser)` as `admin` |
+| `cities` | `areas` | 1 : 0..n | `areas.city_id` | FK | `RESTRICT` | `City.hasMany(Area)` / `Area.belongsTo(City)` |
+| `cities` | `user_profiles` | 1 : 0..n | `user_profiles.city_id` | FK | `RESTRICT` | `UserProfile.belongsTo(City)` as `city` |
+| `areas` | `user_profiles` | 0..1 : 0..n | `(user_profiles.area_id, city_id)` | **Composite FK** → `areas (id, city_id)` | `RESTRICT` | `UserProfile.belongsTo(Area)` as `area` |
+| `admin_users` | `admin_audit_logs` | 1 : 0..n | `admin_audit_logs.admin_id` | FK | `RESTRICT` | none (written through `recordAdminAction()`) |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.
@@ -95,5 +99,4 @@ The development seeder already follows this pattern (`src/seeders/20260925110000
 
 | Relationship | Added by |
 |---|---|
-| `user_profiles.city_id → cities.id`, `user_profiles.area_id → areas.id` | Locations migration |
 | Users → events, attendances, interests, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |
