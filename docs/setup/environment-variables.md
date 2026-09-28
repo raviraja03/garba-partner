@@ -48,11 +48,27 @@ Setup guide: [docs/database/database-setup.md](../database/database-setup.md).
 
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
-| `PHONE_HASH_SECRET` | production, and to create users | — | api, seeders | ≥ 32 characters (e.g. 32 random bytes, base64). HMAC key for `users.phone_hash`. **Long-lived: rotating it requires a re-hash migration** |
-| `PHONE_ENCRYPTION_KEY` | production, and to create users | — | api, seeders | 32 bytes, base64-encoded. AES-256-GCM key for `users.phone_encrypted` |
+| `PHONE_HASH_SECRET` | **yes** | — | api, seeders | ≥ 32 characters (e.g. 32 random bytes, base64). HMAC key for `users.phone_hash`. **Long-lived: rotating it requires a re-hash migration** |
+| `PHONE_ENCRYPTION_KEY` | **yes** | — | api, seeders | 32 bytes, base64-encoded. AES-256-GCM key for `users.phone_encrypted` |
 | `PHONE_ENCRYPTION_KEY_VERSION` | no | `1` | api, seeders | Stored with each ciphertext to support key rotation |
 
-Empty values (`KEY=`) count as "not set".
+### Authentication
+
+Details: [docs/auth/](../auth/authentication.md).
+
+| Variable | Required | Default | Used by | Notes |
+|---|---|---|---|---|
+| `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for stored OTP codes and client-IP hashes |
+| `SMS_PROVIDER` | no | `dev` | api | `dev` = no SMS, and the code is returned in the send-otp response. **Only accepted when `APP_ENV=development`** (boot fails otherwise). Real providers are added before launch |
+| `JWT_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs member access tokens |
+| `JWT_ADMIN_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs admin access tokens. **Must differ** from `JWT_ACCESS_SECRET` |
+| `ACCESS_TOKEN_TTL_SECONDS` | no | `900` | api | 60–3600 |
+| `REFRESH_TOKEN_TTL_DAYS` | no | `30` | api | 1–90 (absolute member session lifetime) |
+| `ADMIN_ACCESS_TOKEN_TTL_SECONDS` | no | `900` | api | 60–3600 |
+| `ADMIN_SESSION_TTL_HOURS` | no | `12` | api | 1–24 (absolute admin session lifetime) |
+| `ADMIN_SESSION_IDLE_MINUTES` | no | `30` | api | 5–240 |
+
+Empty values (`KEY=`) count as "not set". Generate every secret with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
 
 ### Web & Admin (public, `VITE_*`)
 
@@ -66,8 +82,8 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 
 | Phase | Variables |
 |---|---|
-| Member auth | `JWT_ACCESS_SECRET`, `ACCESS_TOKEN_TTL_SECONDS`, `REFRESH_TOKEN_TTL_DAYS`, `OTP_HMAC_SECRET`, `SMS_PROVIDER`, `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID`, `TEST_OTP_PHONES`, `TEST_OTP_CODE` |
-| Admin auth | `JWT_ADMIN_ACCESS_SECRET`, `ADMIN_REFRESH_TOKEN_TTL_HOURS`, `TOTP_ENCRYPTION_KEY` |
+| Production SMS | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` (with a real `SMS_PROVIDER` value) |
+| Admin 2FA | `TOTP_ENCRYPTION_KEY` |
 | Media | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER_PREFIX`, `VITE_CLOUDINARY_CLOUD_NAME` |
 | Realtime | `VITE_SOCKET_URL` |
 | Payments (post-MVP) | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |

@@ -85,7 +85,7 @@ Optionally include the issue number: `feat/42-photo-upload`.
 
 ## Security & safety checklist
 - [ ] Input validated with shared Zod schema (strict)
-- [ ] Authorization: requireMember/requireAdmin(permission) + ownership/participant checks
+- [ ] Authorization: authenticateMember + requireActiveMember / authenticateAdmin + requirePermission(p) + ownership/participant checks
 - [ ] Interaction gate (blocks/suspension) applied where one user affects another
 - [ ] No private data (phone, DOB, exact location, attendance) in responses/logs
 - [ ] Rate limiting considered for new sensitive endpoints

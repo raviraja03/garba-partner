@@ -113,7 +113,7 @@ export class UserVerification extends Model<
   @Column({ type: DataType.DATE, allowNull: true })
   expiresAt!: CreationOptional<Date | null>;
 
-  /** Admin who decided a manual review. FK to `admin_users` is added in the admin phase. */
+  /** Admin who decided a manual review (FK → admin_users, ON DELETE RESTRICT). */
   @Column({ type: DataType.UUID, allowNull: true })
   reviewedByAdminId!: CreationOptional<string | null>;
 

@@ -33,11 +33,14 @@ TEST_DATABASE_URL=postgres://gp_dev:<password>@127.0.0.1:5432/garba_partner_test
 DATABASE_SSL=false
 DATABASE_POOL_MAX=10
 
-# Needed to create users (seeders). Generate each value with:
+# Required. Generate each value with:
 #   node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
 PHONE_HASH_SECRET=<random>
 PHONE_ENCRYPTION_KEY=<random 32-byte base64>
 PHONE_ENCRYPTION_KEY_VERSION=1
+OTP_HMAC_SECRET=<random>
+JWT_ACCESS_SECRET=<random>
+JWT_ADMIN_ACCESS_SECRET=<random, different>
 ```
 
 URL-encode special characters in the password (e.g. `@` → `%40`). See [environment variables](../setup/environment-variables.md) for every option.
@@ -71,6 +74,8 @@ curl http://127.0.0.1:4000/api/v1/health
 | Neha | pending_deletion | ✅ | ❌ | — | Deletion grace period |
 
 IDs are fixed (`a1f0c3de-000N-4000-8000-00000000000N`), so `db:seed:undo` removes exactly these rows.
+
+`20260925120000-dev-admins` adds three admins (`superadmin@`, `moderator@` and `events@garbapartner.test`). They share the development password `garba-dev-admin-2026` and exist **only** in development databases ([authentication §5](../auth/authentication.md#5-local-development)).
 
 ## 3. How the API connects
 

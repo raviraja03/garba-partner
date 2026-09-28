@@ -33,6 +33,13 @@ function migrationName(filePath: string): string {
   return basename(filePath).replace(/\.(ts|js)$/, '');
 }
 
+/** Umzug log events look like `{ event: 'migrated', name: '2026…-create-users' }`. */
+function describeEvent(event: Record<string, unknown>): string {
+  const action = typeof event.event === 'string' ? event.event : 'event';
+  const name = typeof event.name === 'string' ? event.name : '';
+  return `${action} ${name}`.trim();
+}
+
 function createRunner<TContext extends object>(options: {
   directory: 'migrations' | 'seeders';
   tableName: string;
@@ -58,19 +65,25 @@ function createRunner<TContext extends object>(options: {
       },
     },
     context: options.context,
-    storage: new SequelizeStorage({ sequelize: options.sequelize, tableName: options.tableName }),
+    // A distinct modelName per table is required: SequelizeStorage reuses an already-defined
+    // model with the same name, which would silently log seeders into schema_migrations.
+    storage: new SequelizeStorage({
+      sequelize: options.sequelize,
+      tableName: options.tableName,
+      modelName: options.tableName,
+    }),
     logger: {
       info: (event) => {
-        options.logger.info(event, options.directory);
+        options.logger.info(event, `${options.directory}: ${describeEvent(event)}`);
       },
       warn: (event) => {
-        options.logger.warn(event, options.directory);
+        options.logger.warn(event, `${options.directory}: ${describeEvent(event)}`);
       },
       error: (event) => {
-        options.logger.error(event, options.directory);
+        options.logger.error(event, `${options.directory}: ${describeEvent(event)}`);
       },
       debug: (event) => {
-        options.logger.debug(event, options.directory);
+        options.logger.debug(event, `${options.directory}: ${describeEvent(event)}`);
       },
     },
   });

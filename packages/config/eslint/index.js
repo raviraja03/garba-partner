@@ -89,6 +89,16 @@ export function createEslintConfig({ tsconfigRootDir }) {
       rules: { 'no-console': 'error' },
     },
 
+    // Tests: HTTP response bodies (supertest) are untyped JSON; asserting on them is the point.
+    {
+      files: ['**/*.test.ts', '**/*.test.tsx'],
+      rules: {
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+      },
+    },
+
     // Isomorphic shared package: no Node built-ins, it is bundled into browsers.
     {
       files: ['packages/shared/src/**/*.ts'],

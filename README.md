@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation and database layer complete. The monorepo, tooling, shared packages, API with `GET /api/v1/health` (API + database), PostgreSQL schema for users/profiles/preferences/sessions/verifications with migrations and seeders, and the web/admin shells are in place. No product features yet (OTP login, profiles UI, events, matching, chat and payments come in later phases). See the [roadmap](#development-roadmap).
+> **Status:** Foundation, database layer and **authentication** complete: mobile OTP login for members, email/password login for admins, rotating DB-backed sessions, and protected routes in the web and admin apps. Next: onboarding/profile. Events, matching, chat and payments come in later phases. See the [roadmap](#development-roadmap).
 
 ---
 
@@ -42,7 +42,7 @@ See [Product overview](docs/product/product-overview.md) for the full vision, ro
 | ORM | Sequelize 6 / sequelize-typescript, Umzug TypeScript migrations and seeders |
 | Realtime | Socket.IO *(chat phase)* |
 | Image storage | Cloudinary *(profile phase)* |
-| Authentication | Mobile OTP + JWT access token + rotating refresh-token sessions *(auth phase)* |
+| Authentication | Members: mobile OTP. Admins: email + Argon2id password. Short-lived JWT access tokens (`jose`) + rotating refresh tokens in httpOnly cookies, sessions in PostgreSQL |
 | Payments | Razorpay *(post-MVP)* |
 | Deployment | Nginx + PM2 on a VPS |
 
@@ -74,7 +74,7 @@ cp .env.example .env          # PowerShell: Copy-Item .env.example .env
 ```
 
 - `.env` lives at the repo root and is **git-ignored. Never commit it.** `.env.example` documents every variable.
-- Fill in the database and phone-protection values: create the role and databases, then set `DATABASE_URL`, `TEST_DATABASE_URL`, `PHONE_HASH_SECRET` and `PHONE_ENCRYPTION_KEY` as described in [docs/database/database-setup.md](docs/database/database-setup.md). Everything else works as-is locally.
+- Fill in the required values: create the database role and databases, then set `DATABASE_URL` and `TEST_DATABASE_URL` ([docs/database/database-setup.md](docs/database/database-setup.md)). Generate `PHONE_HASH_SECRET`, `PHONE_ENCRYPTION_KEY`, `OTP_HMAC_SECRET`, `JWT_ACCESS_SECRET` and `JWT_ADMIN_ACCESS_SECRET` with `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`. Everything else works as-is locally.
 - The API validates its environment at startup and refuses to start if anything is invalid.
 - Only `VITE_*` variables reach the browser. Never put secrets in them.
 - Don't set `NODE_ENV` in `.env` (it would make Vite build development React bundles).
@@ -89,6 +89,14 @@ npm run db:seed       # fictional development users (never runs in production)
 ```
 
 Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-setup.md](docs/database/database-setup.md).
+
+## Logging in locally
+
+- **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
+- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`.
+- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password.
+
+Details: [docs/auth/authentication.md](docs/auth/authentication.md).
 
 ## Development commands
 
@@ -108,6 +116,7 @@ Run from the repository root:
 | `npm run db:migrate` / `db:migrate:undo` / `db:migrate:status` | Apply / revert last / list migrations |
 | `npm run db:seed` / `db:seed:undo` | Load / remove fictional development data |
 | `npm run db:reset` | Rebuild the development database (undo all → migrate → seed) |
+| `npm run admin:create -- --email … --name … --role …` | Create an admin account (prints a one-time password) |
 | `npm run start:api` | Run the built API (`apps/api/dist`) |
 | `npm run preview:web` / `preview:admin` | Serve the built web/admin apps |
 
@@ -117,9 +126,9 @@ Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/s
 
 | App | Workspace | Dev URL | Description |
 |---|---|---|---|
-| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: `GET /api/v1/health` (reports API and database status) |
-| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: landing shell with an API status indicator |
-| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: console shell with an API status indicator |
+| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: health, member auth (`/auth/send-otp`, `/auth/verify-otp`, `/auth/refresh`, `/auth/logout`, `/auth/me`) and admin auth (`/admin/auth/*`) |
+| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login, OTP verification, protected home, logout |
+| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, protected console with role-based navigation, sign out |
 
 Both Vite dev servers proxy `/api` to the API, so the apps use same-origin requests, as they will in production behind Nginx.
 
@@ -161,6 +170,15 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Local development](docs/setup/local-development.md) | Prerequisites, install, running apps, quality checks, troubleshooting |
 | [Environment variables](docs/setup/environment-variables.md) | Every variable, validation, planned variables, rules for adding new ones |
 | [Project structure](docs/setup/project-structure.md) | Workspaces, dependency rules, TypeScript/ESLint configuration |
+
+### Authentication
+
+| Document | Contents |
+|---|---|
+| [Authentication](docs/auth/authentication.md) | Overview and **API reference for every auth endpoint** (member + admin), rate limits, local login, tests, known limitations |
+| [OTP flow](docs/auth/otp-flow.md) | Sequence, rules, storage/privacy, development OTP mechanism, edge cases |
+| [Session management](docs/auth/session-management.md) | JWT + refresh-token strategy, rotation and reuse detection, CSRF, client behaviour |
+| [Authorization](docs/auth/authorization.md) | Middleware, member status matrix, admin permission matrix, user/admin separation |
 
 ### Database
 
@@ -209,8 +227,8 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 |---|---|---|---|
 | — | Architecture & docs | Product, architecture and development documentation | ✅ Done |
 | **0** | Foundation | Monorepo, `packages/config` & `packages/shared`, TypeScript/ESLint/Prettier, API skeleton (health, envelope, error handling, redacted logging, tests), web/admin shells, setup docs | ✅ Done. Still open from the planned scope: CI workflow, PR template |
-| **1** | Member auth & profile | ✅ **Database layer:** PostgreSQL connection, Umzug migrations/seeders, `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, DB health check. ⏳ **Remaining:** OTP login, sessions/JWT, onboarding with 18+ gate, profile API, photo upload with EXIF stripping, cities/areas, settings, account deletion | 🟡 In progress |
-| **2** | Admin foundation & events | Admin auth + TOTP, roles, audit log, admin management, cities/areas CRUD, events CRUD/publish/cancel, member events & attendance, in-app notifications | Planned |
+| **1** | Member auth & profile | ✅ **Database layer:** PostgreSQL, Umzug migrations/seeders, user tables, DB health check. ✅ **Authentication:** OTP login, rotating sessions, logout, `/auth/me`, auth/authorization middleware, web login/OTP/protected routes, admin login (password) + protected admin routes. ⏳ **Remaining:** onboarding with 18+ gate, profile API, photo upload with EXIF stripping, cities/areas, settings, account deletion | 🟡 In progress |
+| **2** | Admin foundation & events | Admin TOTP 2FA + forced password change (login/roles already done), audit log, admin management, cities/areas CRUD, events CRUD/publish/cancel, member events & attendance, in-app notifications | Planned |
 | **3** | Discovery, interests, matches & safety core | Event & city discovery, interests, matches, unmatch, block, report user, auto-hide, report queue, sanctions, user management | Planned |
 | **4** | Chat | Socket.IO chat, history, read receipts, message reports, contact-sharing nudge, realtime enforcement of blocks/sanctions | Planned |
 | **5** | Verification & moderation | Photo verification, verification & photo review queues, selfie retention job, safety centre | Planned |

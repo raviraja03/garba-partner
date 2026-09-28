@@ -126,7 +126,7 @@ packages/config/
 
 `loadServerEnv()` also enforces cross-field rules:
 
-- `APP_ENV=production` ⇒ `SMS_PROVIDER !== 'mock'` and `TEST_OTP_PHONES` is empty.
+- `SMS_PROVIDER=dev` (codes returned in API responses) is only accepted when `APP_ENV=development`.
 - `JWT_ACCESS_SECRET !== JWT_ADMIN_ACCESS_SECRET`, and each secret is ≥ 32 bytes.
 - Keys decode to exactly 32 bytes.
 
@@ -205,9 +205,9 @@ apps/api/src/
 ├── jobs/                      # one file per job (expire-interests.job.ts ...)
 ├── middlewares/
 │   ├── request-id.ts
-│   ├── require-user.ts        # member auth (JWT aud=app + session + status)
-│   ├── require-member.ts      # onboarded + active
-│   ├── require-admin.ts       # admin auth + permission check
+│   ├── authenticate.ts        # authenticateMember / authenticateAdmin (JWT + session + status)
+│   ├── authorize.ts           # requireActiveMember, requirePermission(p)
+│   ├── csrf.ts                # custom header + Origin check for cookie endpoints
 │   ├── validate.ts            # zod validation of body/query/params
 │   ├── rate-limit.ts          # named limiters
 │   ├── upload.ts              # multer memory storage with limits
@@ -310,14 +310,14 @@ Defined in `packages/shared/src/errors/error-codes.ts`.
 
 ### 4.8 Authentication middleware (members)
 
-`requireUser`:
+`authenticateMember` (see [docs/auth/authorization.md](../auth/authorization.md)):
 
 1. Read `Authorization: Bearer <jwt>`. Verify the HS256 signature with `JWT_ACCESS_SECRET`, `aud = 'app'`, `iss = 'garba-partner'`, and `exp`.
 2. One query: `SELECT u.id, u.status, u.onboarding_completed_at, s.revoked_at FROM users u JOIN user_sessions s ON s.id = :sid AND s.user_id = u.id WHERE u.id = :sub`.
 3. Reject if there's no row, the session is revoked, or `status ∈ {banned, deleted}`.
 4. Attach `req.auth = { userId, sessionId, status, onboarded }`.
 
-`requireMember` (used by all social routes): `status === 'active'` (else `ACCOUNT_SUSPENDED` or the like) **and** `onboarded` (else `ONBOARDING_REQUIRED`).
+`requireActiveMember` (used by all social routes): `status === 'active'` (else `ACCOUNT_SUSPENDED`, `ACCOUNT_PENDING_DELETION` or `ACCOUNT_BANNED`) **and** onboarded (else `FORBIDDEN`).
 
 Checking the DB per request means suspensions and logouts take effect immediately rather than after up to 15 min. The query is a PK join and costs ~1 ms. If it ever becomes hot, it can be cached in-process for ≤ 30 s.
 
@@ -353,7 +353,9 @@ Side effects outside the DB (Socket.IO emits, Cloudinary deletes) run **after co
 
 ## 5. API endpoint catalogue
 
-Auth legend: **P** = public, **U** = `requireUser` (any non-banned status, onboarding not required), **M** = `requireMember` (active + onboarded), **A:perm** = admin with permission.
+Auth legend: **P** = public, **U** = `authenticateMember` (any non-banned status, onboarding not required), **M** = `authenticateMember` + `requireActiveMember` (active + onboarded), **A:perm** = `authenticateAdmin` + `requirePermission(perm)`.
+
+> ✅ = implemented. The implemented auth endpoints are documented in full (request/response/errors) in [docs/auth/authentication.md](../auth/authentication.md).
 
 All paths are prefixed with `/api/v1`.
 
@@ -370,13 +372,13 @@ All paths are prefixed with `/api/v1`.
 
 | Method | Path | Auth | Rate limit | Description |
 |---|---|---|---|---|
-| POST | `/auth/otp/request` | P | per phone hash + per IP (DB-backed) | `{ phone }` → `{ expiresInSec, resendAvailableInSec }` |
-| POST | `/auth/otp/verify` | P | per IP | `{ phone, code }` → `{ accessToken, user: MeDto }` + refresh cookie |
-| POST | `/auth/refresh` | cookie | per IP | Rotates the refresh token → `{ accessToken, user: MeDto }`. Requires the `X-Requested-With: gp-web` header |
-| POST | `/auth/logout` | U | — | Revokes the current session, clears the cookie |
-| POST | `/auth/logout-all` | U | — | Revokes all sessions of the user |
+| POST | `/auth/send-otp` ✅ | P | per phone hash + per IP (DB-backed) | `{ phone }` → `{ expiresInSeconds, resendAvailableInSeconds, devOtp? }` |
+| POST | `/auth/verify-otp` ✅ | P | per IP | `{ phone, code }` → `{ accessToken, accessTokenExpiresAt, user: MeDto }` + refresh cookie |
+| POST | `/auth/refresh` ✅ | cookie | per IP | Rotates the refresh token → `{ accessToken, accessTokenExpiresAt, user: MeDto }`. Requires the `X-Requested-With: gp-web` header |
+| POST | `/auth/logout` ✅ | U | — | `{ allDevices?: boolean }`. Revokes the current session (or all sessions), clears the cookie |
+| GET | `/auth/me` ✅ | U | — | `MeDto` |
 
-Example: `POST /api/v1/auth/otp/verify`
+Example: `POST /api/v1/auth/verify-otp`
 
 ```json
 // request
@@ -483,11 +485,11 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/admin/auth/login` | P (rate limited) → `{ challengeId, requiresSetup }` |
-| POST | `/admin/auth/totp` | challenge → access token + admin refresh cookie |
-| POST | `/admin/auth/setup` | challenge (first login): new password + TOTP enrolment confirm |
-| POST | `/admin/auth/refresh`, `/admin/auth/logout` | cookie / admin |
-| GET | `/admin/me` | any admin |
+| POST | `/admin/auth/login` ✅ | P (rate limited, lockout). Today → `AdminSessionDto` + admin refresh cookie. With TOTP (planned) → `{ challengeId, requiresSetup }` |
+| POST | `/admin/auth/totp` | *(planned)* challenge → access token + admin refresh cookie |
+| POST | `/admin/auth/setup` | *(planned)* challenge (first login): new password + TOTP enrolment confirm |
+| POST | `/admin/auth/refresh` ✅, `/admin/auth/logout` ✅ | cookie (+ `X-Requested-With: gp-admin`) / any admin |
+| GET | `/admin/auth/me` ✅ | any admin → `AdminMeDto` (incl. permissions) |
 | GET | `/admin/dashboard` | `dashboard:view` |
 | GET | `/admin/users`, `/admin/users/:id` | `users:view` |
 | POST | `/admin/users/:id/sanctions` | `users:sanction` — `{ type: 'warning'\|'suspension'\|'ban', durationDays?, reason, reportId? }` |
@@ -520,7 +522,7 @@ Every admin write handler calls `auditService.log({ adminId, action, targetType,
 
 - Default namespace `/`, path `/socket.io`. Transports: WebSocket first, with long-polling fallback.
 - Client: `io({ auth: (cb) => cb({ token: getAccessToken() }) })`. The function form means every reconnect uses the latest token.
-- **Server auth middleware** (`io.use`): verifies the JWT and session exactly like `requireUser`, then requires `status = 'active'` and onboarding complete. Sets `socket.data = { userId, sessionId, tokenExp }` and joins room `user:{userId}`.
+- **Server auth middleware** (`io.use`): verifies the JWT and session exactly like `authenticateMember`, then requires `status = 'active'` and onboarding complete. Sets `socket.data = { userId, sessionId, tokenExp }` and joins room `user:{userId}`.
 - **Token expiry:** a per-socket timer disconnects at `tokenExp` with the reason `token_expired`. The client refreshes over HTTP, then reconnects.
 - Socket.IO `cors` is limited to `WEB_ORIGIN`. `maxHttpBufferSize: 16 KB`.
 - Admins don't use sockets in the MVP (admin queues refresh by polling every 30 s).

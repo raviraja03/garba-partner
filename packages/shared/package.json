@@ -16,10 +16,14 @@
   ],
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b",
-    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
+    "typecheck": "tsc -b && tsc -p test/tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "test": "vitest run --dir test"
   },
   "devDependencies": {
     "@garba-partner/config": "*"
+  },
+  "dependencies": {
+    "zod": "^4.6.5"
   }
 }

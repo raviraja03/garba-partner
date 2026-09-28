@@ -1,3 +1,4 @@
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
@@ -13,7 +14,7 @@ import { createApiRouter, type ApiDependencies } from './routes.js';
 export interface CreateAppOptions {
   env: ServerEnv;
   logger: Logger;
-  /** External dependencies (database, ...), injected so tests can replace them. */
+  /** External dependencies (database, SMS, ...), injected so tests can replace them. */
   dependencies: ApiDependencies;
 }
 
@@ -42,8 +43,9 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
   app.use(helmet());
   app.use(cors({ origin: [env.WEB_ORIGIN, env.ADMIN_ORIGIN], credentials: true }));
   app.use(express.json({ limit: '100kb' }));
+  app.use(cookieParser());
 
-  app.use(API_PREFIX, createApiRouter(dependencies));
+  app.use(API_PREFIX, createApiRouter({ env, logger, dependencies }));
 
   app.use(notFound);
   app.use(errorHandler);

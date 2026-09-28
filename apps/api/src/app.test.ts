@@ -1,14 +1,15 @@
-import { pino } from 'pino';
 import request from 'supertest';
 import { describe, expect, it } from 'vitest';
-import { loadServerEnv } from '@garba-partner/config/server';
-import { createApp } from './app.js';
+import { createSequelize } from './config/database.js';
+import { createTestApp } from './test/helpers.js';
 
-const env = loadServerEnv({
-  source: { NODE_ENV: 'test', DATABASE_URL: 'postgres://unused@127.0.0.1:5432/unused' },
+// No connection is opened: these tests never reach the database.
+const sequelize = createSequelize({
+  url: 'postgres://unused@127.0.0.1:5432/unused',
+  ssl: false,
+  poolMax: 1,
 });
-const logger = pino({ level: 'silent' });
-const app = createApp({ env, logger, dependencies: { pingDatabase: () => Promise.resolve(true) } });
+const app = createTestApp({ sequelize });
 
 describe('GET /api/v1/health', () => {
   it('returns the success envelope with status ok', async () => {
@@ -25,10 +26,9 @@ describe('GET /api/v1/health', () => {
   });
 
   it('returns 503 SERVICE_UNAVAILABLE when the database is down, without internal details', async () => {
-    const appWithoutDb = createApp({
-      env,
-      logger,
-      dependencies: { pingDatabase: () => Promise.resolve(false) },
+    const appWithoutDb = createTestApp({
+      sequelize,
+      pingDatabase: () => Promise.resolve(false),
     });
 
     const res = await request(appWithoutDb).get('/api/v1/health');

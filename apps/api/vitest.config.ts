@@ -12,11 +12,16 @@ function testDatabaseUrl(): string | undefined {
 }
 
 const testDbUrl = testDatabaseUrl();
+// Visible to global-setup.ts (main process) as well as to test workers.
+if (testDbUrl) process.env.TEST_DATABASE_URL = testDbUrl;
 
 export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    globalSetup: ['src/test/global-setup.ts'],
+    // Integration test files share one database, so files run one at a time.
+    fileParallelism: false,
     // Integration tests are skipped when no test database is configured.
     env: testDbUrl ? { TEST_DATABASE_URL: testDbUrl } : {},
   },

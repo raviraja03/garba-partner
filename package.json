@@ -33,6 +33,7 @@
     "db:seed": "npm run db:seed -w @garba-partner/api",
     "db:seed:undo": "npm run db:seed:undo -w @garba-partner/api",
     "db:reset": "npm run db:reset -w @garba-partner/api",
+    "admin:create": "npm run admin:create -w @garba-partner/api --",
     "preview:web": "npm run preview -w @garba-partner/web",
     "preview:admin": "npm run preview -w @garba-partner/admin",
     "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present",

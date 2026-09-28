@@ -174,10 +174,8 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `PHONE_ENCRYPTION_KEY` | api | 32-byte key, base64 (AES-256-GCM) |
 | `PHONE_ENCRYPTION_KEY_VERSION` | api | `1` |
 | `TOTP_ENCRYPTION_KEY` | api | 32-byte key, base64 (encrypts admin TOTP secrets) |
-| `SMS_PROVIDER` | api | `msg91` \| `twilio` \| `mock` (`mock` is rejected when `APP_ENV=production`) |
+| `SMS_PROVIDER` | api | `dev` today (no SMS; code returned in the response, **only accepted when `APP_ENV=development`**). A real provider (e.g. `msg91`) is added before launch |
 | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` | api | Provider credentials / DLT IDs |
-| `TEST_OTP_PHONES` | api | Comma-separated E.164 numbers. **Rejected when `APP_ENV=production`** |
-| `TEST_OTP_CODE` | api | 6 digits. Only with `TEST_OTP_PHONES` |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | api | Cloudinary credentials |
 | `CLOUDINARY_FOLDER_PREFIX` | api | `garba-partner/production` |
 | `LOG_LEVEL` | api | `info` in production |

@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { createSequelize, databaseConfigFromEnv, pingDatabase } from './config/database.js';
 import { readEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
+import { createSmsProvider } from './providers/sms/index.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -32,7 +33,15 @@ function start(): void {
   );
 
   const server = createServer(
-    createApp({ env, logger, dependencies: { pingDatabase: () => pingDatabase(sequelize) } }),
+    createApp({
+      env,
+      logger,
+      dependencies: {
+        sequelize,
+        sms: createSmsProvider(env),
+        pingDatabase: () => pingDatabase(sequelize),
+      },
+    }),
   );
 
   server.on('error', (err: NodeJS.ErrnoException) => {

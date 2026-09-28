@@ -2,7 +2,7 @@
 
 > **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
 
-Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
 
 ## 1. ERD
 
@@ -12,6 +12,8 @@ erDiagram
     users ||--o| user_preferences : "has (0..1)"
     users ||--o{ user_sessions : "has (0..n)"
     users ||--o{ user_verifications : "has (0..n)"
+    admin_users ||--o{ admin_sessions : "has (0..n)"
+    admin_users |o--o{ user_verifications : "reviews"
 
     users {
         uuid id PK
@@ -88,7 +90,50 @@ erDiagram
         timestamptz submitted_at
         timestamptz decided_at
         timestamptz expires_at
-        uuid reviewed_by_admin_id "FK added in admin phase"
+        uuid reviewed_by_admin_id FK "admin_users, RESTRICT"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    otp_requests {
+        uuid id PK
+        char64 phone_hash "HMAC, no FK (number may be new)"
+        char64 otp_hash "HMAC of the code"
+        smallint attempts
+        timestamptz expires_at
+        timestamptz consumed_at
+        timestamptz invalidated_at
+        char64 ip_hash
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    admin_users {
+        uuid id PK
+        varchar254 email UK "lowercase"
+        varchar100 name
+        varchar20 role "super_admin|moderator|event_manager"
+        text password_hash "Argon2id"
+        varchar20 status "active|disabled"
+        smallint failed_login_count
+        timestamptz locked_until
+        timestamptz last_login_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    admin_sessions {
+        uuid id PK
+        uuid admin_id FK
+        char64 refresh_token_hash UK
+        char64 previous_refresh_token_hash
+        timestamptz rotated_at
+        varchar255 user_agent
+        char64 ip_hash
+        timestamptz last_used_at "idle timeout"
+        timestamptz expires_at
+        timestamptz revoked_at
+        varchar30 revoked_reason
         timestamptz created_at
         timestamptz updated_at
     }
@@ -233,7 +278,7 @@ Indexes: `user_sessions_active_user_id_idx` (`user_id WHERE revoked_at IS NULL`)
 | `evidence_deleted_at` | timestamptz | yes | | When evidence was purged |
 | `failure_reason` | varchar(30) | yes | | Set exactly when `rejected`: `gesture_mismatch`, `face_not_visible`, `does_not_match_photos`, `inappropriate`, `provider_failed`, `other` |
 | `submitted_at` / `decided_at` / `expires_at` | timestamptz | yes | | `decided_at` is required for approved/rejected |
-| `reviewed_by_admin_id` | uuid | yes | | FK to `admin_users` added in the admin phase |
+| `reviewed_by_admin_id` | uuid | yes | | FK → `admin_users.id` `ON DELETE RESTRICT` (admins are disabled, never deleted) |
 | `created_at` / `updated_at` | timestamptz | no | `now()` | |
 
 Constraints:
@@ -252,7 +297,53 @@ Indexes: `user_verifications_one_open_per_type_unique` (UNIQUE `(user_id, type) 
 
 **Aadhaar guard (defence in depth).** SQL functions `is_verhoeff_valid(text)` and `contains_aadhaar_like_number(text)` (IMMUTABLE) detect a *standalone* 12-digit number, optionally grouped 4-4-4, whose first digit is 2–9 and that passes the Verhoeff checksum. The same rule is implemented in `apps/api/src/lib/pii-guards.ts` and applied by model validation. Requiring the checksum and standalone boundaries keeps false positives on ordinary IDs (e.g. UUIDs) negligible. The primary protection is still the schema itself: there is no column that could hold a document number, image or KYC payload.
 
-### 4.6 Bookkeeping tables
+### 4.6 `otp_requests`
+
+One-time login codes ([OTP flow](../auth/otp-flow.md)). **Only HMACs are stored.** Neither the code nor the phone number is persisted.
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `phone_hash` | char(64) | no | | Same HMAC as `users.phone_hash`. No FK: the number may not have an account yet |
+| `otp_hash` | char(64) | no | | HMAC-SHA256(`OTP_HMAC_SECRET`, `otp:<phone_hash>:<code>`) |
+| `attempts` | smallint | no | 0 | Wrong attempts (0–20; the app invalidates the code at 5) |
+| `expires_at` | timestamptz | no | | created + 5 min |
+| `consumed_at` | timestamptz | yes | | Set on successful verification |
+| `invalidated_at` | timestamptz | yes | | Superseded, expired or too many attempts |
+| `ip_hash` | char(64) | no | | HMAC of the client IP (per-IP limits) |
+| `created_at` / `updated_at` | timestamptz | no | `now()` | |
+
+Constraints: `otp_requests_hash_format_check`, `otp_requests_attempts_check`, `otp_requests_expiry_check`, `otp_requests_single_outcome_check` (never both consumed and invalidated).
+Indexes: `otp_requests_one_active_per_phone_unique` (UNIQUE `(phone_hash) WHERE consumed_at IS NULL AND invalidated_at IS NULL`), `otp_requests_phone_hash_created_at_idx`, `otp_requests_ip_hash_created_at_idx` (rate-limit windows), `otp_requests_created_at_idx` (24 h purge).
+
+### 4.7 `admin_users`
+
+Admin identities, completely separate from members. **Disabled, never deleted** (so audit/verification references stay valid).
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `email` | varchar(254) | no | | **Unique**, must be lowercase |
+| `name` | varchar(100) | no | | |
+| `role` | varchar(20) | no | | `super_admin`, `moderator`, `event_manager` |
+| `password_hash` | text | no | | Argon2id PHC string (`$argon2id$…`). Excluded from the default model scope |
+| `status` | varchar(20) | no | `'active'` | `active`, `disabled` |
+| `failed_login_count` | smallint | no | 0 | Reset on success or lockout |
+| `locked_until` | timestamptz | yes | | 15-minute lockout after 5 failures |
+| `last_login_at` | timestamptz | yes | | |
+| `created_at` / `updated_at` | timestamptz | no | `now()` | |
+
+Constraints: `admin_users_email_unique`, `admin_users_email_lowercase_check`, `admin_users_name_check`, `admin_users_role_check`, `admin_users_status_check`, `admin_users_password_hash_check` (Argon2id only), `admin_users_failed_login_count_check`.
+
+TOTP columns (`totp_secret_encrypted`, `totp_enabled_at`, `must_change_password`) will be added by the admin 2FA migration.
+
+### 4.8 `admin_sessions`
+
+Same shape and rules as [`user_sessions`](#44-user_sessions), with `admin_id` (FK → `admin_users.id` `ON DELETE CASCADE`) instead of `user_id`. `last_used_at` drives the 30-minute idle timeout. `revoked_reason` ∈ `logout`, `reuse_detected`, `idle_timeout`, `disabled`.
+
+Constraints and indexes mirror `user_sessions` (`admin_sessions_refresh_token_hash_unique`, `admin_sessions_active_admin_id_idx`, …).
+
+### 4.9 Bookkeeping tables
 
 | Table | Created by | Content |
 |---|---|---|
@@ -275,6 +366,8 @@ Indexes: `user_verifications_one_open_per_type_unique` (UNIQUE `(user_id, type) 
 | Phone number | `users` | Only an HMAC hash (lookup) and AES-GCM ciphertext. Excluded from the default model scope. Erased on soft delete |
 | Date of birth | `user_profiles` | Never returned to other members (only age) |
 | Refresh tokens | `user_sessions` | SHA-256 hashes only |
-| IP addresses | `user_sessions` | HMAC only |
+| IP addresses | `user_sessions`, `admin_sessions`, `otp_requests` | HMAC only |
+| OTP codes | `otp_requests` | HMAC only; never logged |
+| Admin passwords | `admin_users` | Argon2id only; excluded from the default scope |
 | Identity documents | — | **Not stored anywhere.** Verification rows hold metadata only, and the DB rejects Aadhaar-like values |
 | Verification evidence | Private storage (later phase) | Referenced by an opaque pointer and purged after the retention period |

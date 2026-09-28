@@ -23,9 +23,16 @@ garba-partner/
 │   │   │   ├── migrations/          timestamped, transactional SQL migrations
 │   │   │   ├── seeders/             development seed data
 │   │   │   ├── scripts/db.ts        db CLI (migrate, undo, status, seed, reset)
-│   │   │   ├── lib/                 app-error, response, logger, request-id, crypto, pii-guards, migration-helpers
-│   │   │   ├── middlewares/         not-found, error-handler
-│   │   │   └── modules/health/      GET /api/v1/health (API + database)
+│   │   │   ├── lib/                 app-error, response, logger, request-id, crypto, passwords, cookies, validation, pii-guards, migration-helpers
+│   │   │   ├── middlewares/         authenticate, authorize, csrf, rate-limit, not-found, error-handler
+│   │   │   ├── modules/
+│   │   │   │   ├── health/          GET /api/v1/health (API + database)
+│   │   │   │   ├── auth/            member OTP auth: routes, controller, service, otp.service, token.service
+│   │   │   │   └── admin/auth/      admin login/refresh/logout/me
+│   │   │   ├── providers/sms/       SmsProvider interface + development provider
+│   │   │   ├── scripts/             db.ts (db CLI), create-admin.ts
+│   │   │   ├── test/                test helpers + global setup (migrates the test DB once)
+│   │   │   └── types/express.d.ts   req.auth / req.admin typings
 │   │   ├── tsconfig.json            type-check config (src + tests, no emit)
 │   │   ├── tsconfig.build.json      build config (src → dist, tests excluded)
 │   │   └── vitest.config.ts
@@ -34,14 +41,16 @@ garba-partner/
 │   │   ├── public/                  static assets (favicon)
 │   │   ├── src/
 │   │   │   ├── main.tsx             React root
-│   │   │   ├── App.tsx              landing shell
-│   │   │   ├── components/          ApiStatus
+│   │   │   ├── App.tsx              router (public-only login routes, protected routes)
+│   │   │   ├── pages/               LoginPage, VerifyOtpPage, HomePage, NotFoundPage
+│   │   │   ├── components/          AuthLayout, ApiStatus, FullPageSpinner, ui/ (Button, Alert)
+│   │   │   ├── features/auth/       AuthProvider, auth context, guards, auth API calls
 │   │   │   ├── features/system/     useApiHealth hook
-│   │   │   ├── lib/                 env (validated VITE_* vars), api-client (envelope unwrapping)
+│   │   │   ├── lib/                 env (validated VITE_* vars), api-client (in-memory token, silent refresh)
 │   │   │   └── styles/index.css     Tailwind + shared theme tokens
 │   │   ├── tsconfig.json            references tsconfig.app.json (browser) + tsconfig.node.json (vite.config)
 │   │   └── vite.config.ts           envDir = repo root, /api proxy, port 5173
-│   └── admin/                       @garba-partner/admin — admin SPA (same stack as web, port 5174)
+│   └── admin/                       @garba-partner/admin — admin SPA (same stack as web, port 5174): login, protected layout, dashboard
 ├── packages/
 │   ├── config/                      @garba-partner/config — shared configuration
 │   │   ├── src/server/              loadServerEnv() — Node only
@@ -54,7 +63,11 @@ garba-partner/
 │       └── src/
 │           ├── constants/app.ts     APP_NAME, API_PREFIX, ADMIN_API_PREFIX, REQUEST_ID_HEADER
 │           ├── constants/enums.ts   domain enumerations (statuses, genders, verification types, ...)
-│           ├── constants/limits.ts  LIMITS (ages, name/bio lengths)
+│           ├── constants/limits.ts  LIMITS (ages, name/bio lengths, OTP/session/admin-login limits)
+│           ├── constants/auth.ts    cookie names, CSRF header
+│           ├── constants/admin.ts   ADMIN_ROLES, ADMIN_PERMISSIONS, ROLE_PERMISSIONS
+│           ├── schemas/             zod/mini request schemas (auth)
+│           ├── utils/phone.ts       normalizeIndianMobile, maskPhone
 │           ├── errors/error-codes.ts ERROR_CODES (+ HTTP status, default message)
 │           └── types/               ApiResponse envelope types, HealthDto
 ├── docs/                            product, architecture, development, setup docs
@@ -72,10 +85,10 @@ garba-partner/
 | Workspace | Depends on | Consumed by |
 |---|---|---|
 | `@garba-partner/config` | zod, ESLint plugins | all workspaces (tsconfig presets, ESLint, Prettier), api (`/server`), web + admin (`/client`, `/tailwind/theme.css`) |
-| `@garba-partner/shared` | — (no runtime deps) | api, web, admin |
-| `@garba-partner/api` | config, shared, express, helmet, cors, pino, sequelize, sequelize-typescript, pg, umzug, reflect-metadata | — |
-| `@garba-partner/web` | config, shared, react | — |
-| `@garba-partner/admin` | config, shared, react | — |
+| `@garba-partner/shared` | zod (`zod/mini` API) | api, web, admin |
+| `@garba-partner/api` | config, shared, express, helmet, cors, cookie-parser, express-rate-limit, pino, sequelize, sequelize-typescript, pg, umzug, reflect-metadata, jose, @node-rs/argon2 | — |
+| `@garba-partner/web` | config, shared, react, react-router | — |
+| `@garba-partner/admin` | config, shared, react, react-router | — |
 
 Rules (enforced by ESLint `no-restricted-imports`):
 

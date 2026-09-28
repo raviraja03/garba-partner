@@ -31,9 +31,12 @@ apps/api/src/
 │   ├── 20260925100100-create-user-profiles.ts
 │   ├── 20260925100200-create-user-preferences.ts
 │   ├── 20260925100300-create-user-sessions.ts
-│   └── 20260925100400-create-user-verifications.ts
+│   ├── 20260925100400-create-user-verifications.ts
+│   ├── 20260925120000-create-otp-requests.ts
+│   └── 20260925120100-create-admin-users-and-sessions.ts
 ├── seeders/
-│   └── 20260925110000-dev-users.ts
+│   ├── 20260925110000-dev-users.ts
+│   └── 20260925120000-dev-admins.ts
 ├── config/umzug.ts          # migrator + seeder factories
 └── scripts/db.ts            # CLI
 ```
@@ -93,14 +96,14 @@ Example: adding a verification provider (requires legal review first).
 
 ## 4. Seeders
 
-- Seeders are for **development data only**. Each checks `APP_ENV !== 'production'`, and so does the CLI.
+- Seeders are for **development data only**. Each refuses to run unless `APP_ENV=development`, and the CLI also blocks seeding in production.
 - Use fictional people, obviously fake phone numbers (`+9199999xxxxx`), no real photos and no identity documents.
 - Use fixed UUIDs, so `down` can remove exactly what `up` inserted.
 - Insert through **models** inside one transaction, so model validation also checks the seed data.
 - Seeders need `PHONE_HASH_SECRET` and `PHONE_ENCRYPTION_KEY` (users can't exist without phone data).
 - Reference data that production needs (e.g. cities) will get its own idempotent seeder that *is* allowed in production. It will be introduced with the locations phase.
 
-Current seeder `20260925110000-dev-users` creates 8 fictional users covering: verified, pending and rejected verification, not discoverable, onboarding incomplete, suspended, and pending deletion. It also creates two example sessions (one active, one revoked).
+Current seeder `20260925110000-dev-users` creates 8 fictional users covering: verified, pending and rejected verification, not discoverable, onboarding incomplete, suspended, and pending deletion. It also creates two example sessions (one active, one revoked). `20260925120000-dev-admins` creates one admin per role (password documented in [authentication §5](../auth/authentication.md#5-local-development)). Real admins are created with `npm run admin:create`.
 
 ## 5. Testing migrations
 

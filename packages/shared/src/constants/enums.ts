@@ -33,6 +33,14 @@ export const SESSION_REVOKE_REASONS = [
 ] as const;
 export type SessionRevokeReason = (typeof SESSION_REVOKE_REASONS)[number];
 
+export const ADMIN_SESSION_REVOKE_REASONS = [
+  'logout',
+  'reuse_detected',
+  'idle_timeout',
+  'disabled',
+] as const;
+export type AdminSessionRevokeReason = (typeof ADMIN_SESSION_REVOKE_REASONS)[number];
+
 /** `photo` is the MVP moderator-reviewed selfie check; `government_id` is reserved (post-MVP). */
 export const VERIFICATION_TYPES = ['photo', 'government_id'] as const;
 export type VerificationType = (typeof VERIFICATION_TYPES)[number];

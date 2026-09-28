@@ -60,13 +60,13 @@ sequenceDiagram
     participant A as API
     participant S as SMS provider
     U->>W: Enter phone (+91 default)
-    W->>A: POST /api/v1/auth/otp/request {phone}
+    W->>A: POST /api/v1/auth/send-otp {phone}
     A->>A: Normalise to E.164, rate-limit (phone hash + IP), ban-list check
     A->>A: Generate 6-digit OTP, store HMAC(otp) with 5-min TTL
     A->>S: Send OTP via DLT-approved template
     A-->>W: 200 {resendAvailableInSec, expiresInSec}
     U->>W: Enter OTP
-    W->>A: POST /api/v1/auth/otp/verify {phone, code}
+    W->>A: POST /api/v1/auth/verify-otp {phone, code}
     A->>A: Verify HMAC, attempts < 5, not expired, not consumed
     A->>A: Find or create user by phone hash, create session
     A-->>W: 200 {accessToken, user{id, status, onboardingStatus}} + Set-Cookie refresh token (httpOnly)
@@ -87,8 +87,8 @@ sequenceDiagram
 
 **Responses and edge cases**
 
-- **The `otp/request` response is the same** whether the number is new, existing, suspended or banned. This prevents account enumeration. Ban handling happens after verification.
-- Banned phone hash: `otp/request` still returns 200 but **no SMS is sent** (saves cost and gives nothing away). `verify` then fails with the generic `OTP_INVALID`.
+- **The `send-otp` response is the same** whether the number is new, existing, suspended or banned. This prevents account enumeration. Ban handling happens after verification.
+- Banned account: `send-otp` still returns 200 but **no SMS is sent** (saves cost and gives nothing away). `verify-otp` fails with `ACCOUNT_BANNED` and creates no session.
 - Wrong code → `OTP_INVALID` with remaining attempts. Expired → `OTP_EXPIRED`. Too many attempts → `OTP_ATTEMPTS_EXCEEDED`.
 - Account `status = banned` after a successful OTP: no session is created. The user sees `ACCOUNT_BANNED` with a support/grievance link.
 - Account `status = suspended`: a session is created, but the app shows a suspension screen (reason category + end date). Every social API returns `ACCOUNT_SUSPENDED`.
@@ -471,7 +471,7 @@ The admin panel is a separate app (`apps/admin`) on its own subdomain. Every act
 ### 12.1 Admin login
 
 1. `admin.<domain>` → email + password → `POST /api/v1/admin/auth/login` → returns `challengeId` (no tokens yet).
-2. TOTP code from an authenticator app → `POST /api/v1/admin/auth/totp {challengeId, code}` → access token + admin refresh cookie.
+2. TOTP code from an authenticator app → access token + admin refresh cookie. *(TOTP is planned; the current implementation issues the session directly after the password step — see [authentication §7](../auth/authentication.md#7-known-limitations-to-address-before-launch).)*
 3. First login (account created by a super admin with a one-time temporary password): forced password change and TOTP enrolment (QR code) before anything else.
 4. Lockout: 5 failed password or TOTP attempts → the account is locked for 15 min and the event is audit-logged.
 

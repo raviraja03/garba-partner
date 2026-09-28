@@ -62,7 +62,7 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 | T2 | Account enumeration via OTP responses | Identical responses for new, existing and banned numbers (§3.1) |
 | T3 | Stalking via location, event attendance, EXIF or activity timestamps | No GPS, area opt-in, reciprocal event visibility, EXIF stripping, no last-seen (§4.3, §7) |
 | T4 | Harassment after block or through a new account | Symmetric block enforced in SQL, phone-hash ban list, OTP limits (§4, §5) |
-| T5 | Suspended/banned user bypassing restrictions through another endpoint or socket | Per-request status check, `requireMember`, the interaction gate in every service, socket disconnect on sanction (§5) |
+| T5 | Suspended/banned user bypassing restrictions through another endpoint or socket | Per-request status check, `requireActiveMember`, the interaction gate in every service, socket disconnect on sanction (§5) |
 | T6 | IDOR: reading others' chats, profiles, interests or reports | Ownership/participant checks in services, query scoping, UUIDs, 404 on hidden resources (§5.3) |
 | T7 | Minors on the platform | DOB gate + lock, P0 underage reports + auto-hide, future ID age check (§4) |
 | T8 | Scams, spam and mass messaging | Consent-first chat, interest/message limits, contact nudge, reports (§4) |
@@ -89,9 +89,9 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 | OTP comparison | `crypto.timingSafeEqual` |
 | Expiry / attempts | 5 min / 5 attempts. A new request invalidates older OTPs |
 | Send limits | DB-backed: 5/h and 10/day per phone hash, 20/h per IP hash, 30 s resend cooldown |
-| Enumeration | `otp/request` always returns the same shape and timing class. Banned numbers silently get no SMS |
+| Enumeration | `send-otp` always returns the same shape and timing class. Banned numbers silently get no SMS |
 | SMS content | DLT-approved template. Contains only the code, the app name and "Do not share this code" |
-| Dev/test | `TEST_OTP_PHONES` + `TEST_OTP_CODE` only when `APP_ENV ≠ production` (boot fails otherwise). There is **no** OTP console logging in any environment |
+| Dev/test | `SMS_PROVIDER=dev` returns the code in the send-otp response; the env schema refuses it unless `APP_ENV=development` (boot fails otherwise). There is **no** OTP logging in any environment ([OTP flow §4](../auth/otp-flow.md#4-development-otp-mechanism)) |
 
 ### 3.2 Tokens and sessions
 
@@ -201,7 +201,7 @@ flowchart LR
 
 | Layer | Check |
 |---|---|
-| Route | `requireUser` / `requireMember` / `requireAdmin(permission)` |
+| Route | `authenticateMember` (+ `requireActiveMember`) / `authenticateAdmin` + `requirePermission(permission)` |
 | Validation | Strict Zod schema, UUID params |
 | Service | Ownership/participant checks + **interaction gate** + state checks (e.g. interest still `pending`) |
 | Query | Every query scoped by the caller (`WHERE receiver_id = :userId`, `WHERE (user_a_id = :u OR user_b_id = :u)`) |
@@ -213,7 +213,7 @@ flowchart LR
 
 `safetyService.assertCanInteract(actorId, targetId, { action })`. **Every** service method where one member affects or sees another must call it:
 
-1. The actor is `active` and onboarded (already guaranteed by `requireMember` for REST. Sockets check it again).
+1. The actor is `active` and onboarded (already guaranteed by `requireActiveMember` for REST. Sockets check it again).
 2. The target exists, is `active`, onboarded, not `pending_deletion` and not soft-deleted (`deleted_at`).
 3. There's no block in either direction.
 4. Action-specific rules (e.g. `send_interest` also checks discovery eligibility, daily limit and cooldown. `send_message` checks the active match).
@@ -313,9 +313,9 @@ Two tiers: Nginx `limit_req` (coarse, per IP) and application limiters (fine, pe
 | Target | Key | Limit | Store |
 |---|---|---|---|
 | All `/api/` (Nginx) | IP | 20 r/s burst 40 | Nginx |
-| `POST /auth/otp/request` | phone hash | 5/h, 10/day, 30 s cooldown | DB (`otp_requests`) |
-| `POST /auth/otp/request` | IP hash | 20/h | DB |
-| `POST /auth/otp/verify` | IP | 30/15 min | memory |
+| `POST /auth/send-otp` | phone hash | 5/h, 10/day, 30 s cooldown | DB (`otp_requests`) |
+| `POST /auth/send-otp` | IP hash | 20/h | DB |
+| `POST /auth/verify-otp` | IP | 30/15 min | memory |
 | `POST /auth/refresh` | IP | 60/15 min | memory |
 | `POST /admin/auth/*` | IP + email | 10/15 min, plus account lockout | memory + DB |
 | `GET /discovery` | user | 60/min | memory |
@@ -418,14 +418,14 @@ A runbook (`docs/runbooks/incident-response.md`, Phase 6) covers:
 
 Authentication & sessions
 - [ ] OTP never logged, stored hashed, constant-time compare, TTL/attempt/send limits enforced (DB-backed).
-- [ ] `otp/request` responses are identical for new/existing/banned numbers.
+- [ ] `send-otp` responses are identical for new/existing/banned numbers.
 - [ ] Test OTP mode impossible in production (boot fails).
 - [ ] Access token in memory only. Refresh cookie `HttpOnly; Secure; SameSite=Strict`, path-scoped. Rotation + reuse detection tested.
 - [ ] Member and admin tokens use different secrets and audiences. Cross-use rejected (test).
 - [ ] Admin: Argon2id, mandatory TOTP, lockout, idle timeout, forced first-login setup.
 
 Authorization & safety
-- [ ] Every social endpoint uses `requireMember`. Every admin endpoint uses `requireAdmin(permission)`.
+- [ ] Every social endpoint uses `authenticateMember` + `requireActiveMember`. Every admin endpoint uses `authenticateAdmin` + `requirePermission(permission)`.
 - [ ] The interaction gate is called in every service listed in §5.2 (checked by review + tests).
 - [ ] Automated tests: a blocked user can't see, interest, message or view the profile of the blocker, via REST **and** socket.
 - [ ] Automated tests: a suspended user is cut off from every social REST endpoint and socket event immediately after the sanction.

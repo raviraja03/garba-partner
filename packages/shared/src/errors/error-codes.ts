@@ -13,6 +13,27 @@ export const ERROR_CODES = {
   RATE_LIMITED: { httpStatus: 429, message: 'Too many requests. Please try again later.' },
   INTERNAL_ERROR: { httpStatus: 500, message: 'Something went wrong. Please try again.' },
   SERVICE_UNAVAILABLE: { httpStatus: 503, message: 'The service is temporarily unavailable.' },
+
+  // Authentication (docs/auth/authentication.md)
+  OTP_INVALID: { httpStatus: 400, message: 'That code is not correct. Please try again.' },
+  OTP_EXPIRED: { httpStatus: 400, message: 'That code has expired. Please request a new one.' },
+  OTP_ATTEMPTS_EXCEEDED: {
+    httpStatus: 400,
+    message: 'Too many incorrect attempts. Please request a new code.',
+  },
+  REFRESH_INVALID: { httpStatus: 401, message: 'Your session has ended. Please log in again.' },
+  INVALID_CREDENTIALS: { httpStatus: 401, message: 'Incorrect email or password.' },
+  ACCOUNT_LOCKED: {
+    httpStatus: 423,
+    message: 'Too many failed attempts. Please try again later.',
+  },
+  ACCOUNT_SUSPENDED: { httpStatus: 403, message: 'Your account is currently suspended.' },
+  ACCOUNT_BANNED: {
+    httpStatus: 403,
+    message:
+      'This account has been permanently banned. Contact support if you think this is a mistake.',
+  },
+  ACCOUNT_PENDING_DELETION: { httpStatus: 403, message: 'This account is scheduled for deletion.' },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

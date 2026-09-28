@@ -205,15 +205,13 @@ function fakeTokenHash(label: string): string {
 }
 
 export const up: MigrationFn<SeederContext> = async ({ context: { sequelize, env } }) => {
-  if (env.APP_ENV === 'production') throw new Error('Development seeders never run in production');
+  if (env.APP_ENV !== 'development') {
+    throw new Error('Development seeders only run when APP_ENV=development');
+  }
 
+  // Both keys are required by the env schema.
   const hashSecret = env.PHONE_HASH_SECRET;
   const encryptionKey = env.PHONE_ENCRYPTION_KEY;
-  if (!hashSecret || !encryptionKey) {
-    throw new Error(
-      'PHONE_HASH_SECRET and PHONE_ENCRYPTION_KEY are required to seed users (see docs/database/database-setup.md)',
-    );
-  }
 
   const now = Date.now();
 
@@ -294,7 +292,9 @@ export const up: MigrationFn<SeederContext> = async ({ context: { sequelize, env
 };
 
 export const down: MigrationFn<SeederContext> = async ({ context: { sequelize, env } }) => {
-  if (env.APP_ENV === 'production') throw new Error('Development seeders never run in production');
+  if (env.APP_ENV !== 'development') {
+    throw new Error('Development seeders only run when APP_ENV=development');
+  }
 
   // Hard delete; profiles, preferences, sessions and verifications cascade.
   await sequelize.transaction(async (transaction) => {

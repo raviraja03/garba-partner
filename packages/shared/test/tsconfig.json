@@ -1,0 +1,10 @@
+{
+  "extends": "@garba-partner/config/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts"]
+}

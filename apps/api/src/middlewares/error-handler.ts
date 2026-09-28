@@ -43,6 +43,10 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, next) 
     return;
   }
 
+  if (appError.retryAfterSeconds !== null) {
+    res.setHeader('Retry-After', String(appError.retryAfterSeconds));
+  }
+
   const body: ApiErrorBody = {
     success: false,
     message: appError.message,

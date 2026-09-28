@@ -19,7 +19,7 @@ These standards apply to every workspace. ESLint and Prettier enforce most of th
 
 | Thing | Convention | Example |
 |---|---|---|
-| Files (non-component) | kebab-case + role suffix | `interest.service.ts`, `require-member.ts`, `discovery.queries.ts` |
+| Files (non-component) | kebab-case + role suffix | `interest.service.ts`, `rate-limit.ts`, `discovery.queries.ts` |
 | React components | PascalCase file = component | `ReportDialog.tsx` |
 | Hooks | `use` + camelCase | `useChatMessages.ts` |
 | Sequelize models | PascalCase singular, `.model.ts` | `ProfilePhoto.model.ts` → table `profile_photos` |
@@ -177,7 +177,7 @@ Rules:
 
 | Area | Packages |
 |---|---|
-| API | express, socket.io, sequelize, sequelize-typescript, pg, umzug, zod, jsonwebtoken, argon2, otplib, helmet, cors, cookie-parser, express-rate-limit, multer, sharp, cloudinary, pino, pino-http, libphonenumber-js, node-cron, date-fns, date-fns-tz |
-| Web/Admin | react, react-dom, react-router, @tanstack/react-query, react-hook-form, @hookform/resolvers, socket.io-client, tailwindcss, date-fns |
-| Shared | zod |
+| API | express, socket.io, sequelize, sequelize-typescript, pg, umzug, reflect-metadata, jose (JWT), @node-rs/argon2 (admin passwords), otplib (admin TOTP, planned), helmet, cors, cookie-parser, express-rate-limit, multer, sharp, cloudinary, pino, pino-http, node-cron, date-fns, date-fns-tz |
+| Web/Admin | react, react-dom, react-router (v7), @tanstack/react-query, react-hook-form, @hookform/resolvers, socket.io-client, tailwindcss, date-fns |
+| Shared | zod (the `zod/mini` API, for small browser bundles) |
 | Dev | typescript, vite, @vitejs/plugin-react, vitest, supertest, @testing-library/react, eslint + plugins, prettier, concurrently |

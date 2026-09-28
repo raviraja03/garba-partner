@@ -1,4 +1,12 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from 'node:crypto';
 
 const E164_PATTERN = /^\+[1-9]\d{7,14}$/;
 const AES_ALGORITHM = 'aes-256-gcm';
@@ -45,4 +53,28 @@ export function decryptString(payload: string, base64Key: string): string {
   const decipher = createDecipheriv(AES_ALGORITHM, decodeKey(base64Key), iv);
   decipher.setAuthTag(authTag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+}
+
+/** SHA-256 as lowercase hex (used for refresh tokens, which are already high-entropy). */
+export function sha256Hex(value: string): string {
+  return createHash('sha256').update(value, 'utf8').digest('hex');
+}
+
+/** Cryptographically random, URL-safe token (default 32 bytes = 256 bits). */
+export function randomToken(bytes = 32): string {
+  return randomBytes(bytes).toString('base64url');
+}
+
+/** Uniformly random numeric code, zero-padded (e.g. a 6-digit OTP). */
+export function randomNumericCode(length: number): string {
+  return randomInt(0, 10 ** length)
+    .toString()
+    .padStart(length, '0');
+}
+
+/** Constant-time comparison of two hex digests. */
+export function timingSafeEqualHex(a: string, b: string): boolean {
+  const left = Buffer.from(a, 'hex');
+  const right = Buffer.from(b, 'hex');
+  return left.length === right.length && left.length > 0 && timingSafeEqual(left, right);
 }

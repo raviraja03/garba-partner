@@ -4,7 +4,7 @@
 
 ## 1. Overview
 
-Every table introduced so far belongs to a user. `users` is the aggregate root.
+Member tables belong to a user (`users` is the aggregate root). Admin tables belong to an admin (`admin_users`). `otp_requests` is keyed by phone hash only, with no FK, because a code can be requested before an account exists.
 
 ```mermaid
 flowchart LR
@@ -12,6 +12,9 @@ flowchart LR
     U -->|1 : 0..1| PR[user_preferences]
     U -->|1 : 0..n| S[user_sessions]
     U -->|1 : 0..n| V[user_verifications]
+    A[admin_users] -->|1 : 0..n| AS[admin_sessions]
+    A -.->|reviews 0..n| V
+    O[otp_requests]
 ```
 
 | Parent | Child | Cardinality | FK column | DB constraint | `ON DELETE` | Sequelize association |
@@ -20,6 +23,8 @@ flowchart LR
 | `users` | `user_preferences` | 1 : 0..1 | `user_preferences.user_id` | FK + `UNIQUE (user_id)` | `CASCADE` | `User.hasOne(UserPreference)` as `preferences` / `belongsTo` as `user` |
 | `users` | `user_sessions` | 1 : 0..n | `user_sessions.user_id` | FK | `CASCADE` | `User.hasMany(UserSession)` as `sessions` / `belongsTo` as `user` |
 | `users` | `user_verifications` | 1 : 0..n (at most one **open** per type) | `user_verifications.user_id` | FK + partial unique index | `CASCADE` | `User.hasMany(UserVerification)` as `verifications` / `belongsTo` as `user` |
+| `admin_users` | `admin_sessions` | 1 : 0..n | `admin_sessions.admin_id` | FK | `CASCADE` | `AdminUser.hasMany(AdminSession)` as `sessions` / `AdminSession.belongsTo(AdminUser)` as `admin` |
+| `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.
 
@@ -91,5 +96,4 @@ The development seeder already follows this pattern (`src/seeders/20260925110000
 | Relationship | Added by |
 |---|---|
 | `user_profiles.city_id → cities.id`, `user_profiles.area_id → areas.id` | Locations migration |
-| `user_verifications.reviewed_by_admin_id → admin_users.id` | Admin foundation phase |
 | Users → events, attendances, interests, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |

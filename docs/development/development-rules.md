@@ -115,7 +115,7 @@ npm run db:seed -- dev-fixtures     # fake data, development only
 npm run dev                         # api :4000, web :5173, admin :5174
 ```
 
-- Log in locally with a number from `TEST_OTP_PHONES` and `TEST_OTP_CODE` (development only). Real SMS is never sent in development.
+- Log in locally with any Indian-looking mobile number: with `SMS_PROVIDER=dev` no SMS is sent and the OTP screen shows the code (development only, see [OTP flow §4](../auth/otp-flow.md#4-development-otp-mechanism)). Dev admins: see [authentication §5](../auth/authentication.md#5-local-development).
 - The first admin: `npm run db:seed -- bootstrap-admin -w apps/api`.
 
 ### 4.3 Test data

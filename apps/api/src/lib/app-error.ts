@@ -4,6 +4,8 @@ export interface AppErrorOptions {
   /** Overrides the default user-facing message of the code. Must not contain sensitive data. */
   message?: string;
   details?: ValidationIssue[];
+  /** Sent as the `Retry-After` header (rate limits, lockouts). */
+  retryAfterSeconds?: number;
   cause?: unknown;
 }
 
@@ -12,6 +14,7 @@ export class AppError extends Error {
   readonly code: ErrorCode;
   readonly httpStatus: number;
   readonly details: ValidationIssue[] | null;
+  readonly retryAfterSeconds: number | null;
 
   constructor(code: ErrorCode, options: AppErrorOptions = {}) {
     super(options.message ?? ERROR_CODES[code].message, { cause: options.cause });
@@ -19,5 +22,9 @@ export class AppError extends Error {
     this.code = code;
     this.httpStatus = ERROR_CODES[code].httpStatus;
     this.details = options.details ?? null;
+    this.retryAfterSeconds =
+      options.retryAfterSeconds === undefined
+        ? null
+        : Math.max(1, Math.ceil(options.retryAfterSeconds));
   }
 }

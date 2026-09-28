@@ -5,10 +5,16 @@ import { z } from 'zod';
 export const NODE_ENVS = ['development', 'test', 'production'] as const;
 export const APP_ENVS = ['development', 'staging', 'production'] as const;
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
+/**
+ * `dev` sends no SMS and returns the code in the send-otp response. It is only accepted when
+ * APP_ENV=development. Real providers (e.g. MSG91) are added before launch.
+ */
+export const SMS_PROVIDERS = ['dev'] as const;
 
 export type NodeEnv = (typeof NODE_ENVS)[number];
 export type AppEnv = (typeof APP_ENVS)[number];
 export type LogLevel = (typeof LOG_LEVELS)[number];
+export type SmsProvider = (typeof SMS_PROVIDERS)[number];
 
 /** Normalises an origin such as `https://example.com/` to `https://example.com`. */
 const originSchema = z.url({ protocol: /^https?$/ }).transform((value) => new URL(value).origin);
@@ -49,10 +55,24 @@ export const serverEnvSchema = z
     TEST_DATABASE_URL: postgresUrlSchema.optional(),
 
     /** HMAC key for `users.phone_hash`. Long-lived: rotating it requires a re-hash migration. */
-    PHONE_HASH_SECRET: secretSchema.optional(),
+    PHONE_HASH_SECRET: secretSchema,
     /** AES-256-GCM key for `users.phone_encrypted`. */
-    PHONE_ENCRYPTION_KEY: aes256KeySchema.optional(),
+    PHONE_ENCRYPTION_KEY: aes256KeySchema,
     PHONE_ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).max(32_767).default(1),
+
+    /** HMAC key for OTP codes and client IP hashes. */
+    OTP_HMAC_SECRET: secretSchema,
+    SMS_PROVIDER: z.enum(SMS_PROVIDERS).default('dev'),
+
+    /** Member access tokens (JWT HS256, audience "garba-partner:app"). */
+    JWT_ACCESS_SECRET: secretSchema,
+    /** Admin access tokens (audience "garba-partner:admin"). Must differ from the member secret. */
+    JWT_ADMIN_ACCESS_SECRET: secretSchema,
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+    ADMIN_ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    ADMIN_SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(24).default(12),
+    ADMIN_SESSION_IDLE_MINUTES: z.coerce.number().int().min(5).max(240).default(30),
   })
   .superRefine((env, ctx) => {
     if (env.TEST_DATABASE_URL !== undefined && env.TEST_DATABASE_URL === env.DATABASE_URL) {
@@ -60,6 +80,22 @@ export const serverEnvSchema = z
         code: 'custom',
         path: ['TEST_DATABASE_URL'],
         message: 'must point to a different database than DATABASE_URL (tests truncate tables)',
+      });
+    }
+
+    if (env.JWT_ACCESS_SECRET === env.JWT_ADMIN_ACCESS_SECRET) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['JWT_ADMIN_ACCESS_SECRET'],
+        message: 'must differ from JWT_ACCESS_SECRET (member and admin tokens are separate)',
+      });
+    }
+    // The dev OTP mechanism returns codes in API responses: never outside local development.
+    if (env.SMS_PROVIDER === 'dev' && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SMS_PROVIDER'],
+        message: '"dev" is only allowed when APP_ENV=development; configure a real SMS provider',
       });
     }
 
@@ -75,11 +111,6 @@ export const serverEnvSchema = z
     for (const key of ['WEB_ORIGIN', 'ADMIN_ORIGIN'] as const) {
       if (!env[key].startsWith('https://')) {
         ctx.addIssue({ code: 'custom', path: [key], message: 'must use https in production' });
-      }
-    }
-    for (const key of ['PHONE_HASH_SECRET', 'PHONE_ENCRYPTION_KEY'] as const) {
-      if (env[key] === undefined) {
-        ctx.addIssue({ code: 'custom', path: [key], message: 'is required in production' });
       }
     }
   });

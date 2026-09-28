@@ -18,6 +18,8 @@
     "db:seed:undo": "tsx src/scripts/db.ts seed:undo",
     "db:reset": "tsx src/scripts/db.ts reset",
     "db:migrate:prod": "node dist/scripts/db.js migrate",
+    "admin:create": "tsx src/scripts/create-admin.ts",
+    "admin:create:prod": "node dist/scripts/create-admin.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\""
@@ -25,9 +27,13 @@
   "dependencies": {
     "@garba-partner/config": "*",
     "@garba-partner/shared": "*",
+    "@node-rs/argon2": "^2.2.1",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
     "helmet": "^8.3.0",
+    "jose": "^6.2.12",
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "pino-http": "^11.0.0",
@@ -37,6 +43,7 @@
     "umzug": "^3.8.3"
   },
   "devDependencies": {
+    "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
     "@types/node": "^22.19.0",

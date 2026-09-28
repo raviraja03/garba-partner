@@ -1,18 +1,15 @@
 import { randomBytes } from 'node:crypto';
-import { pino } from 'pino';
 import { BaseError, UniqueConstraintError } from 'sequelize';
-import type { Sequelize } from 'sequelize-typescript';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { createSequelize } from '../config/database.js';
-import { createMigrator } from '../config/umzug.js';
+import { describe, expect, it } from 'vitest';
 import { encryptString, hashPhone } from '../lib/crypto.js';
+import { hasTestDatabase, useTestDatabase } from '../test/helpers.js';
 import { User, UserPreference, UserProfile, UserSession, UserVerification } from './index.js';
 
 /**
  * Schema integration tests. They need a disposable database in TEST_DATABASE_URL
  * (see docs/database/database-setup.md) and are skipped when it is not configured.
+ * The schema is rebuilt once per run (down → up) by src/test/global-setup.ts.
  */
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? '';
 const HASH_SECRET = 'integration-test-secret-at-least-32-characters';
 const ENCRYPTION_KEY = randomBytes(32).toString('base64');
 const CHECK_VIOLATION = '23514';
@@ -48,29 +45,12 @@ async function pgErrorCode(promise: Promise<unknown>): Promise<string | undefine
   return undefined;
 }
 
-describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
-  let sequelize: Sequelize;
-
-  beforeAll(async () => {
-    sequelize = createSequelize({ url: TEST_DATABASE_URL, ssl: false, poolMax: 2 });
-    const migrator = createMigrator(sequelize, pino({ level: 'silent' }));
-    // Exercise both directions of every migration, ending on a fresh schema.
-    await migrator.up();
-    await migrator.down({ to: 0 });
-    await migrator.up();
-  });
-
-  afterAll(async () => {
-    await sequelize.close();
-  });
-
-  beforeEach(async () => {
-    await sequelize.query('TRUNCATE users CASCADE');
-  });
+describe.skipIf(!hasTestDatabase)('database schema (integration)', () => {
+  const db = useTestDatabase();
 
   describe('users', () => {
     it('creates a user with profile and preferences in one transaction and loads associations', async () => {
-      const userId = await sequelize.transaction(async (transaction) => {
+      const userId = await db().transaction(async (transaction) => {
         const user = await User.create(newPhoneAttributes(), { transaction });
         await UserProfile.create(
           {
@@ -117,9 +97,9 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       const attributes = newPhoneAttributes();
 
       await expect(
-        sequelize.transaction(async (transaction) => {
+        db().transaction(async (transaction) => {
           const user = await User.create(attributes, { transaction });
-          await sequelize.query(
+          await db().query(
             `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, experience, styles)
              VALUES (:userId, 'X', '2000-01-01', 'robot', 'beginner', ARRAY['garba'])`,
             { replacements: { userId: user.id }, transaction },
@@ -151,7 +131,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       const { id } = await createUser();
 
       const code = await pgErrorCode(
-        sequelize.query('UPDATE users SET hidden_from_discovery = true WHERE id = :id', {
+        db().query('UPDATE users SET hidden_from_discovery = true WHERE id = :id', {
           replacements: { id },
         }),
       );
@@ -180,7 +160,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
         provider: 'internal_review',
       });
 
-      await sequelize.query('DELETE FROM users WHERE id = :id', { replacements: { id: user.id } });
+      await db().query('DELETE FROM users WHERE id = :id', { replacements: { id: user.id } });
 
       expect(await UserProfile.count()).toBe(0);
       expect(await UserPreference.count()).toBe(0);
@@ -209,7 +189,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       const user = await createUser();
 
       const code = await pgErrorCode(
-        sequelize.query(
+        db().query(
           `INSERT INTO user_profiles (user_id, display_name, date_of_birth, gender, experience, styles)
            VALUES (:userId, 'Test', '2000-01-01', 'woman', 'beginner', ARRAY['salsa'])`,
           { replacements: { userId: user.id } },
@@ -225,7 +205,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
         UserPreference.create({ userId: user.id, ageMin: 40, ageMax: 30 }),
       ).rejects.toThrow(/ageMin/);
       const code = await pgErrorCode(
-        sequelize.query('INSERT INTO user_preferences (user_id, age_min) VALUES (:userId, 16)', {
+        db().query('INSERT INTO user_preferences (user_id, age_min) VALUES (:userId, 16)', {
           replacements: { userId: user.id },
         }),
       );
@@ -238,7 +218,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       const user = await createUser();
 
       const code = await pgErrorCode(
-        sequelize.query(
+        db().query(
           `INSERT INTO user_sessions (user_id, refresh_token_hash, expires_at, revoked_at)
            VALUES (:userId, :hash, now() + interval '1 day', now())`,
           { replacements: { userId: user.id, hash: 'b'.repeat(64) } },
@@ -265,7 +245,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       ).rejects.toThrow(/Identity document numbers/);
 
       const code = await pgErrorCode(
-        sequelize.query(
+        db().query(
           `INSERT INTO user_verifications (user_id, type, provider, evidence_reference)
            VALUES (:userId, 'photo', 'internal_review', :ref)`,
           { replacements: { userId: user.id, ref: `docs/${AADHAAR_SHAPED}` } },
@@ -303,7 +283,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       const user = await createUser();
 
       const code = await pgErrorCode(
-        sequelize.query(
+        db().query(
           `INSERT INTO user_verifications (user_id, type, provider)
            VALUES (:userId, 'government_id', 'internal_review')`,
           { replacements: { userId: user.id } },
@@ -316,7 +296,7 @@ describe.skipIf(!TEST_DATABASE_URL)('database schema (integration)', () => {
       const user = await createUser();
 
       const code = await pgErrorCode(
-        sequelize.query(
+        db().query(
           `INSERT INTO user_verifications (user_id, type, provider, status, decided_at)
            VALUES (:userId, 'photo', 'internal_review', 'rejected', now())`,
           { replacements: { userId: user.id } },
