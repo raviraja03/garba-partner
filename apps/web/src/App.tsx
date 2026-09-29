@@ -21,6 +21,7 @@ import { LoginPage } from './pages/LoginPage';
 import { MatchesPage } from './pages/MatchesPage';
 import { MatchPage } from './pages/MatchPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { NotificationsPage } from './pages/NotificationsPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { PartnerProfilePage } from './pages/PartnerProfilePage';
 import { PreferencesPage } from './pages/PreferencesPage';
@@ -77,6 +78,7 @@ const router = createBrowserRouter([
               { path: '/matches/:matchId', element: <MatchPage /> },
               { path: '/chats', element: <ChatsPage /> },
               { path: '/chats/:matchId', element: <ChatPage /> },
+              { path: '/notifications', element: <NotificationsPage /> },
             ],
           },
         ],

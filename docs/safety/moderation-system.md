@@ -217,7 +217,6 @@ Run: `npm run test` (API integration tests need `TEST_DATABASE_URL`, see [databa
 
 ## 12. Known limitations
 
-- The reporter doesn't get an in-app "we reviewed your report" update yet (needs notifications).
-- Warnings, restrictions and suspensions show up on the member's next page load or within 5 minutes; there is no push notification.
+- Reporters get a generic "we reviewed your report" notification and sanctioned members a safety notification ([notifications](../notifications/notifications.md)); there are no web push or email notifications yet.
 - Appeals are handled outside the app (a super admin can lift a ban; moderators can lift restrictions and suspensions).
 - Moderator workload metrics (time to first review, per-moderator counts) are not built yet; the audit log has the raw data.

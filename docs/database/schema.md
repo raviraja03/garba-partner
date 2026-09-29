@@ -708,6 +708,31 @@ Other changes:
 | `messages.contains_money_request` | See §4.16 |
 | `messages_sender_id_created_at_idx` | `(sender_id, created_at DESC)`, for per-sender detection queries |
 
+### 4.21 `notifications` and `notification_preferences`
+
+Migration `20261001100000-create-notifications`. See [notifications](../notifications/notifications.md).
+
+**`notifications`**
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `user_id` | uuid | no | | Recipient. FK → `users.id` `ON DELETE CASCADE` |
+| `type` | varchar(30) | no | | `interest_received` \| `interest_accepted` \| `match_created` \| `new_message` \| `verification_completed` \| `event_reminder` \| `safety` |
+| `actor_user_id` | uuid | yes | | The other member. FK → `users.id` `CASCADE`. Check: not the recipient |
+| `match_id` | uuid | yes | | FK → `matches.id` `CASCADE`. Required for `interest_accepted`, `match_created`, `new_message` |
+| `interest_id` | uuid | yes | | FK → `partner_interests.id` `CASCADE` |
+| `event_id` | uuid | yes | | FK → `events.id` `CASCADE`. Required for `event_reminder` |
+| `data` | jsonb | no | `{}` | Safety kind or verification outcome only. Never message text, contact details, locations or notes |
+| `count` | integer | no | `1` | Collapsed chat messages (≥ 1) |
+| `occurred_at` | timestamptz | no | `now()` | Latest occurrence (ordering, retention) |
+| `read_at` | timestamptz | yes | | |
+| `created_at`, `updated_at` | timestamptz | no | `now()` | `updated_at` trigger |
+
+Indexes: `(user_id, occurred_at DESC, id DESC)`, partial `(user_id) WHERE read_at IS NULL`, **unique** `(user_id, match_id) WHERE type = 'new_message' AND read_at IS NULL`, **unique** `(user_id, event_id) WHERE type = 'event_reminder'`, partial `(actor_user_id, user_id)`, `(occurred_at)`, `(type, occurred_at)`. Rows are deleted 90 days after `occurred_at`.
+
+**`notification_preferences`**: `user_id` (PK, FK → `users.id` `CASCADE`), `interest_received`, `interest_accepted`, `match_created`, `new_message`, `verification_completed`, `event_reminder` (boolean, default `true`), `created_at`, `updated_at`. A missing row means everything is on. There is no `safety` column: safety notifications can't be turned off.
+
 ## 5. Database functions and triggers
 
 | Object | Created in | Purpose |

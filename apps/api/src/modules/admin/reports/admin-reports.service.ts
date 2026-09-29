@@ -25,6 +25,7 @@ import {
   applySanctionEffects,
   loadSanctionHistory,
 } from '../../safety/sanctions.js';
+import type { Notifier } from '../../notifications/notifications.service.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 import type { AdminActor } from '../users/admin-users.service.js';
 
@@ -108,8 +109,9 @@ export function createAdminReportsService(deps: {
   env: ServerEnv;
   media: MediaStorage;
   hub: RealtimeHub;
+  notifier: Notifier;
 }): AdminReportsService {
-  const { sequelize, env, media, hub } = deps;
+  const { sequelize, env, media, hub, notifier } = deps;
 
   async function people(ids: string[]): Promise<Map<string, AdminReportUserDto>> {
     const unique = [...new Set(ids)];
@@ -389,7 +391,7 @@ export function createAdminReportsService(deps: {
           ],
         });
       }
-      const effects = await sequelize.transaction(async (transaction) => {
+      const outcome = await sequelize.transaction(async (transaction) => {
         const report = await Report.findByPk(reportId, {
           lock: transaction.LOCK.UPDATE,
           transaction,
@@ -462,11 +464,19 @@ export function createAdminReportsService(deps: {
           env.OTP_HMAC_SECRET,
           transaction,
         );
-        return applied?.effects ?? null;
+        return { effects: applied?.effects ?? null, reporterId: report.reporterId };
       });
 
       // After commit: sanctions take effect on open sockets immediately.
-      if (effects) applySanctionEffects(hub, effects);
+      if (outcome.effects) await applySanctionEffects(hub, notifier, outcome.effects);
+      // The reporter hears that the report was reviewed, never what was decided.
+      if (outcome.reporterId) {
+        await notifier.notify({
+          userId: outcome.reporterId,
+          type: 'safety',
+          data: { safetyKind: 'report_reviewed' },
+        });
+      }
       return getDetail(reportId);
     },
   };

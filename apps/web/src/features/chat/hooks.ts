@@ -96,6 +96,8 @@ export function useMarkRead(matchId: string) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: chatKeys.unread }),
         queryClient.invalidateQueries({ queryKey: chatKeys.list }),
+        // Reading a chat also reads its new-message notification.
+        queryClient.invalidateQueries({ queryKey: ['notifications'] }),
       ]);
     },
   });

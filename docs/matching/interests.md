@@ -130,5 +130,5 @@ Because only one pending interest can exist per pair, two members sending to eac
 
 ## 9. Known limitations
 
-- No notifications yet (in-app or push): members see new interests when they open Interests.
+- New interests, acceptances and matches create in-app [notifications](../notifications/notifications.md) (live over Socket.IO); there is no web push or email yet.
 - Expiry is lazy (no background job); expired rows stay `pending` in the table until touched, but are never shown or accepted.

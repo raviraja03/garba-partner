@@ -5,6 +5,7 @@ import { Block, User, UserProfile } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
 import type { RealtimeHub } from '../../realtime/hub.js';
 import { emitMatchEnded, endConnections, lockPair } from '../interests/connections.js';
+import { removeNotificationsBetween } from '../notifications/notifications.service.js';
 import type { SafetyLogger } from './safety-log.service.js';
 import type { SuspiciousActivityDetector } from './suspicious-activity.service.js';
 
@@ -54,6 +55,8 @@ export function createBlocksService(deps: {
           { matchStatus: 'blocked', endedByUserId: blockerId },
           transaction,
         );
+        // The blocked member's name must never show up again in notifications.
+        await removeNotificationsBetween(blockerId, targetUserId, transaction);
         return { created: isNew, endedMatchId: ended };
       });
       emitMatchEnded(hub, endedMatchId, blockerId, targetUserId);

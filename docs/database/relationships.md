@@ -50,6 +50,9 @@ flowchart LR
 | `users` | `user_sanctions` | 1 : 0..n | `user_sanctions.user_id` | FK | `RESTRICT` | `(user_id, created_at DESC)`; partial unique one active non-warning sanction per type |
 | `reports` | `user_sanctions` | 0..1 : 0..n | `user_sanctions.report_id` | FK | `SET NULL` | partial `(report_id)` |
 | `admin_users` | `user_sanctions` | 1 : 0..n (creator, revoker) | `created_by_admin_id`, `revoked_by_admin_id` | FK | `RESTRICT` | none |
+| `users` | `notifications` | 1 : 0..n (recipient, actor) | `notifications.user_id`, `notifications.actor_user_id` | FK | `CASCADE` | `(user_id, occurred_at DESC, id DESC)`, partial `(actor_user_id, user_id)` |
+| `matches` / `partner_interests` / `events` | `notifications` | 0..1 : 0..n | `match_id`, `interest_id`, `event_id` | FK | `CASCADE` | partial unique `(user_id, match_id)` unread messages, `(user_id, event_id)` reminders |
+| `users` | `notification_preferences` | 1 : 0..1 | `notification_preferences.user_id` (PK) | FK | `CASCADE` | PK |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.

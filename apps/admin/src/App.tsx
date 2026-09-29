@@ -10,6 +10,7 @@ import { EditEventPage, NewEventPage } from './pages/EventFormPage';
 import { EventsPage } from './pages/EventsPage';
 import { AuditLogPage, SafetyLogsPage } from './pages/LogPages';
 import { LoginPage } from './pages/LoginPage';
+import { NotificationsMonitorPage } from './pages/NotificationsMonitorPage';
 import { EditOrganizerPage, NewOrganizerPage, OrganizerDetailPage } from './pages/OrganizerPages';
 import { OrganizersPage } from './pages/OrganizersPage';
 import { ReportDetailPage } from './pages/ReportDetailPage';
@@ -52,7 +53,10 @@ const router = createBrowserRouter([
         children: [
           {
             element: <RequireAdmin permission="dashboard:view" />,
-            children: [{ path: '/', element: <DashboardPage /> }],
+            children: [
+              { path: '/', element: <DashboardPage /> },
+              { path: '/notifications', element: <NotificationsMonitorPage /> },
+            ],
           },
           {
             element: <RequireAdmin permission="users:view" />,

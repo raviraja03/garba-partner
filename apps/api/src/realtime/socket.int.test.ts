@@ -264,6 +264,20 @@ describe.skipIf(!hasTestDatabase)('Socket.IO chat (integration)', () => {
       expect(await Message.count({ where: { matchId } })).toBe(0);
     });
 
+    it('pushes notification:new with the unread total (never the message text)', async () => {
+      const { a, b, matchId } = await createMatchedPair(server.app);
+      const bSocket = await connect(b.accessToken);
+      const pushed = next(bSocket, 'notification:new');
+      const aSocket = await connect(a.accessToken);
+      const ack = (await sendVia(aSocket, matchId, 'Meet at the north gate')) as SocketAck<unknown>;
+      expect(ack.ok).toBe(true);
+      const payload = await pushed;
+      expect(payload.notification).toMatchObject({ type: 'new_message', matchId, count: 1 });
+      // B also has the earlier interest and match notifications.
+      expect(payload.unreadCount).toBe(3);
+      expect(JSON.stringify(payload)).not.toContain('north gate');
+    });
+
     it('a chat restriction refuses socket sends but keeps the member connected', async () => {
       const { a, b, matchId } = await createMatchedPair(server.app);
       const aSocket = await connect(a.accessToken);

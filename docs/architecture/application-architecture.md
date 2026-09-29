@@ -481,9 +481,10 @@ Example: `PublicProfileDto` (what other members receive):
 | GET | `/blocks` | U | Blocked members (id, displayName, primary photo) |
 | DELETE | `/blocks/:userId` | U | Unblock |
 | POST | `/reports` ✅ | U** | `{ reportedUserId, messageId?, reason, details?, alsoBlock }` (`messageId` comes with chat) |
-| GET | `/notifications` | U | Cursor list |
-| GET | `/notifications/unread-count` | U | `{ count }` |
-| POST | `/notifications/read` | U | `{ ids?: uuid[], all?: true }` |
+| GET | `/notifications` | U | ✅ Cursor list ([notifications](../notifications/notifications.md#5-api)) |
+| GET | `/notifications/unread-count` | U | ✅ `{ unread }` |
+| POST | `/notifications/:id/read`, `/notifications/read-all` | U | ✅ (replaces the planned `POST /notifications/read`) |
+| GET, PUT | `/notifications/preferences` | U | ✅ Per-type preferences (safety always on) |
 
 ### 5.8 Admin API (`/api/v1/admin`)
 
@@ -525,7 +526,7 @@ Every admin write handler calls `auditService.log({ adminId, action, targetType,
 
 ## 6. Realtime architecture (Socket.IO)
 
-> **Implemented** for chat: see [chat architecture](../chat/architecture.md) and [socket events](../chat/socket-events.md). Differences from the plan below: sanctions emit `session:ended` (not `account:status`) before disconnecting; `interest:new`, `match:new` and `notification:new` come with notifications.
+> **Implemented** for chat: see [chat architecture](../chat/architecture.md) and [socket events](../chat/socket-events.md). Differences from the plan below: sanctions emit `session:ended` (not `account:status`) before disconnecting; `notification:new` ([notifications](../notifications/notifications.md)) carries interests, matches and other notices, so there are no separate `interest:new` / `match:new` events.
 
 ### 6.1 Connection
 

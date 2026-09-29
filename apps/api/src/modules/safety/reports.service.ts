@@ -18,6 +18,7 @@ import {
 } from '../../models/index.js';
 import type { RealtimeHub } from '../../realtime/hub.js';
 import { emitMatchEnded, endConnections, lockPair } from '../interests/connections.js';
+import { removeNotificationsBetween } from '../notifications/notifications.service.js';
 import type { SafetyLogger } from './safety-log.service.js';
 import { hideFromDiscovery } from './sanctions.js';
 
@@ -228,6 +229,7 @@ export function createReportsService(deps: {
           { matchStatus: blocked ? 'blocked' : 'closed', endedByUserId: reporterId },
           transaction,
         );
+        await removeNotificationsBetween(reporterId, input.reportedUserId, transaction);
 
         let hiddenReason: 'p0_report' | 'report_threshold' | null = null;
         if (!existing) {

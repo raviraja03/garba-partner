@@ -8,6 +8,7 @@ import { useAdminAuth } from '../features/auth/auth-context';
 /** Planned sections; each is shown only to roles holding its permission (UX only). */
 const SECTIONS: readonly { label: string; permission: AdminPermission; path?: string }[] = [
   { label: 'Dashboard', permission: 'dashboard:view', path: '/' },
+  { label: 'Notifications', permission: 'dashboard:view', path: '/notifications' },
   { label: 'Reports', permission: 'reports:manage', path: '/reports' },
   { label: 'Safety logs', permission: 'safety_logs:view', path: '/safety-logs' },
   { label: 'Verifications', permission: 'verifications:review' },

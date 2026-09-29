@@ -122,6 +122,16 @@ export const LIMITS = {
   /** Chat events per socket per minute (sends + reads). */
   SOCKET_EVENTS_PER_MINUTE: 120,
 
+  // Notifications (docs/notifications/notifications.md)
+  NOTIFICATIONS_PAGE_SIZE_DEFAULT: 20,
+  NOTIFICATIONS_PAGE_SIZE_MAX: 50,
+  /** Notifications are deleted this long after they occurred. */
+  NOTIFICATION_RETENTION_DAYS: 90,
+  /** Event reminders go out this long before an event starts. */
+  EVENT_REMINDER_HOURS_BEFORE: 24,
+  /** Mark-read / preference changes per member per minute. */
+  NOTIFICATION_ACTIONS_PER_MINUTE: 60,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

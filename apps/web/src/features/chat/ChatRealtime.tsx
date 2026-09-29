@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { useAuth } from '../auth/auth-context';
 import { startChatSocket } from './chat-socket';
+import { notificationKeys } from '../notifications/hooks';
 import { addMessageToCache, chatKeys } from './hooks';
 
 /**
@@ -30,6 +31,10 @@ export function ChatRealtime() {
         void queryClient.invalidateQueries({ queryKey: chatKeys.all });
         void queryClient.invalidateQueries({ queryKey: chatKeys.chat(matchId) });
         void queryClient.invalidateQueries({ queryKey: ['connections'] });
+      },
+      onNotification: ({ unreadCount }) => {
+        queryClient.setQueryData(notificationKeys.unread, { unread: unreadCount });
+        void queryClient.invalidateQueries({ queryKey: ['notifications', 'list'] });
       },
       onSessionEnded: () => {
         // Suspension or session end: re-read the account (the app shows the right state).

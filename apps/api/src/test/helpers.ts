@@ -15,6 +15,7 @@ import { hashPassword } from '../lib/passwords.js';
 import { AdminUser } from '../models/index.js';
 import { createTokenService } from '../modules/auth/token.service.js';
 import { createChatService } from '../modules/chat/chat.service.js';
+import { createNotifier } from '../modules/notifications/notifications.service.js';
 import { createSafetyLogger } from '../modules/safety/safety-log.service.js';
 import { createSuspiciousActivityDetector } from '../modules/safety/suspicious-activity.service.js';
 import type { MediaStorage } from '../providers/media/index.js';
@@ -129,6 +130,7 @@ export async function startTestServer(options: {
         safetyLog,
         logger,
       }),
+      notifier: createNotifier({ sequelize: options.sequelize, media, hub, logger }),
     }),
     hub,
   });
@@ -161,7 +163,7 @@ export function useTestDatabase(): () => Sequelize {
   beforeEach(async () => {
     // Reference data (cities, areas) is kept; everything user- and admin-generated is emptied.
     await sequelize?.query(
-      'TRUNCATE user_sanctions, users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
+      'TRUNCATE notifications, notification_preferences, user_sanctions, users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
     );
   });
 

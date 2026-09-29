@@ -87,6 +87,7 @@ The message must belong to that chat (`NOT_FOUND` otherwise). Read positions onl
 | `message:read` | `{ matchId, userId, lastReadAt }` | The **other** member | Someone reads up to a message |
 | `match:ended` | `{ matchId }` | Both members | Unmatch, block, report, moderator close, ban. **No reason is given** |
 | `session:ended` | `{ reason: 'account_restricted' \| 'session_revoked' }` | The member | Just before the server disconnects them (suspension/ban, or a revoked session) |
+| `notification:new` | `{ notification: NotificationDto, unreadCount }` | The recipient (all tabs) | A notification is created, or a chat's unread message notification is bumped ([notifications](../notifications/notifications.md#realtime)). Never contains message text |
 
 All server events are emitted **after** the database transaction commits, so a client never sees a message that could still roll back.
 

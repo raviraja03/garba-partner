@@ -19,6 +19,10 @@ import type { RealtimeHub } from '../../realtime/hub.js';
 import { loadEvents } from '../interests/matches.service.js';
 import { lockPair } from '../interests/connections.js';
 import { loadPublicProfiles } from '../profiles/public-profiles.js';
+import {
+  markChatNotificationsRead,
+  type Notifier,
+} from '../notifications/notifications.service.js';
 import type { SuspiciousActivityDetector } from '../safety/suspicious-activity.service.js';
 
 const PREVIEW_LENGTH = 120;
@@ -80,8 +84,9 @@ export function createChatService(deps: {
   media: MediaStorage;
   hub: RealtimeHub;
   suspicious: SuspiciousActivityDetector;
+  notifier: Notifier;
 }): ChatService {
-  const { sequelize, media, hub, suspicious } = deps;
+  const { sequelize, media, hub, suspicious, notifier } = deps;
 
   /** A moderator chat restriction stops sending (reading and read receipts still work). */
   async function assertCanSend(userId: string, transaction?: Transaction): Promise<void> {
@@ -344,6 +349,13 @@ export function createChatService(deps: {
         // After commit only: both members' rooms (the sender's other tabs included).
         hub.toUser(partnerId, 'message:new', dto);
         hub.toUser(userId, 'message:new', dto);
+        // One collapsed "new message" notification per chat (never contains the text).
+        await notifier.notify({
+          userId: partnerId,
+          type: 'new_message',
+          actorUserId: userId,
+          matchId,
+        });
         // Scam and spam patterns go to the moderation queue (never blocks the send).
         await suspicious.afterMessage(message);
       }
@@ -370,6 +382,8 @@ export function createChatService(deps: {
       const updated = (rows as { last_read_at: Date }[])[0];
       const lastReadAt = new Date(updated?.last_read_at ?? message.createdAt).toISOString();
       hub.toUser(partnerId, 'message:read', { matchId, userId, lastReadAt });
+      // Reading the chat also reads its "new message" notification.
+      await markChatNotificationsRead(userId, matchId);
       return { lastReadAt };
     },
   };

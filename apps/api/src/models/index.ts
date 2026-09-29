@@ -9,6 +9,8 @@ import { EventOrganizer } from './event-organizer.model.js';
 import { Event } from './event.model.js';
 import { Match } from './match.model.js';
 import { Message } from './message.model.js';
+import { NotificationPreference } from './notification-preference.model.js';
+import { Notification } from './notification.model.js';
 import { OtpRequest } from './otp-request.model.js';
 import { PartnerInterest } from './partner-interest.model.js';
 import { Report } from './report.model.js';
@@ -35,6 +37,8 @@ export { EventOrganizer, ORGANIZER_PUBLIC_ATTRIBUTES } from './event-organizer.m
 export { Event } from './event.model.js';
 export { canonicalPair, Match } from './match.model.js';
 export { Message } from './message.model.js';
+export { NotificationPreference } from './notification-preference.model.js';
+export { Notification, type NotificationData } from './notification.model.js';
 export { OtpRequest } from './otp-request.model.js';
 export { PartnerInterest } from './partner-interest.model.js';
 export { Report, type ReportEvidence } from './report.model.js';
@@ -69,4 +73,6 @@ export const MODELS = [
   Match,
   Message,
   UserSanction,
+  Notification,
+  NotificationPreference,
 ];

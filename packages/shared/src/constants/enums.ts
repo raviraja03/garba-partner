@@ -263,3 +263,37 @@ export const CONNECTION_STATUSES = [
   'matched',
 ] as const;
 export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];
+
+// --- Notifications (docs/notifications/notifications.md) --------------------------------------
+
+export const NOTIFICATION_TYPES = [
+  'interest_received',
+  'interest_accepted',
+  'match_created',
+  'new_message',
+  'verification_completed',
+  'event_reminder',
+  'safety',
+] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/** Types a member can turn off. Safety notifications are always delivered. */
+export const CONFIGURABLE_NOTIFICATION_TYPES = [
+  'interest_received',
+  'interest_accepted',
+  'match_created',
+  'new_message',
+  'verification_completed',
+  'event_reminder',
+] as const satisfies readonly NotificationType[];
+export type ConfigurableNotificationType = (typeof CONFIGURABLE_NOTIFICATION_TYPES)[number];
+
+/** What a `safety` notification is about. Never names a reporter or includes moderator notes. */
+export const SAFETY_NOTIFICATION_KINDS = [
+  'warning_issued',
+  'chat_restricted',
+  'account_suspended',
+  'restriction_lifted',
+  'report_reviewed',
+] as const;
+export type SafetyNotificationKind = (typeof SAFETY_NOTIFICATION_KINDS)[number];

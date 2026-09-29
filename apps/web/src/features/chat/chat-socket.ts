@@ -4,6 +4,7 @@ import type {
   MessageDto,
   ServerToClientEvents,
   SocketAck,
+  NotificationDto,
 } from '@garba-partner/shared';
 import { ApiClientError, getAccessToken, refreshSession } from '../../lib/api-client';
 import { markReadRest, sendMessageRest } from './chat-api';
@@ -14,6 +15,8 @@ export interface ChatSocketHandlers {
   onMessage: (message: MessageDto) => void;
   onRead: (payload: { matchId: string; userId: string; lastReadAt: string }) => void;
   onMatchEnded: (payload: { matchId: string }) => void;
+  /** A new notification (and the unread total). */
+  onNotification: (payload: { notification: NotificationDto; unreadCount: number }) => void;
   /** The server ended this member's session (sanction or logout elsewhere). */
   onSessionEnded: () => void;
 }
@@ -87,6 +90,7 @@ export function startChatSocket(handlers: ChatSocketHandlers): () => void {
   client.on('message:new', handlers.onMessage);
   client.on('message:read', handlers.onRead);
   client.on('match:ended', handlers.onMatchEnded);
+  client.on('notification:new', handlers.onNotification);
   client.on('session:ended', () => {
     sessionEnded = true;
     handlers.onSessionEnded();

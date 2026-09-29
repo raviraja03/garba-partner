@@ -17,6 +17,8 @@ import { createAdminEventsRouter } from './modules/admin/events/admin-events.rou
 import { createAdminLogsRouter } from './modules/admin/log-viewer/admin-logs.routes.js';
 import { createAdminLogsService } from './modules/admin/log-viewer/admin-logs.service.js';
 import { createAdminMatchesRouter } from './modules/admin/matches/admin-matches.routes.js';
+import { createAdminNotificationsRouter } from './modules/admin/notifications/admin-notifications.routes.js';
+import { createAdminNotificationsService } from './modules/admin/notifications/admin-notifications.service.js';
 import { createAdminMatchesService } from './modules/admin/matches/admin-matches.service.js';
 import { createAdminReportsRouter } from './modules/admin/reports/admin-reports.routes.js';
 import { createAdminReportsService } from './modules/admin/reports/admin-reports.service.js';
@@ -48,6 +50,11 @@ import {
 import { createInterestsService } from './modules/interests/interests.service.js';
 import { createMatchesService } from './modules/interests/matches.service.js';
 import { createHealthRouter } from './modules/health/health.routes.js';
+import { createNotificationsRouter } from './modules/notifications/notifications.routes.js';
+import {
+  createNotificationsService,
+  createNotifier,
+} from './modules/notifications/notifications.service.js';
 import { createLocationsRouter } from './modules/locations/locations.routes.js';
 import { createProfileController } from './modules/profiles/profile.controller.js';
 import {
@@ -94,6 +101,9 @@ export function createApiRouter(options: {
     createProfileService({ sequelize, media, logger }),
   );
 
+  // In-app notifications (docs/notifications/notifications.md): created after commits, never fatal.
+  const notifier = createNotifier({ sequelize, media, hub, logger });
+
   const router = Router();
   router.use('/health', createHealthRouter(dependencies));
   router.use('/cities', createLocationsRouter());
@@ -133,7 +143,7 @@ export function createApiRouter(options: {
   router.use(
     '/admin/users',
     createAdminUsersRouter({
-      service: createAdminUsersService({ sequelize, env, media, hub }),
+      service: createAdminUsersService({ sequelize, env, media, hub, notifier }),
       authenticateAdmin,
     }),
   );
@@ -179,7 +189,14 @@ export function createApiRouter(options: {
   router.use(
     '/interests',
     createInterestsRouter({
-      service: createInterestsService({ sequelize, media, discovery, matches, safetyLog }),
+      service: createInterestsService({
+        sequelize,
+        media,
+        discovery,
+        matches,
+        safetyLog,
+        notifier,
+      }),
       authenticateMember,
       limiter: interestLimiter,
     }),
@@ -218,7 +235,7 @@ export function createApiRouter(options: {
   router.use(
     '/chats',
     createChatRouter({
-      service: createChatService({ sequelize, media, hub, suspicious }),
+      service: createChatService({ sequelize, media, hub, suspicious, notifier }),
       authenticateMember,
       limiter: createMemberRateLimiter({
         windowMs: 60 * 1000,
@@ -227,9 +244,27 @@ export function createApiRouter(options: {
     }),
   );
   router.use(
+    '/notifications',
+    createNotificationsRouter({
+      service: createNotificationsService({ media }),
+      authenticateMember,
+      limiter: createMemberRateLimiter({
+        windowMs: 60 * 1000,
+        limit: LIMITS.NOTIFICATION_ACTIONS_PER_MINUTE,
+      }),
+    }),
+  );
+  router.use(
+    '/admin/notifications',
+    createAdminNotificationsRouter({
+      service: createAdminNotificationsService({ sequelize }),
+      authenticateAdmin,
+    }),
+  );
+  router.use(
     '/admin/reports',
     createAdminReportsRouter({
-      service: createAdminReportsService({ sequelize, env, media, hub }),
+      service: createAdminReportsService({ sequelize, env, media, hub, notifier }),
       authenticateAdmin,
     }),
   );

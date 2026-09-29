@@ -5,6 +5,7 @@ import {
   type AdminSanctionDto,
   type HiddenReason,
   type ReportReason,
+  type SafetyNotificationKind,
   type SanctionDurationDays,
   type SanctionType,
 } from '@garba-partner/shared';
@@ -12,6 +13,7 @@ import { AppError } from '../../lib/app-error.js';
 import { Block, User, UserSanction, UserSession } from '../../models/index.js';
 import type { RealtimeHub } from '../../realtime/hub.js';
 import { recordAdminAction } from '../admin/audit/audit.service.js';
+import type { Notifier } from '../notifications/notifications.service.js';
 import {
   cancelPendingInterestsOf,
   emitMatchEnded,
@@ -100,6 +102,8 @@ export interface SanctionEffects {
   userId: string;
   disconnect: boolean;
   endedMatches: [string, string][];
+  /** Safety notification for the member (none for bans: they can no longer sign in). */
+  notify: SafetyNotificationKind | null;
 }
 
 export interface AppliedSanction {
@@ -126,6 +130,7 @@ const noEffects = (userId: string): SanctionEffects => ({
   userId,
   disconnect: false,
   endedMatches: [],
+  notify: null,
 });
 
 /** Active = not revoked by a moderator and not expired. */
@@ -203,13 +208,16 @@ export async function applySanction(
   let cancelledInterests = 0;
   switch (type) {
     case 'warning':
+      effects.notify = 'warning_issued';
       break;
     case 'chat_restriction':
       await user.update({ chatRestrictedAt: now }, { transaction });
+      effects.notify = 'chat_restricted';
       break;
     case 'suspension':
       await setAccountStatus(userId, 'suspended', transaction);
       effects.disconnect = true;
+      effects.notify = 'account_suspended';
       break;
     case 'ban':
       // A ban supersedes a running suspension (so an expiry can never reactivate a banned account).
@@ -315,12 +323,26 @@ export async function liftSanction(
   );
 }
 
-/** Pushes a committed sanction to open connections: ended chats close, sockets disconnect. */
-export function applySanctionEffects(hub: RealtimeHub, effects: SanctionEffects): void {
+/**
+ * After commit: ended chats close and sockets disconnect, and the member gets a safety
+ * notification (the kind only; never the note, the report or the reporter).
+ */
+export async function applySanctionEffects(
+  hub: RealtimeHub,
+  notifier: Notifier,
+  effects: SanctionEffects,
+): Promise<void> {
   for (const [matchId, partnerId] of effects.endedMatches) {
     emitMatchEnded(hub, matchId, effects.userId, partnerId);
   }
   if (effects.disconnect) hub.disconnectUser(effects.userId, 'account_restricted');
+  if (effects.notify) {
+    await notifier.notify({
+      userId: effects.userId,
+      type: 'safety',
+      data: { safetyKind: effects.notify },
+    });
+  }
 }
 
 export interface ExpiredSanction {

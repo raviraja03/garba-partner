@@ -1,5 +1,6 @@
 import type { ErrorCode } from '../errors/error-codes.js';
 import type { MessageDto } from './dto/chat.dto.js';
+import type { NotificationDto } from './dto/notification.dto.js';
 
 /**
  * Socket.IO contract (docs/chat/socket-events.md). Typed on both ends:
@@ -31,6 +32,8 @@ export interface ServerToClientEvents {
   'match:ended': (payload: { matchId: string }) => void;
   /** Just before the server disconnects a member (sanction, session end). */
   'session:ended': (payload: { reason: 'account_restricted' | 'session_revoked' }) => void;
+  /** A new (or updated, for collapsed chat messages) notification and the new unread total. */
+  'notification:new': (payload: { notification: NotificationDto; unreadCount: number }) => void;
 }
 
 /** Errors a client receives in `connect_error` (`error.message` is the code). */

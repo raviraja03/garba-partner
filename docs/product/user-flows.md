@@ -483,7 +483,7 @@ The admin panel is a separate app (`apps/admin`) on its own subdomain. Every act
 
 ### 12.2 Report handling
 
-> **Implemented** ([moderation system](../safety/moderation-system.md), [admin actions](../safety/admin-actions.md)) with these refinements: reasons are fake profile, harassment, spam, asking for money, inappropriate behaviour, threatening behaviour, impersonation, underage, other; `restrict_chat` is an additional action; `remove_content` and reporter notifications are not built yet; bans need an assigned (in-review) report.
+> **Implemented** ([moderation system](../safety/moderation-system.md), [admin actions](../safety/admin-actions.md)) with these refinements: reasons are fake profile, harassment, spam, asking for money, inappropriate behaviour, threatening behaviour, impersonation, underage, other; `restrict_chat` is an additional action; `remove_content` is not built yet; reporters get a generic "report reviewed" [notification](../notifications/notifications.md); bans need an assigned (in-review) report.
 
 1. **Reports queue**: filter by status (`open`, `in_review`, `resolved`, `dismissed`), priority and reason. Default sort: priority, then oldest first.
 2. Open a report → **Assign to me** (`in_review`).

@@ -349,6 +349,8 @@ Indexes: `(user_id, created_at DESC)`, `(ends_at) WHERE type = 'suspension' AND 
 
 #### `notifications`
 
+> **Implemented** with a different shape: real FK columns (`actor_user_id`, `match_id`, `interest_id`, `event_id`) instead of IDs in `data`, `count` and `occurred_at` for collapsed chat notifications, the types in [notifications §2](../notifications/notifications.md#2-types), and a `notification_preferences` table. See [schema §4.21](../database/schema.md#421-notifications-and-notification_preferences).
+
 `id` uuid PK, `user_id` FK → users `ON DELETE CASCADE`, `type` varchar(40) (`interest_received`, `match_created`, `verification_approved`, `verification_rejected`, `event_updated`, `event_cancelled`, `photo_rejected`, `warning_issued`, `report_reviewed`), `data` jsonb (IDs and display strings only, no private data), `read_at` null.
 
 Indexes: `(user_id, created_at DESC)`, `(user_id) WHERE read_at IS NULL`.

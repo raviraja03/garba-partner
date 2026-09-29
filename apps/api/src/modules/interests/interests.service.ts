@@ -25,6 +25,7 @@ import {
 import type { MediaStorage } from '../../providers/media/index.js';
 import type { DiscoveryService } from '../discovery/discovery.service.js';
 import { loadPublicProfiles } from '../profiles/public-profiles.js';
+import type { Notifier } from '../notifications/notifications.service.js';
 import type { SafetyLogger } from '../safety/safety-log.service.js';
 import { lockPair, pendingBetween } from './connections.js';
 import { loadEvents, type MatchesService } from './matches.service.js';
@@ -78,8 +79,9 @@ export function createInterestsService(deps: {
   discovery: DiscoveryService;
   matches: MatchesService;
   safetyLog: SafetyLogger;
+  notifier: Notifier;
 }): InterestsService {
-  const { sequelize, media, discovery, matches, safetyLog } = deps;
+  const { sequelize, media, discovery, matches, safetyLog, notifier } = deps;
 
   /** Members under review or restriction can't create new connections. */
   async function assertCanInteract(userId: string): Promise<void> {
@@ -317,6 +319,30 @@ export function createInterestsService(deps: {
         throw error;
       }
 
+      // After commit: mutual interest → both hear about the match; otherwise the receiver
+      // hears about the interest. A repeated send notifies nobody.
+      if (outcome.matchId && !outcome.alreadySent) {
+        await notifier.notify({
+          userId: receiverId,
+          type: 'match_created',
+          actorUserId: senderId,
+          matchId: outcome.matchId,
+        });
+        await notifier.notify({
+          userId: senderId,
+          type: 'match_created',
+          actorUserId: receiverId,
+          matchId: outcome.matchId,
+        });
+      } else if (!outcome.alreadySent) {
+        await notifier.notify({
+          userId: receiverId,
+          type: 'interest_received',
+          actorUserId: senderId,
+          interestId: outcome.interestId,
+        });
+      }
+
       const match = outcome.matchId ? await matches.get(senderId, outcome.matchId) : null;
       return {
         interestId: outcome.interestId,
@@ -356,7 +382,7 @@ export function createInterestsService(deps: {
         throw new AppError('USER_UNAVAILABLE');
       }
 
-      const matchId = await sequelize.transaction(async (transaction) => {
+      const accepted = await sequelize.transaction(async (transaction) => {
         await lockPair(sequelize, userId, interest.senderId, transaction);
         const locked = await PartnerInterest.findByPk(interestId, {
           lock: transaction.LOCK.UPDATE,
@@ -371,14 +397,23 @@ export function createInterestsService(deps: {
           attributes: ['id'],
           transaction,
         });
-        if (existing) return existing.id;
+        if (existing) return { matchId: existing.id, created: false };
         const match = await Match.create(
           { ...pair, interestId, eventId: locked.eventId },
           { transaction },
         );
-        return match.id;
+        return { matchId: match.id, created: true };
       });
-      return matches.get(userId, matchId);
+      if (accepted.created) {
+        await notifier.notify({
+          userId: interest.senderId,
+          type: 'interest_accepted',
+          actorUserId: userId,
+          interestId,
+          matchId: accepted.matchId,
+        });
+      }
+      return matches.get(userId, accepted.matchId);
     },
 
     reject: (userId, interestId) => respond(userId, interestId, 'receiverId', 'declined'),

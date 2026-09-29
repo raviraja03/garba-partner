@@ -37,6 +37,7 @@ import {
   toPreferencesDto,
 } from '../../profiles/profile.mapper.js';
 import { cancelPendingInterestsOf } from '../../interests/connections.js';
+import type { Notifier } from '../../notifications/notifications.service.js';
 import {
   applySanction,
   applySanctionEffects,
@@ -91,8 +92,9 @@ export function createAdminUsersService(deps: {
   env: ServerEnv;
   media: MediaStorage;
   hub: RealtimeHub;
+  notifier: Notifier;
 }): AdminUsersService {
-  const { sequelize, env, media, hub } = deps;
+  const { sequelize, env, media, hub, notifier } = deps;
 
   /** Builds the search condition. Phone searches match the HMAC — the number is never stored or returned. */
   function searchWhere(q: string): WhereOptions {
@@ -255,7 +257,7 @@ export function createAdminUsersService(deps: {
         transaction,
       ),
     );
-    applySanctionEffects(hub, effects);
+    await applySanctionEffects(hub, notifier, effects);
     return getDetail(userId);
   }
 
@@ -268,6 +270,7 @@ export function createAdminUsersService(deps: {
     await sequelize.transaction((transaction) =>
       liftSanction(actor, { userId, type, reason }, env.OTP_HMAC_SECRET, transaction),
     );
+    await notifier.notify({ userId, type: 'safety', data: { safetyKind: 'restriction_lifted' } });
     return getDetail(userId);
   }
 

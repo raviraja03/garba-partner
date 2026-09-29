@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { APP_NAME } from '@garba-partner/shared';
 import { useAuth } from '../features/auth/auth-context';
 import { useUnreadCount } from '../features/chat/hooks';
+import { NotificationBell } from '../features/notifications/NotificationBell';
 import { SafetyNotices } from '../features/safety/components/SafetyNotices';
 import { Button } from './ui/Button';
 
@@ -77,6 +78,7 @@ export function AppShell() {
               </NavLink>
             ),
           )}
+          {authenticated && <NotificationBell enabled={authenticated} />}
           {authenticated && (
             <Button variant="link" loading={signingOut} onClick={() => void handleSignOut()}>
               Log out

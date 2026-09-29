@@ -7,6 +7,8 @@ import { readEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
 import { createTokenService } from './modules/auth/token.service.js';
 import { createChatService } from './modules/chat/chat.service.js';
+import { startNotificationJobs } from './modules/notifications/notification-jobs.js';
+import { createNotifier } from './modules/notifications/notifications.service.js';
 import { startSanctionExpiryJob } from './modules/safety/sanction-expiry.job.js';
 import { createSafetyLogger } from './modules/safety/safety-log.service.js';
 import { createSuspiciousActivityDetector } from './modules/safety/suspicious-activity.service.js';
@@ -56,6 +58,7 @@ function start(): void {
     }),
   );
   const safetyLog = createSafetyLogger({ ipHashSecret: env.OTP_HMAC_SECRET, logger });
+  const notifier = createNotifier({ sequelize, media, hub: realtime, logger });
   // Socket.IO shares the HTTP server (path /socket.io) and the same services as REST.
   const io = attachSocketServer(server, {
     env,
@@ -66,12 +69,15 @@ function start(): void {
       media,
       hub: realtime,
       suspicious: createSuspiciousActivityDetector({ sequelize, safetyLog, logger }),
+      notifier,
     }),
     hub: realtime,
   });
 
   // Timed suspensions and chat restrictions end on their own (docs/safety/admin-actions.md).
   const stopSanctionExpiry = startSanctionExpiryJob({ sequelize, safetyLog, logger });
+  // Event reminders and notification retention (docs/notifications/notifications.md).
+  const stopNotificationJobs = startNotificationJobs({ sequelize, notifier, logger });
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     const message =
@@ -102,6 +108,7 @@ function start(): void {
     forceExit.unref();
 
     stopSanctionExpiry();
+    stopNotificationJobs();
     // Closes every socket, then the HTTP server.
     void io.close();
     server.close((err) => {
