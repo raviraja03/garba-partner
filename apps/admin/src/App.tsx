@@ -13,6 +13,7 @@ import { LoginPage } from './pages/LoginPage';
 import { NotificationsMonitorPage } from './pages/NotificationsMonitorPage';
 import { EditOrganizerPage, NewOrganizerPage, OrganizerDetailPage } from './pages/OrganizerPages';
 import { OrganizersPage } from './pages/OrganizersPage';
+import { PaymentBookingPage, PaymentsPage } from './pages/PaymentsPage';
 import { ReportDetailPage } from './pages/ReportDetailPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { UserDetailPage } from './pages/UserDetailPage';
@@ -75,6 +76,13 @@ const router = createBrowserRouter([
           {
             element: <RequireAdmin permission="safety_logs:view" />,
             children: [{ path: '/safety-logs', element: <SafetyLogsPage /> }],
+          },
+          {
+            element: <RequireAdmin permission="payments:view" />,
+            children: [
+              { path: '/payments', element: <PaymentsPage /> },
+              { path: '/payments/bookings/:bookingId', element: <PaymentBookingPage /> },
+            ],
           },
           {
             element: <RequireAdmin permission="audit:view" />,

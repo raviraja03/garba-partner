@@ -1,3 +1,4 @@
+import type { AdminEventPassDto, EventPassDto } from './payment.dto.js';
 import type { EventStatus, OrganizerStatus } from '../../constants/enums.js';
 
 /**
@@ -49,6 +50,8 @@ export interface EventCardDto {
   isVerified: boolean;
   organizer: PublicOrganizerSummaryDto;
   hasTicketUrl: boolean;
+  /** Pass price when passes are sold on Garba Partner (paise), else null. */
+  passPricePaise: number | null;
 }
 
 /** Public event detail (`GET /api/v1/events/:idOrSlug`). */
@@ -59,6 +62,8 @@ export interface EventDetailDto extends Omit<EventCardDto, 'organizer'> {
   /** External pass/ticket page, `https://` only. */
   ticketUrl: string | null;
   organizer: PublicOrganizerDto;
+  /** Online pass sales (docs/payments/payment-flow.md); null when not sold here. */
+  pass: EventPassDto | null;
 }
 
 // --- Admin -----------------------------------------------------------------------------------
@@ -137,4 +142,5 @@ export interface AdminEventDetailDto extends AdminEventListItemDto {
   updatedBy: AdminActorDto | null;
   /** Only drafts that were never published can be deleted; everything else is archived. */
   canDelete: boolean;
+  pass: AdminEventPassDto;
 }

@@ -132,6 +132,18 @@ export const LIMITS = {
   /** Mark-read / preference changes per member per minute. */
   NOTIFICATION_ACTIONS_PER_MINUTE: 60,
 
+  // Event passes & payments (docs/payments/payment-flow.md)
+  PASS_MAX_PER_ORDER: 6,
+  /** ₹1 – ₹10,000 per pass, in paise. */
+  PASS_PRICE_MIN_PAISE: 100,
+  PASS_PRICE_MAX_PAISE: 1_000_000,
+  PASS_CAPACITY_MAX: 100_000,
+  /** Seats stay reserved for an unpaid order this long. */
+  ORDER_EXPIRY_MINUTES: 15,
+  ORDERS_PER_MINUTE: 10,
+  PAYMENT_VERIFICATIONS_PER_MINUTE: 30,
+  BOOKINGS_PAGE_SIZE: 20,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

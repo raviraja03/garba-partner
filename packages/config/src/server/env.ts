@@ -21,6 +21,12 @@ export const MEDIA_STORAGES = ['cloudinary', 'local'] as const;
  * provider and is only accepted when APP_ENV=development. Real providers are added by adapter.
  */
 export const IDENTITY_PROVIDERS = ['disabled', 'mock'] as const;
+/**
+ * Event pass payments (docs/payments/razorpay.md). `disabled` turns online pass sales off.
+ * `razorpay` needs the three RAZORPAY_* variables: TEST keys (rzp_test_) everywhere except
+ * APP_ENV=production, which requires LIVE keys (rzp_live_).
+ */
+export const PAYMENT_PROVIDERS = ['disabled', 'razorpay'] as const;
 
 export type NodeEnv = (typeof NODE_ENVS)[number];
 export type AppEnv = (typeof APP_ENVS)[number];
@@ -28,6 +34,7 @@ export type LogLevel = (typeof LOG_LEVELS)[number];
 export type SmsProvider = (typeof SMS_PROVIDERS)[number];
 export type MediaStorageKind = (typeof MEDIA_STORAGES)[number];
 export type IdentityProviderKind = (typeof IDENTITY_PROVIDERS)[number];
+export type PaymentProviderKind = (typeof PAYMENT_PROVIDERS)[number];
 
 /** Normalises an origin such as `https://example.com/` to `https://example.com`. */
 const originSchema = z.url({ protocol: /^https?$/ }).transform((value) => new URL(value).origin);
@@ -100,6 +107,20 @@ export const serverEnvSchema = z
     IDENTITY_PROVIDER: z.enum(IDENTITY_PROVIDERS).default('disabled'),
     /** HMAC key the provider uses to sign webhooks. Required unless IDENTITY_PROVIDER=disabled. */
     IDENTITY_WEBHOOK_SECRET: secretSchema.optional(),
+
+    PAYMENT_PROVIDER: z.enum(PAYMENT_PROVIDERS).default('disabled'),
+    /** Public key ID (sent to the browser for Checkout). */
+    RAZORPAY_KEY_ID: z
+      .string()
+      .regex(
+        /^rzp_(test|live)_[A-Za-z0-9]{6,40}$/,
+        'must be a Razorpay key ID (rzp_test_… / rzp_live_…)',
+      )
+      .optional(),
+    /** API key secret: server only. Signs checkout results; authenticates API calls. */
+    RAZORPAY_KEY_SECRET: z.string().min(8).optional(),
+    /** Webhook secret configured in the Razorpay dashboard. */
+    RAZORPAY_WEBHOOK_SECRET: z.string().min(8).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.IDENTITY_PROVIDER !== 'disabled' && env.IDENTITY_WEBHOOK_SECRET === undefined) {
@@ -116,6 +137,48 @@ export const serverEnvSchema = z
         path: ['IDENTITY_PROVIDER'],
         message: '"mock" is only allowed when APP_ENV=development; configure a licensed provider',
       });
+    }
+
+    if (env.PAYMENT_PROVIDER === 'razorpay') {
+      for (const key of [
+        'RAZORPAY_KEY_ID',
+        'RAZORPAY_KEY_SECRET',
+        'RAZORPAY_WEBHOOK_SECRET',
+      ] as const) {
+        if (env[key] === undefined) {
+          ctx.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'is required when PAYMENT_PROVIDER=razorpay',
+          });
+        }
+      }
+      // Real money only in production; production never runs on test keys.
+      const live = env.RAZORPAY_KEY_ID?.startsWith('rzp_live_') ?? false;
+      if (live && env.APP_ENV !== 'production') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['RAZORPAY_KEY_ID'],
+          message: 'live keys are only allowed when APP_ENV=production; use test keys (rzp_test_)',
+        });
+      }
+      if (!live && env.RAZORPAY_KEY_ID !== undefined && env.APP_ENV === 'production') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['RAZORPAY_KEY_ID'],
+          message: 'production requires live keys (rzp_live_)',
+        });
+      }
+      if (
+        env.RAZORPAY_WEBHOOK_SECRET !== undefined &&
+        env.RAZORPAY_WEBHOOK_SECRET === env.RAZORPAY_KEY_SECRET
+      ) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['RAZORPAY_WEBHOOK_SECRET'],
+          message: 'must differ from RAZORPAY_KEY_SECRET',
+        });
+      }
     }
 
     if (env.TEST_DATABASE_URL !== undefined && env.TEST_DATABASE_URL === env.DATABASE_URL) {

@@ -34,6 +34,7 @@ import {
 } from '../../events/event.mapper.js';
 import { istStartOfDay } from '../../events/events.service.js';
 import { assertValidLocation } from '../../locations/locations.service.js';
+import { loadAdminEventPass, seatCounts } from '../../payments/pass-availability.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 import type { AdminActor } from '../users/admin-users.service.js';
 
@@ -82,6 +83,12 @@ export interface AdminEventsService {
   restore(actor: AdminActor, eventId: string): Promise<AdminEventDetailDto>;
   /** Hard delete: only for events that were never published. */
   remove(actor: AdminActor, eventId: string): Promise<void>;
+  /** Online pass price and capacity (docs/payments/payment-flow.md). Audited. */
+  updatePass(
+    actor: AdminActor,
+    eventId: string,
+    input: { pricePaise: number | null; capacity: number | null },
+  ): Promise<AdminEventDetailDto>;
 }
 
 const notFound = () => new AppError('NOT_FOUND', { message: 'Event not found.' });
@@ -139,7 +146,12 @@ export function createAdminEventsService(deps: {
       ],
     });
     if (!event) throw notFound();
-    return toAdminEventDetailDto(event, media, new Date());
+    return toAdminEventDetailDto(
+      event,
+      media,
+      new Date(),
+      await loadAdminEventPass(sequelize, event),
+    );
   }
 
   function audit(
@@ -198,6 +210,37 @@ export function createAdminEventsService(deps: {
   }
 
   return {
+    async updatePass(actor, eventId, input) {
+      await sequelize.transaction(async (transaction) => {
+        // Same lock as order creation, so capacity can't change under a checkout.
+        const event = await lockEditable(eventId, transaction);
+        const { sold, reserved } = await seatCounts(sequelize, event.id, { transaction });
+        if (input.capacity !== null && input.capacity < sold + reserved) {
+          throw invalid(
+            'capacity',
+            `Capacity can't be lower than the ${String(sold + reserved)} passes already sold or reserved.`,
+          );
+        }
+        const before = { pricePaise: event.passPricePaise, capacity: event.passCapacity };
+        await event.update(
+          {
+            passPricePaise: input.pricePaise,
+            passCapacity: input.capacity,
+            updatedByAdminId: actor.adminId,
+          },
+          { transaction },
+        );
+        await audit(
+          actor,
+          'event.pass_update',
+          event.id,
+          { before, after: input, sold },
+          transaction,
+        );
+      });
+      return getDetail(eventId);
+    },
+
     async list(query) {
       const sort = query.sort ?? 'created_desc';
       const order = ADMIN_ORDERS[sort];

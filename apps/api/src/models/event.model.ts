@@ -82,6 +82,14 @@ export class Event extends Model<InferAttributes<Event>, InferCreationAttributes
   @Column({ type: DataType.STRING(500), allowNull: true })
   ticketUrl!: CreationOptional<string | null>;
 
+  /** Pass price in paise when passes are sold on the platform (docs/payments/payment-flow.md). */
+  @Column({ type: DataType.INTEGER, allowNull: true })
+  passPricePaise!: CreationOptional<number | null>;
+
+  /** Maximum passes sold (null = unlimited). */
+  @Column({ type: DataType.INTEGER, allowNull: true })
+  passCapacity!: CreationOptional<number | null>;
+
   @Column({
     type: DataType.STRING(20),
     allowNull: false,

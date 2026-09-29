@@ -1,4 +1,5 @@
 import type {
+  BookingNotificationKind,
   ConfigurableNotificationType,
   NotificationDto,
   SafetyNotificationKind,
@@ -12,6 +13,15 @@ const SAFETY_TEXT: Record<SafetyNotificationKind, string> = {
   account_suspended: 'Your account has been suspended. You can still block and report members.',
   restriction_lifted: 'A restriction on your account has been lifted.',
   report_reviewed: "We've reviewed your report. Thank you for helping keep Garba Partner safe.",
+};
+
+const BOOKING_TEXT: Record<BookingNotificationKind, string> = {
+  confirmed: 'Your passes are booked. Show your booking code at the venue.',
+  cancelled: 'Your booking was cancelled. A full refund has been started.',
+  refund_processed:
+    'Your refund has been processed. It can take 5–7 working days to reach your account.',
+  refund_failed:
+    'We could not complete your refund yet. Our team will retry and contact you if needed.',
 };
 
 /**
@@ -39,6 +49,10 @@ export function notificationText(n: NotificationDto): string {
       return n.event ? `${n.event.name} starts soon. Have a great night!` : 'An event starts soon.';
     case 'safety':
       return n.safety ? SAFETY_TEXT[n.safety.kind] : 'A notice about your account.';
+    case 'booking':
+      return n.booking
+        ? `${BOOKING_TEXT[n.booking.kind]}${n.event ? ` (${n.event.name})` : ''}`
+        : 'An update about your booking.';
   }
 }
 

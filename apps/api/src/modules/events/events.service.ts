@@ -1,4 +1,5 @@
 import { Op, type WhereOptions } from 'sequelize';
+import type { Sequelize } from 'sequelize-typescript';
 import {
   LIMITS,
   addDays,
@@ -24,6 +25,7 @@ import {
   ORGANIZER_PUBLIC_ATTRIBUTES,
 } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
+import { loadEventPass } from '../payments/pass-availability.js';
 import { toEventCardDto, toEventDetailDto } from './event.mapper.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -54,8 +56,11 @@ export interface EventsService {
 }
 
 /** Public event browsing (docs/events/event-api.md#public-endpoints). */
-export function createEventsService(deps: { media: MediaStorage }): EventsService {
-  const { media } = deps;
+export function createEventsService(deps: {
+  sequelize: Sequelize;
+  media: MediaStorage;
+}): EventsService {
+  const { sequelize, media } = deps;
 
   return {
     async list(query) {
@@ -125,7 +130,8 @@ export function createEventsService(deps: { media: MediaStorage }): EventsServic
       });
       // Drafts, archived events and unknown IDs are indistinguishable: 404.
       if (!event) throw new AppError('NOT_FOUND', { message: 'Event not found.' });
-      return toEventDetailDto(event, media, new Date());
+      const now = new Date();
+      return toEventDetailDto(event, media, now, await loadEventPass(sequelize, event, now));
     },
   };
 }

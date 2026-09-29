@@ -20,6 +20,8 @@ export const ADMIN_PERMISSIONS = [
   'events:view',
   'events:manage',
   'locations:manage',
+  'payments:view',
+  'payments:refund',
   'audit:view',
   'safety_logs:view',
   'admins:manage',
@@ -38,7 +40,13 @@ export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermissi
     'photos:review',
     'events:view',
   ],
-  event_manager: ['dashboard:view', 'events:view', 'events:manage', 'locations:manage'],
+  event_manager: [
+    'dashboard:view',
+    'events:view',
+    'events:manage',
+    'locations:manage',
+    'payments:view',
+  ],
 };
 
 export function roleHasPermission(role: AdminRole, permission: AdminPermission): boolean {

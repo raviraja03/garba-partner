@@ -9,6 +9,7 @@ import { API_PREFIX } from '@garba-partner/shared';
 import { resolveRequestId } from './lib/request-id.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFound } from './middlewares/not-found.js';
+import { RAZORPAY_WEBHOOK_PATH } from './modules/payments/payments.routes.js';
 import { LOCAL_MEDIA_DIRECTORY, LOCAL_MEDIA_ROUTE } from './providers/media/index.js';
 import { createApiRouter, type ApiDependencies } from './routes.js';
 
@@ -20,6 +21,7 @@ export interface CreateAppOptions {
 }
 
 const HEALTH_PATH = `${API_PREFIX}/health`;
+const WEBHOOK_PATH = `${API_PREFIX}${RAZORPAY_WEBHOOK_PATH}`;
 
 /** Builds the Express application. Kept free of side effects so tests can create instances. */
 export function createApp({ env, logger, dependencies }: CreateAppOptions): Express {
@@ -43,7 +45,15 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
   );
   app.use(helmet());
   app.use(cors({ origin: [env.WEB_ORIGIN, env.ADMIN_ORIGIN], credentials: true }));
-  app.use(express.json({ limit: '100kb' }));
+  app.use(
+    express.json({
+      limit: '100kb',
+      // Webhook signatures are computed over the exact bytes received: keep them for that path.
+      verify: (req, _res, buffer) => {
+        if (req.url === WEBHOOK_PATH) (req as express.Request).rawBody = Buffer.from(buffer);
+      },
+    }),
+  );
   app.use(cookieParser());
 
   if (env.MEDIA_STORAGE === 'local') {

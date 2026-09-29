@@ -6,7 +6,7 @@ import {
 } from '../src/schemas/notification.schema.js';
 
 describe('notification types', () => {
-  it('are the seven product types; everything but safety is configurable', () => {
+  it('are the product types; safety and booking are always on', () => {
     expect([...NOTIFICATION_TYPES]).toEqual([
       'interest_received',
       'interest_accepted',
@@ -15,12 +15,13 @@ describe('notification types', () => {
       'verification_completed',
       'event_reminder',
       'safety',
+      'booking',
     ]);
     expect(
       NOTIFICATION_TYPES.filter(
         (t) => !(CONFIGURABLE_NOTIFICATION_TYPES as readonly string[]).includes(t),
       ),
-    ).toEqual(['safety']);
+    ).toEqual(['safety', 'booking']);
   });
 });
 

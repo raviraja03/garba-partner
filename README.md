@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). **Partner discovery** and **interests & matches** are live: ranked suggestions filtered by mutual preferences, city, date, level, event and verification; request → accept interests with exactly one match per pair; block, report and admin match moderation. **Real-time chat** (Socket.IO) connects matched members, with read receipts, unread counts, message reports and an admin reports queue with audited conversation review. The **safety and moderation system** is complete: reports with product reasons, block/unblock, warnings, chat restrictions, timed suspensions and bans (always decided by a moderator), automated suspicious-activity flags, scam/money warnings, a safety centre and community guidelines, and audited admin actions with safety and audit log viewers. **In-app notifications** (bell with unread count, live over Socket.IO) cover interests, matches, messages, event reminders and safety notices, with per-type preferences and admin monitoring. Payments come in a later phase. See the [roadmap](#development-roadmap).
+> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). **Partner discovery** and **interests & matches** are live: ranked suggestions filtered by mutual preferences, city, date, level, event and verification; request → accept interests with exactly one match per pair; block, report and admin match moderation. **Real-time chat** (Socket.IO) connects matched members, with read receipts, unread counts, message reports and an admin reports queue with audited conversation review. The **safety and moderation system** is complete: reports with product reasons, block/unblock, warnings, chat restrictions, timed suspensions and bans (always decided by a moderator), automated suspicious-activity flags, scam/money warnings, a safety centre and community guidelines, and audited admin actions with safety and audit log viewers. **In-app notifications** (bell with unread count, live over Socket.IO) cover interests, matches, messages, event reminders and safety notices, with per-type preferences and admin monitoring. **Event passes** can be bought on the platform with **Razorpay** (server-verified payments, signed webhooks, idempotent orders, capacity holds, automatic and admin refunds, booking codes). See the [roadmap](#development-roadmap).
 
 ---
 
@@ -15,7 +15,7 @@ Many people skip Navratri events, or dance at the edges, because their friends a
 3. **Find partners.** See other adults looking for a partner at the same event (or in your city), filtered by experience and style.
 4. **Connect by consent.** Send an interest. A chat opens only if they accept.
 5. **Chat and meet at the event.** In-app chat. Phone numbers are never shared by the platform.
-6. **(Later) Buy passes** through Razorpay.
+6. **Buy passes** through Razorpay (UPI, cards, net banking).
 
 ### Safety & privacy by design
 
@@ -43,7 +43,7 @@ See [Product overview](docs/product/product-overview.md) for the full vision, ro
 | Realtime | Socket.IO *(chat phase)* |
 | Image storage | Cloudinary (server-side signed uploads; images re-encoded with sharp, EXIF/GPS removed). Local disk storage for development |
 | Authentication | Members: mobile OTP. Admins: email + Argon2id password. Short-lived JWT access tokens (`jose`) + rotating refresh tokens in httpOnly cookies, sessions in PostgreSQL |
-| Payments | Razorpay *(post-MVP)* |
+| Payments | Razorpay (REST API + hosted Checkout, no SDK) |
 | Deployment | Nginx + PM2 on a VPS |
 
 ---
@@ -217,6 +217,15 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Chat moderation](docs/chat/moderation.md) | Message reports and evidence, **admin reports queue**, audited conversation access, resolutions |
 | [Chat safety](docs/chat/safety.md) | Who can chat and how it is enforced, contact-sharing nudge, rate limits, retention, privacy |
 
+### Payments
+
+| Document | Contents |
+|---|---|
+| [Razorpay](docs/payments/razorpay.md) | Integration architecture, configuration and **test credentials locally**, secrets handling, API calls, security |
+| [Payment flow](docs/payments/payment-flow.md) | Event → order → Checkout → verification → booking; **API reference**, statuses, idempotency, transactions, failure handling, web flow, tests |
+| [Webhook](docs/payments/webhook.md) | Signature verification over the raw body, events handled, idempotency, reconciliation, operations |
+| [Refunds](docs/payments/refunds.md) | Automatic and admin refunds, refund status lifecycle, admin API, audit |
+
 ### Notifications
 
 | Document | Contents |
@@ -286,17 +295,17 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **4** | Chat | ✅ Socket.IO chat (handshake auth, per-event session checks), history, read receipts, unread counts, REST fallback, message reports with evidence snapshots, contact-sharing nudge, live enforcement of blocks/unmatch/sanctions, admin reports queue with audited conversation review. ⏳ Retention purge job (hardening phase) | ✅ Done |
 | **5** | Safety & moderation | ✅ Product report reasons, block/unblock UI, warnings with acknowledgement, chat restriction, timed suspensions, bans (manual, reviewed), sanction history, expiry job, suspicious-activity flags, scam/money warnings, safety centre, community guidelines, safety and audit log viewers. ⏳ Photo verification and photo/verification review queues, `banned_phone_hashes` (with account deletion) | ✅ Done (moderation) |
 | **5b** | Notifications | ✅ In-app notifications (interest received/accepted, match, collapsed chat messages, event reminders, safety notices, report reviewed), unread/read, mark one/all, cursor pagination, per-type preferences, live `notification:new`, 90-day retention, admin monitoring. ⏳ Verification trigger (with the verification flow), web push/email | ✅ Done |
+| **5c** | Event pass payments | ✅ Razorpay orders with server-computed amounts, idempotency keys, capacity holds, checkout signature + API verification, signed webhooks with de-duplication, reconciliation job, bookings with codes, automatic refunds (sold out, duplicates, unavailable events), admin refunds, pass settings, payments back office, booking notifications. ⏳ QR check-in, partial refunds, invoices | ✅ Done |
 | **6** | Hardening & launch | Security review, load test, Nginx/PM2/VPS, TLS, backups & restore drill, legal pages, SMS DLT, runbooks | Planned |
 
 ### Post-MVP (indicative)
 
 1. Web push notifications
-2. Razorpay event pass purchase (orders, verified webhooks, digital passes, refunds)
-3. ID/age verification via a licensed provider (outcome-only storage)
-4. Organiser portal
-5. Image messages with moderation
-6. Group partner finding
-7. Gujarati / Hindi UI
+2. ID/age verification via a licensed provider (outcome-only storage)
+3. Organiser portal
+4. Image messages with moderation
+5. Group partner finding
+6. Gujarati / Hindi UI
 
 Details: [MVP scope §4–§6](docs/product/MVP-scope.md#4-delivery-phases).
 

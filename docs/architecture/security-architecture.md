@@ -288,14 +288,16 @@ Failures return `USER_UNAVAILABLE` (actions) or `NOT_FOUND` (reads). The respons
 
 API: `helmet()` defaults, plus `Cache-Control: no-store` on all authenticated responses.
 
+The Razorpay entries (Checkout script, its iframe, and `same-origin-allow-popups` for UPI/bank redirects) are required for [event pass payments](../payments/razorpay.md); the web app loads `checkout.js` only when a member starts a payment.
+
 Web/admin (Nginx):
 
 ```text
-Content-Security-Policy: default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' wss://garbapartner.example; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+Content-Security-Policy: default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' wss://garbapartner.example https://api.razorpay.com https://lumberjack.razorpay.com; script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
 X-Content-Type-Options: nosniff
 Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: geolocation=(), microphone=(), camera=(self), payment=()
-Cross-Origin-Opener-Policy: same-origin
+Permissions-Policy: geolocation=(), microphone=(), camera=(self), payment=(self "https://api.razorpay.com")
+Cross-Origin-Opener-Policy: same-origin-allow-popups
 ```
 
 (`style-src 'unsafe-inline'` only if needed by tooling. Try to remove it. Admin CSP `connect-src` has no `wss:`. Add Razorpay domains only when payments ship.)

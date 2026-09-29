@@ -53,6 +53,10 @@ flowchart LR
 | `users` | `notifications` | 1 : 0..n (recipient, actor) | `notifications.user_id`, `notifications.actor_user_id` | FK | `CASCADE` | `(user_id, occurred_at DESC, id DESC)`, partial `(actor_user_id, user_id)` |
 | `matches` / `partner_interests` / `events` | `notifications` | 0..1 : 0..n | `match_id`, `interest_id`, `event_id` | FK | `CASCADE` | partial unique `(user_id, match_id)` unread messages, `(user_id, event_id)` reminders |
 | `users` | `notification_preferences` | 1 : 0..1 | `notification_preferences.user_id` (PK) | FK | `CASCADE` | PK |
+| `users` / `events` | `orders` | 1 : 0..n | `orders.user_id`, `orders.event_id` | FK + `UNIQUE (user_id, idempotency_key)` | `RESTRICT` | `(user_id, created_at DESC)`, partial `(event_id, expires_at)` |
+| `orders` | `payments` | 1 : 0..n (attempts) | `payments.order_id` | FK + `UNIQUE (razorpay_payment_id)` | `RESTRICT` | `(order_id, created_at DESC)` |
+| `orders` / `payments` | `event_bookings` | 1 : 0..1 | `event_bookings.order_id`, `event_bookings.payment_id` | FK + `UNIQUE` each | `RESTRICT` | unique indexes |
+| `users` / `events` | `event_bookings` | 1 : 0..n | `event_bookings.user_id`, `event_bookings.event_id` | FK | `RESTRICT` | `(user_id, created_at DESC)`, partial `(event_id) WHERE confirmed` |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.

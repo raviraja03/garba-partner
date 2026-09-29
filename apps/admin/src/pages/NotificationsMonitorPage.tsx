@@ -13,6 +13,7 @@ const TYPE_LABELS: Record<NotificationType, string> = {
   verification_completed: 'Verification completed',
   event_reminder: 'Event reminder',
   safety: 'Safety notice (always on)',
+  booking: 'Pass booking (always on)',
 };
 
 const percent = (value: number | null) =>

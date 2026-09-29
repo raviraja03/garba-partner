@@ -7,6 +7,7 @@ import { FullPageSpinner } from '../components/FullPageSpinner';
 import { useHasPermission } from '../features/auth/auth-context';
 import { EventStatusBadge, VerifiedMark } from '../features/events/Badges';
 import type { EventAction } from '../features/events/events-api';
+import { PassSettings } from '../features/payments/PassSettings';
 import {
   useDeleteEvent,
   useEvent,
@@ -276,6 +277,10 @@ export function EventDetailPage() {
           />
         </Section>
       </div>
+
+      <Section title="Passes (online sales)">
+        <PassSettings event={event} canManage={canManage} />
+      </Section>
 
       <Section title="Image">
         <ImageManager event={event} canManage={canManage} />

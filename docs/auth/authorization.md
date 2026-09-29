@@ -56,6 +56,8 @@ Defined once in `packages/shared/src/constants/admin.ts` (`ROLE_PERMISSIONS`). *
 | `events:view` | ✅ | ✅ | ✅ |
 | `events:manage` | ✅ | ❌ | ✅ |
 | `locations:manage` | ✅ | ❌ | ✅ |
+| `payments:view` | ✅ | ❌ | ✅ |
+| `payments:refund` | ✅ | ❌ | ❌ |
 | `audit:view` | ✅ | ❌ | ❌ |
 | `safety_logs:view` | ✅ | ✅ | ❌ |
 | `admins:manage` | ✅ | ❌ | ❌ |

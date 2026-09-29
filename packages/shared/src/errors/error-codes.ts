@@ -83,6 +83,30 @@ export const ERROR_CODES = {
     message:
       "You can't send messages right now because of a restriction on your account. See the notice in the app for details.",
   },
+
+  // Payments (docs/payments/payment-flow.md)
+  PAYMENTS_UNAVAILABLE: {
+    httpStatus: 503,
+    message: 'Online pass sales are not available right now.',
+  },
+  PASSES_NOT_ON_SALE: { httpStatus: 409, message: 'Passes for this event are not on sale.' },
+  SOLD_OUT: { httpStatus: 409, message: 'Not enough passes are left for this event.' },
+  ORDER_EXPIRED: {
+    httpStatus: 409,
+    message: 'This order has expired. Please start again.',
+  },
+  IDEMPOTENCY_CONFLICT: {
+    httpStatus: 409,
+    message: 'This request key was already used for a different order.',
+  },
+  PAYMENT_VERIFICATION_FAILED: {
+    httpStatus: 400,
+    message: 'We could not verify this payment. If money was deducted, it will be refunded.',
+  },
+  PAYMENT_PROVIDER_ERROR: {
+    httpStatus: 502,
+    message: 'The payment service is not responding. Please try again.',
+  },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

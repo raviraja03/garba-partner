@@ -61,7 +61,9 @@ export function createAdminNotificationsService(deps: {
           last7d,
           readRate7d: last7d > 0 ? Math.round(((row?.read7d ?? 0) / last7d) * 1000) / 1000 : null,
           unread: row?.unread ?? 0,
-          optedOut: type === 'safety' ? null : (optOuts?.[type] ?? 0),
+          optedOut: (CONFIGURABLE_NOTIFICATION_TYPES as readonly string[]).includes(type)
+            ? (optOuts?.[type] ?? 0)
+            : null,
         };
       });
       return {

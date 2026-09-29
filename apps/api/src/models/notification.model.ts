@@ -16,6 +16,7 @@ import {
 } from 'sequelize-typescript';
 import {
   NOTIFICATION_TYPES,
+  type BookingNotificationKind,
   type NotificationType,
   type SafetyNotificationKind,
   type VerificationType,
@@ -30,6 +31,7 @@ export interface NotificationData {
   safetyKind?: SafetyNotificationKind;
   verificationType?: VerificationType;
   outcome?: 'approved' | 'rejected';
+  bookingKind?: BookingNotificationKind;
 }
 
 /** An in-app notification for `userId`. */
@@ -67,6 +69,9 @@ export class Notification extends Model<
   @ForeignKey(() => Event)
   @Column({ type: DataType.UUID, allowNull: true })
   eventId!: CreationOptional<string | null>;
+
+  @Column({ type: DataType.UUID, allowNull: true })
+  bookingId!: CreationOptional<string | null>;
 
   @Column({ type: DataType.JSONB, allowNull: false, defaultValue: {} })
   data!: CreationOptional<NotificationData>;

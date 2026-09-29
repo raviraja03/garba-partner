@@ -733,6 +733,20 @@ Indexes: `(user_id, occurred_at DESC, id DESC)`, partial `(user_id) WHERE read_a
 
 **`notification_preferences`**: `user_id` (PK, FK → `users.id` `CASCADE`), `interest_received`, `interest_accepted`, `match_created`, `new_message`, `verification_completed`, `event_reminder` (boolean, default `true`), `created_at`, `updated_at`. A missing row means everything is on. There is no `safety` column: safety notifications can't be turned off.
 
+### 4.22 Payments: `orders`, `payments`, `event_bookings`, `payment_webhook_events`
+
+Migration `20261002100000-create-payments`. See [payment flow](../payments/payment-flow.md). Financial rows reference users and events with `ON DELETE RESTRICT`: they are never deleted.
+
+| Table | Key columns | Constraints / indexes |
+|---|---|---|
+| `events` (added) | `pass_price_paise` (null = not sold), `pass_capacity` (null = unlimited) | `events_pass_price_check` (100–1,000,000), `events_pass_capacity_check` (1–100,000) |
+| `orders` | `user_id`, `event_id`, `idempotency_key` (uuid), `quantity` (1–6), `unit_price_paise`, `amount_paise`, `currency` (`INR`), `status` (`created`\|`paid`\|`expired`\|`failed`), `razorpay_order_id`, `expires_at`, `paid_at` | **`amount_paise = unit_price_paise * quantity`**, `(status = 'paid') = (paid_at IS NOT NULL)`, **`UNIQUE (user_id, idempotency_key)`**, `UNIQUE (razorpay_order_id)`; `(user_id, created_at DESC, id DESC)`, partial `(event_id, expires_at) WHERE status = 'created'` (capacity), partial `(expires_at) WHERE status = 'created'` (expiry job), `(status, created_at DESC, id DESC)` |
+| `payments` | `order_id`, `razorpay_payment_id`, `status` (`created`\|`authorized`\|`captured`\|`failed`\|`refunded`), `amount_paise`, `currency`, `method`, `error_code`, `error_reason`, `captured_at`, `refund_status` (`none`\|`pending`\|`processed`\|`failed`), `razorpay_refund_id`, `amount_refunded_paise`, `refunded_at` | **`UNIQUE (razorpay_payment_id)`**, `UNIQUE (razorpay_refund_id)`, refunded ≤ amount; `(order_id, created_at DESC)`, partial `(updated_at) WHERE refund_status = 'pending'`. No card numbers, UPI IDs, emails or phone numbers |
+| `event_bookings` | `code` (e.g. `GP-7K3M9QX2`), `order_id`, `payment_id`, `user_id`, `event_id`, `quantity`, `amount_paise`, `status` (`confirmed`\|`cancelled`), `refund_status`, `cancel_reason` (`admin_refund`\|`sold_out`\|`event_unavailable`), `cancelled_at` | **`UNIQUE (order_id)`**, **`UNIQUE (payment_id)`**, `UNIQUE (code)`, cancel consistency check; `(user_id, created_at DESC, id DESC)`, partial `(event_id) WHERE status = 'confirmed'` (capacity), `(status, created_at DESC, id DESC)` |
+| `payment_webhook_events` | `event_id` (PK, `X-Razorpay-Event-Id`), `event`, `razorpay_payment_id`, `razorpay_order_id`, `received_at`, `processed_at` | Webhook de-duplication. The payload itself is not stored |
+
+Also: `notifications.booking_id` (FK → `event_bookings` `CASCADE`), notification type `booking` (check `type <> 'booking' OR booking_id IS NOT NULL`), and audit target type `booking`.
+
 ## 5. Database functions and triggers
 
 | Object | Created in | Purpose |

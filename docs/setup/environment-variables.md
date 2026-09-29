@@ -82,6 +82,17 @@ Details: [docs/users/cloudinary.md](../users/cloudinary.md).
 | `CLOUDINARY_API_SECRET` | with `cloudinary` | — | api | **Secret**, server only |
 | `CLOUDINARY_FOLDER_PREFIX` | no | `garba-partner` | api | Assets go to `<prefix>/<APP_ENV>/profile-images/` |
 
+### Event pass payments
+
+Details: [Razorpay](../payments/razorpay.md).
+
+| Variable | Required | Default | Used by | Notes |
+|---|---|---|---|---|
+| `PAYMENT_PROVIDER` | no | `disabled` | api | `disabled` \| `razorpay`. Disabled: `/orders` and the webhook return `503` |
+| `RAZORPAY_KEY_ID` | with `razorpay` | — | api | Public key ID sent to Checkout. **`rzp_test_` except in `APP_ENV=production`, which requires `rzp_live_`** |
+| `RAZORPAY_KEY_SECRET` | with `razorpay` | — | api | **Secret**, server only (API auth, checkout signatures) |
+| `RAZORPAY_WEBHOOK_SECRET` | with `razorpay` | — | api | **Secret**, server only. Must differ from the key secret |
+
 ### Web & Admin (public, `VITE_*`)
 
 | Variable | Required | Default | Used by | Notes |
@@ -97,7 +108,6 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 | Production SMS | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` (with a real `SMS_PROVIDER` value) |
 | Admin 2FA | `TOTP_ENCRYPTION_KEY` |
 | Realtime | `VITE_SOCKET_URL` |
-| Payments (post-MVP) | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` |
 
 Generate secrets with a CSPRNG, e.g. `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
 

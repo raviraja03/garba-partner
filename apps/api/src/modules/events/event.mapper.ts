@@ -1,4 +1,6 @@
 import type {
+  AdminEventPassDto,
+  EventPassDto,
   AdminEventDetailDto,
   AdminEventListItemDto,
   AdminOrganizerDto,
@@ -56,10 +58,17 @@ export function toEventCardDto(event: Event, media: MediaStorage, now: Date): Ev
     isVerified: event.isVerified,
     organizer: toPublicOrganizerSummaryDto(loaded(event.organizer, 'Event organizer')),
     hasTicketUrl: event.ticketUrl !== null,
+    passPricePaise: event.passPricePaise,
   };
 }
 
-export function toEventDetailDto(event: Event, media: MediaStorage, now: Date): EventDetailDto {
+/** `pass` comes from `loadEventPass()` (it needs a capacity query). */
+export function toEventDetailDto(
+  event: Event,
+  media: MediaStorage,
+  now: Date,
+  pass: EventPassDto | null,
+): EventDetailDto {
   return {
     ...toEventCardDto(event, media, now),
     imageUrl: event.imagePublicId ? media.url(event.imagePublicId, 'event_banner') : null,
@@ -67,6 +76,7 @@ export function toEventDetailDto(event: Event, media: MediaStorage, now: Date): 
     venueAddress: event.venueAddress,
     ticketUrl: event.ticketUrl,
     organizer: toPublicOrganizerDto(loaded(event.organizer, 'Event organizer')),
+    pass,
   };
 }
 
@@ -101,6 +111,7 @@ export function toAdminEventDetailDto(
   event: Event,
   media: MediaStorage,
   now: Date,
+  pass: AdminEventPassDto,
 ): AdminEventDetailDto {
   return {
     ...toAdminEventListItemDto(event, media, now),
@@ -117,6 +128,7 @@ export function toAdminEventDetailDto(
     createdBy: actor(event.createdBy),
     updatedBy: actor(event.updatedBy),
     canDelete: event.firstPublishedAt === null,
+    pass,
   };
 }
 

@@ -8,6 +8,7 @@ import { VerifiedBadge } from '../features/events/components/VerifiedBadge';
 import { formatEventDate, formatTimeRange, linkHost } from '../features/events/event-dates';
 import { useEvent } from '../features/events/hooks';
 import { VERIFIED_EVENT_NOTE, VERIFIED_ORGANIZER_NOTE } from '../features/events/verified-copy';
+import { BuyPass } from '../features/passes/BuyPass';
 import { ApiClientError } from '../lib/api-client';
 
 /** Opens in a new tab without giving the other site access to this page. */
@@ -37,7 +38,9 @@ function CallsToAction({ event }: { event: EventDetailDto }) {
       >
         Find a partner
       </Link>
-      {event.ticketUrl ? (
+      {event.pass ? (
+        <BuyPass event={event} pass={event.pass} />
+      ) : event.ticketUrl ? (
         <a
           href={event.ticketUrl}
           {...EXTERNAL}
@@ -53,10 +56,10 @@ function CallsToAction({ event }: { event: EventDetailDto }) {
           Pass details coming soon
         </p>
       )}
-      {event.ticketUrl && (
+      {!event.pass && event.ticketUrl && (
         <p className="text-xs text-muted sm:col-span-2">
-          Passes are sold by the organizer on their own site. Garba Partner does not sell passes and
-          never asks you to pay another member.
+          Passes for this event are sold by the organizer on their own site. Garba Partner never
+          asks you to pay another member.
         </p>
       )}
     </section>

@@ -89,6 +89,14 @@ Adds to the card fields: `description`, `venueAddress`, `ticketUrl`, and the pub
 }
 ```
 
+Events whose passes are sold on Garba Partner also have `pass` (and cards have `passPricePaise`):
+
+```json
+{ "pass": { "pricePaise": 49900, "currency": "INR", "maxPerOrder": 6, "onSale": true, "remaining": 42, "soldOut": false } }
+```
+
+`pass` is `null` when passes aren't sold here (the external `ticketUrl` may still be set). See [payment flow](../payments/payment-flow.md).
+
 **Never returned publicly:** organizer contact name/email/phone, internal notes, event status, admin IDs/names, image public IDs.
 
 ## Admin events
@@ -169,6 +177,10 @@ All return `200` with the updated `AdminEventDetailDto`, or `409 CONFLICT` for a
 ```
 
 `DELETE /admin/events/:eventId` → `200 { "id": "…", "deleted": true }`.
+
+### `PUT /admin/events/:eventId/pass`
+
+`events:manage`. `{ "pricePaise": 49900 | null, "capacity": 200 | null }`: online pass price (₹1–₹10,000, in paise; `null` stops sales) and capacity (`null` = unlimited, never below passes sold or held). Audited `event.pass_update`. The admin event detail includes `pass: { pricePaise, capacity, sold, reserved }`. See [payment flow §3](../payments/payment-flow.md#3-pass-settings).
 
 ## Admin organizers
 

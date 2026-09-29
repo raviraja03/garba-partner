@@ -1,6 +1,7 @@
 import type {
   ConfigurableNotificationType,
   NotificationType,
+  BookingNotificationKind,
   SafetyNotificationKind,
   VerificationType,
 } from '../../constants/enums.js';
@@ -27,6 +28,7 @@ export interface NotificationDto {
   event: { id: string; slug: string; name: string; startsAt: string } | null;
   verification: { type: VerificationType; outcome: 'approved' | 'rejected' } | null;
   safety: { kind: SafetyNotificationKind } | null;
+  booking: { id: string; kind: BookingNotificationKind } | null;
   /** Latest occurrence (bumped when a `new_message` notification collapses another message). */
   occurredAt: string;
   readAt: string | null;
@@ -50,7 +52,7 @@ export interface AdminNotificationStatsDto {
     /** Share of the last 7 days' notifications that have been read (null when none). */
     readRate7d: number | null;
     unread: number;
-    /** Members who turned this type off (null for `safety`, which can't be turned off). */
+    /** Members who turned this type off (null for `safety` and `booking`: always on). */
     optedOut: number | null;
   }[];
 }

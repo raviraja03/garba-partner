@@ -24,6 +24,7 @@ Principles:
 | `verification_completed` | The member | A verification is decided (approved / rejected) | — | `/profile` | ✅ |
 | `event_reminder` | Members going to or interested in an event | 24 h before a published event starts (job) | — | `/events/:slug` | ✅ |
 | `safety` | The member | A moderator warns, restricts chat, suspends, lifts a restriction; the member's report is reviewed | — | `/guidelines` or `/safety` | ❌ always on |
+| `booking` | The buyer | Pass booking confirmed, cancelled, refund processed or failed ([payments](../payments/payment-flow.md)) | — | `/bookings/:id` | ❌ always on (transactional) |
 
 `safety` kinds: `warning_issued`, `chat_restricted`, `account_suspended`, `restriction_lifted`, `report_reviewed`. Bans send nothing (the member can no longer sign in). A reporter is told **only** that the report was reviewed, never the outcome.
 

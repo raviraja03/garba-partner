@@ -16,6 +16,7 @@ const SECTIONS: readonly { label: string; permission: AdminPermission; path?: st
   { label: 'Users', permission: 'users:view', path: '/users' },
   { label: 'Events', permission: 'events:view', path: '/events' },
   { label: 'Organizers', permission: 'events:view', path: '/organizers' },
+  { label: 'Payments', permission: 'payments:view', path: '/payments' },
   { label: 'Cities', permission: 'locations:manage' },
   { label: 'Audit log', permission: 'audit:view', path: '/audit-logs' },
   { label: 'Admins', permission: 'admins:manage' },

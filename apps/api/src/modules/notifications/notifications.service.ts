@@ -38,6 +38,7 @@ export interface NotifyInput {
   matchId?: string | null;
   interestId?: string | null;
   eventId?: string | null;
+  bookingId?: string | null;
   data?: NotificationData;
 }
 
@@ -95,6 +96,8 @@ function linkFor(n: Notification): string | null {
       return n.event ? `/events/${n.event.slug}` : '/events';
     case 'safety':
       return n.data.safetyKind === 'report_reviewed' ? '/safety' : '/guidelines';
+    case 'booking':
+      return n.bookingId ? `/bookings/${n.bookingId}` : '/bookings';
   }
 }
 
@@ -154,6 +157,10 @@ export async function toNotificationDtos(
         ? { type: n.data.verificationType, outcome: n.data.outcome }
         : null,
     safety: n.type === 'safety' && n.data.safetyKind ? { kind: n.data.safetyKind } : null,
+    booking:
+      n.type === 'booking' && n.bookingId && n.data.bookingKind
+        ? { id: n.bookingId, kind: n.data.bookingKind }
+        : null,
     occurredAt: n.occurredAt.toISOString(),
     readAt: n.readAt?.toISOString() ?? null,
   }));
@@ -200,7 +207,7 @@ export async function markChatNotificationsRead(userId: string, matchId: string)
 }
 
 async function isEnabled(userId: string, type: NotificationType): Promise<boolean> {
-  if (!isConfigurable(type)) return true; // safety: always delivered
+  if (!isConfigurable(type)) return true; // safety and booking: always delivered
   const preference = await NotificationPreference.findByPk(userId, {
     attributes: [PREFERENCE_ATTRIBUTE[type]],
   });
@@ -270,6 +277,7 @@ export function createNotifier(deps: {
       matchId: input.matchId ?? null,
       interestId: input.interestId ?? null,
       eventId: input.eventId ?? null,
+      bookingId: input.bookingId ?? null,
       data: input.data ?? {},
     });
     return created.id;

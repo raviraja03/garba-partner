@@ -7,6 +7,7 @@ import { PublicOnly, RequireAuth } from './features/auth/guards';
 import { RequireProfile } from './features/profile/RequireProfile';
 import { ApiClientError } from './lib/api-client';
 import { BlockedMembersPage } from './pages/BlockedMembersPage';
+import { BookingPage, BookingsPage } from './pages/BookingPages';
 import { ChatPage } from './pages/ChatPage';
 import { ChatsPage } from './pages/ChatsPage';
 import { CommunityGuidelinesPage } from './pages/CommunityGuidelinesPage';
@@ -79,6 +80,8 @@ const router = createBrowserRouter([
               { path: '/chats', element: <ChatsPage /> },
               { path: '/chats/:matchId', element: <ChatPage /> },
               { path: '/notifications', element: <NotificationsPage /> },
+              { path: '/bookings', element: <BookingsPage /> },
+              { path: '/bookings/:bookingId', element: <BookingPage /> },
             ],
           },
         ],

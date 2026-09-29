@@ -112,7 +112,7 @@ Two separate badges:
 | `/events/:slug` | Public | Image, name, badges, date/time (IST), venue with an "Open in Maps" link (a search for the public venue), organizer (name, Instagram, website), description, "What verified means", safety tips, CTAs |
 | `/events/:slug/find-partner` | Member with profile | "Partner matching is coming soon" + profile readiness. Anonymous visitors are sent to log in and brought back |
 
-- **Get pass** opens the organizer's `https://` ticket page in a new tab (`rel="noopener noreferrer nofollow"`) and shows its domain ("on tickets.example.com") so members know where they are going. A note says passes are sold by the organizer, and Garba Partner never asks you to pay another member.
+- **Get pass** opens the organizer's `https://` ticket page in a new tab (`rel="noopener noreferrer nofollow"`) and shows its domain ("on tickets.example.com") so members know where they are going. A note says passes are sold by the organizer, and Garba Partner never asks you to pay another member. When the event has an online pass price, the page shows **Buy passes** (Razorpay) instead ([payment flow](../payments/payment-flow.md)).
 - Ended events show "This event has ended" and hide both CTAs.
 - The home page links to the events page; the navigation shows **Events** to everyone and **Log in** to visitors.
 

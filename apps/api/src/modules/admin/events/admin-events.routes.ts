@@ -1,5 +1,6 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import {
+  eventPassSettingsSchema,
   adminEventListQuerySchema,
   createEventSchema,
   updateEventSchema,
@@ -77,6 +78,12 @@ export function createAdminEventsRouter(deps: {
       ok(res, await service[action](actor(req), eventId(req)), message);
     });
   }
+
+  router.put('/:eventId/pass', ...canManage, async (req, res) => {
+    const eventId = parseInput(uuidParamSchema, req.params.eventId);
+    const input = parseInput(eventPassSettingsSchema, req.body);
+    ok(res, await service.updatePass(actor(req), eventId, input), 'Pass settings saved');
+  });
 
   router.delete('/:eventId', ...canManage, async (req, res) => {
     const id = eventId(req);

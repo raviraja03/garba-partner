@@ -19,6 +19,7 @@ import { createNotifier } from '../modules/notifications/notifications.service.j
 import { createSafetyLogger } from '../modules/safety/safety-log.service.js';
 import { createSuspiciousActivityDetector } from '../modules/safety/suspicious-activity.service.js';
 import type { MediaStorage } from '../providers/media/index.js';
+import type { PaymentGateway } from '../providers/payments/index.js';
 import { createRealtimeHub, type RealtimeHub } from '../realtime/hub.js';
 import { attachSocketServer } from '../realtime/socket-server.js';
 import { devSmsProvider } from '../providers/sms/dev.sms.js';
@@ -86,6 +87,8 @@ export function createTestApp(options: {
   sms?: SmsProvider;
   media?: MediaStorage;
   realtime?: RealtimeHub;
+  /** Razorpay gateway (tests pass the mocked one from `razorpay-mock.ts`). Default: disabled. */
+  payments?: PaymentGateway | null;
   pingDatabase?: () => Promise<boolean>;
 }): Express {
   return createApp({
@@ -96,6 +99,7 @@ export function createTestApp(options: {
       sms: options.sms ?? devSmsProvider,
       media: options.media ?? createFakeMediaStorage(),
       realtime: options.realtime ?? createRealtimeHub(),
+      payments: options.payments ?? null,
       pingDatabase: options.pingDatabase ?? (() => Promise.resolve(true)),
     },
   });
@@ -163,7 +167,7 @@ export function useTestDatabase(): () => Sequelize {
   beforeEach(async () => {
     // Reference data (cities, areas) is kept; everything user- and admin-generated is emptied.
     await sequelize?.query(
-      'TRUNCATE notifications, notification_preferences, user_sanctions, users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
+      'TRUNCATE payment_webhook_events, event_bookings, payments, orders, notifications, notification_preferences, user_sanctions, users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
     );
   });
 

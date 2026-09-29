@@ -20,6 +20,8 @@ import { createAdminMatchesRouter } from './modules/admin/matches/admin-matches.
 import { createAdminNotificationsRouter } from './modules/admin/notifications/admin-notifications.routes.js';
 import { createAdminNotificationsService } from './modules/admin/notifications/admin-notifications.service.js';
 import { createAdminMatchesService } from './modules/admin/matches/admin-matches.service.js';
+import { createAdminPaymentsRouter } from './modules/admin/payments/admin-payments.routes.js';
+import { createAdminPaymentsService } from './modules/admin/payments/admin-payments.service.js';
 import { createAdminReportsRouter } from './modules/admin/reports/admin-reports.routes.js';
 import { createAdminReportsService } from './modules/admin/reports/admin-reports.service.js';
 import { createAdminEventsService } from './modules/admin/events/admin-events.service.js';
@@ -56,6 +58,12 @@ import {
   createNotifier,
 } from './modules/notifications/notifications.service.js';
 import { createLocationsRouter } from './modules/locations/locations.routes.js';
+import {
+  createBookingsRouter,
+  createOrdersRouter,
+  createPaymentWebhookRouter,
+} from './modules/payments/payments.routes.js';
+import { createPaymentsService } from './modules/payments/payments.service.js';
 import { createProfileController } from './modules/profiles/profile.controller.js';
 import {
   createMyProfileRouter,
@@ -69,6 +77,7 @@ import { createSafetyLogger } from './modules/safety/safety-log.service.js';
 import { createMySafetyRouter, createSafetyRouters } from './modules/safety/safety.routes.js';
 import { createSuspiciousActivityDetector } from './modules/safety/suspicious-activity.service.js';
 import type { MediaStorage } from './providers/media/index.js';
+import type { PaymentGateway } from './providers/payments/index.js';
 import type { RealtimeHub } from './realtime/hub.js';
 import type { SmsProvider } from './providers/sms/index.js';
 
@@ -79,6 +88,8 @@ export interface ApiDependencies extends HealthDependencies {
   media: MediaStorage;
   /** Socket.IO seam: emits and disconnects (no-ops until a socket server is attached). */
   realtime: RealtimeHub;
+  /** Razorpay (docs/payments/razorpay.md); null when online pass sales are disabled. */
+  payments: PaymentGateway | null;
 }
 
 /** Routes mounted under `/api/v1`. */
@@ -243,6 +254,38 @@ export function createApiRouter(options: {
       }),
     }),
   );
+  // Event pass purchase (docs/payments/payment-flow.md).
+  const payments = createPaymentsService({
+    sequelize,
+    env,
+    gateway: dependencies.payments,
+    notifier,
+    logger,
+  });
+  router.use(
+    '/orders',
+    createOrdersRouter({
+      service: payments,
+      authenticateMember,
+      orderLimiter: createMemberRateLimiter({
+        windowMs: 60 * 1000,
+        limit: LIMITS.ORDERS_PER_MINUTE,
+      }),
+      verifyLimiter: createMemberRateLimiter({
+        windowMs: 60 * 1000,
+        limit: LIMITS.PAYMENT_VERIFICATIONS_PER_MINUTE,
+      }),
+    }),
+  );
+  router.use('/bookings', createBookingsRouter({ service: payments, authenticateMember }));
+  router.use(createPaymentWebhookRouter({ service: payments }));
+  router.use(
+    '/admin/payments',
+    createAdminPaymentsRouter({
+      service: createAdminPaymentsService({ payments }),
+      authenticateAdmin,
+    }),
+  );
   router.use(
     '/notifications',
     createNotificationsRouter({
@@ -272,7 +315,7 @@ export function createApiRouter(options: {
   router.use(
     '/events',
     createEventsRouter({
-      service: createEventsService({ media }),
+      service: createEventsService({ sequelize, media }),
       limiter: createIpRateLimiter({
         windowMs: 60 * 1000,
         limit: LIMITS.PUBLIC_EVENT_REQUESTS_PER_MINUTE,

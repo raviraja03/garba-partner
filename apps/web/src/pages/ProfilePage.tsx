@@ -38,6 +38,9 @@ export function ProfilePage() {
         <Link to="/profile/edit#photo" className={LINK_CLASS}>
           {profile.image ? 'Change photo' : 'Add photo'}
         </Link>
+        <Link to="/bookings" className={LINK_CLASS}>
+          My passes
+        </Link>
         <Link to="/profile/blocked" className={LINK_CLASS}>
           Blocked members
         </Link>

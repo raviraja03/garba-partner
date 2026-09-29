@@ -12,7 +12,10 @@ import { createNotifier } from './modules/notifications/notifications.service.js
 import { startSanctionExpiryJob } from './modules/safety/sanction-expiry.job.js';
 import { createSafetyLogger } from './modules/safety/safety-log.service.js';
 import { createSuspiciousActivityDetector } from './modules/safety/suspicious-activity.service.js';
+import { startPaymentJobs } from './modules/payments/payment-jobs.js';
+import { createPaymentsService } from './modules/payments/payments.service.js';
 import { createMediaStorage } from './providers/media/index.js';
+import { createPaymentGateway } from './providers/payments/index.js';
 import { createSmsProvider } from './providers/sms/index.js';
 import { createRealtimeHub } from './realtime/hub.js';
 import { attachSocketServer } from './realtime/socket-server.js';
@@ -44,6 +47,7 @@ function start(): void {
 
   const media = createMediaStorage(env);
   const realtime = createRealtimeHub();
+  const paymentGateway = createPaymentGateway(env, logger);
   const server = createServer(
     createApp({
       env,
@@ -53,6 +57,7 @@ function start(): void {
         sms: createSmsProvider(env),
         media,
         realtime,
+        payments: paymentGateway,
         pingDatabase: () => pingDatabase(sequelize),
       },
     }),
@@ -78,6 +83,19 @@ function start(): void {
   const stopSanctionExpiry = startSanctionExpiryJob({ sequelize, safetyLog, logger });
   // Event reminders and notification retention (docs/notifications/notifications.md).
   const stopNotificationJobs = startNotificationJobs({ sequelize, notifier, logger });
+  // Expire unpaid orders after reconciling them with Razorpay (docs/payments/webhook.md).
+  const stopPaymentJobs = paymentGateway
+    ? startPaymentJobs({
+        payments: createPaymentsService({
+          sequelize,
+          env,
+          gateway: paymentGateway,
+          notifier,
+          logger,
+        }),
+        logger,
+      })
+    : () => undefined;
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     const message =
@@ -109,6 +127,7 @@ function start(): void {
 
     stopSanctionExpiry();
     stopNotificationJobs();
+    stopPaymentJobs();
     // Closes every socket, then the HTTP server.
     void io.close();
     server.close((err) => {

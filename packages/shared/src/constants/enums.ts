@@ -274,10 +274,12 @@ export const NOTIFICATION_TYPES = [
   'verification_completed',
   'event_reminder',
   'safety',
+  /** Pass bookings: confirmation, cancellation and refunds (transactional, always on). */
+  'booking',
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
-/** Types a member can turn off. Safety notifications are always delivered. */
+/** Types a member can turn off. Safety and booking notifications are always delivered. */
 export const CONFIGURABLE_NOTIFICATION_TYPES = [
   'interest_received',
   'interest_accepted',
@@ -297,3 +299,46 @@ export const SAFETY_NOTIFICATION_KINDS = [
   'report_reviewed',
 ] as const;
 export type SafetyNotificationKind = (typeof SAFETY_NOTIFICATION_KINDS)[number];
+
+// --- Event passes & payments (docs/payments/payment-flow.md) ----------------------------------
+
+/**
+ * `created` = waiting for payment (seats reserved until `expires_at`); `paid` = a captured
+ * payment was verified server-side; `expired` = no payment in time; `failed` = the payment
+ * provider could not create the order.
+ */
+export const ORDER_STATUSES = ['created', 'paid', 'expired', 'failed'] as const;
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
+
+/** Mirrors the Razorpay payment lifecycle as verified by the server. */
+export const PAYMENT_STATUSES = [
+  'created',
+  'authorized',
+  'captured',
+  'failed',
+  'refunded',
+] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+
+export const BOOKING_STATUSES = ['confirmed', 'cancelled'] as const;
+export type BookingStatus = (typeof BOOKING_STATUSES)[number];
+
+/** `none` = not refunded; `pending` = requested at Razorpay; `processed` / `failed` = final. */
+export const REFUND_STATUSES = ['none', 'pending', 'processed', 'failed'] as const;
+export type RefundStatus = (typeof REFUND_STATUSES)[number];
+
+/**
+ * Why a booking was cancelled. `sold_out` / `event_unavailable` = the payment arrived after the
+ * reservation lapsed and the passes were gone or the event closed: refunded automatically.
+ */
+export const BOOKING_CANCEL_REASONS = ['admin_refund', 'sold_out', 'event_unavailable'] as const;
+export type BookingCancelReason = (typeof BOOKING_CANCEL_REASONS)[number];
+
+/** What a `booking` notification is about. */
+export const BOOKING_NOTIFICATION_KINDS = [
+  'confirmed',
+  'cancelled',
+  'refund_processed',
+  'refund_failed',
+] as const;
+export type BookingNotificationKind = (typeof BOOKING_NOTIFICATION_KINDS)[number];
