@@ -2,9 +2,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createBrowserRouter, RouterProvider } from 'react-router';
 import { AppShell } from './components/AppShell';
 import { AuthProvider } from './features/auth/AuthProvider';
+import { ChatRealtime } from './features/chat/ChatRealtime';
 import { PublicOnly, RequireAuth } from './features/auth/guards';
 import { RequireProfile } from './features/profile/RequireProfile';
 import { ApiClientError } from './lib/api-client';
+import { ChatPage } from './pages/ChatPage';
+import { ChatsPage } from './pages/ChatsPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { EditProfilePage } from './pages/EditProfilePage';
 import { EventDetailPage } from './pages/EventDetailPage';
@@ -65,6 +68,8 @@ const router = createBrowserRouter([
               { path: '/interests', element: <InterestsPage /> },
               { path: '/matches', element: <MatchesPage /> },
               { path: '/matches/:matchId', element: <MatchPage /> },
+              { path: '/chats', element: <ChatsPage /> },
+              { path: '/chats/:matchId', element: <ChatPage /> },
             ],
           },
         ],
@@ -78,6 +83,7 @@ export function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <ChatRealtime />
         <RouterProvider router={router} />
       </AuthProvider>
     </QueryClientProvider>

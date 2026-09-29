@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). **Partner discovery** and **interests & matches** are live: ranked suggestions filtered by mutual preferences, city, date, level, event and verification; request → accept interests with exactly one match per pair; block, report and admin match moderation. Chat and payments come in later phases; identity verification and the admin reports queue are still pending. See the [roadmap](#development-roadmap).
+> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). **Partner discovery** and **interests & matches** are live: ranked suggestions filtered by mutual preferences, city, date, level, event and verification; request → accept interests with exactly one match per pair; block, report and admin match moderation. **Real-time chat** (Socket.IO) connects matched members, with read receipts, unread counts, message reports and an admin reports queue with audited conversation review. Payments come in a later phase; identity verification and the admin reports queue are still pending. See the [roadmap](#development-roadmap).
 
 ---
 
@@ -127,9 +127,9 @@ Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/s
 
 | App | Workspace | Dev URL | Description |
 |---|---|---|---|
-| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: health, member auth (`/auth/*`), profiles (`/me/*`, `/users/:id/profile`), cities, public events (`/events`), attendance, discovery (`/partners`), interests and matches, blocks and reports, admin auth, users, events and organizers (`/admin/*`) |
-| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login/OTP, onboarding, profile, photo upload, preferences, public events list and detail, event attendance ("looking for a partner"), **Discover** (filters, verified only, partner profile), **Interests** (received/sent: accept, decline, withdraw), **Matches** (match screen, unmatch, block, report) |
-| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, role-based navigation, users (with match history, close match, interaction restriction), **events** (create/edit/publish/verify/archive, image upload) and **organizers** |
+| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: health, member auth (`/auth/*`), profiles (`/me/*`, `/users/:id/profile`), cities, public events (`/events`), attendance, discovery (`/partners`), interests and matches, blocks and reports, admin auth, users, events and organizers (`/admin/*`); Socket.IO chat at `/socket.io` and chat REST (`/chats/*`), admin reports (`/admin/reports`) |
+| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login/OTP, onboarding, profile, photo upload, preferences, public events list and detail, event attendance ("looking for a partner"), **Discover** (filters, verified only, partner profile), **Interests** (received/sent: accept, decline, withdraw), **Matches** (match screen, unmatch, block, report), **Chats** (live messages, unread badge, read receipts, report message, block) |
+| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, role-based navigation, users (with match history, close match, interaction restriction), **events** (create/edit/publish/verify/archive, image upload) and **organizers**, **reports queue** (evidence, audited conversation review, resolve: dismiss/warn/suspend/ban) |
 
 Both Vite dev servers proxy `/api` to the API, so the apps use same-origin requests, as they will in production behind Nginx.
 
@@ -208,6 +208,15 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Matches](docs/matching/matches.md) | Match lifecycle, how matches end, **admin match moderation** and interaction restrictions, database guarantees |
 | [Discovery privacy](docs/matching/privacy.md) | What members can see, reciprocal event attendance, blocks/reports, scraping controls, change checklist |
 
+### Chat
+
+| Document | Contents |
+|---|---|
+| [Chat architecture](docs/chat/architecture.md) | Components, data model, **REST API**, sending flow, read status, web client, scaling, tests |
+| [Socket events](docs/chat/socket-events.md) | Connection and handshake auth, every client/server event, acknowledgements and error codes |
+| [Chat moderation](docs/chat/moderation.md) | Message reports and evidence, **admin reports queue**, audited conversation access, resolutions |
+| [Chat safety](docs/chat/safety.md) | Who can chat and how it is enforced, contact-sharing nudge, rate limits, retention, privacy |
+
 ### Database
 
 | Document | Contents |
@@ -258,7 +267,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **1** | Member auth & profile | ✅ Database layer. ✅ Authentication (member OTP, admin password, sessions, middleware). ✅ **Profiles:** onboarding with 18+ gate, profile + preferences API, Cloudinary photo upload with EXIF stripping, completion % and status, public profile, cities/areas, admin user list/detail/suspend/reactivate + audit log. ⏳ **Remaining:** account deletion, "log out of all devices" UI | 🟡 Nearly done |
 | **2** | Admin foundation & events | ✅ **Events:** organizers (public profile + private contact, verify, archive), events CRUD, publish/unpublish, verify, archive/restore, image upload, public list/detail with filters, sorting and pagination, web events pages. ⏳ **Remaining:** admin TOTP 2FA + forced password change, admin management, cities/areas CRUD, attendance ("going"/"looking for a partner"), event cancellation with notice, in-app notifications | 🟡 In progress |
 | **3** | Discovery, interests, matches & safety core | ✅ **Discovery** (`/partners`, mutual preferences, filters, deterministic ranking without exposing scores). ✅ **Interests & matches:** send/accept/reject/withdraw, mutual interest → exactly one match (DB-enforced), unmatch, block/report end matches, admin match history + close match + interaction restriction. ✅ Event attendance, **block**, **report user**, auto-hide. ⏳ **Remaining:** admin report queue, sanctions from reports | 🟡 Nearly done |
-| **4** | Chat | Socket.IO chat, history, read receipts, message reports, contact-sharing nudge, realtime enforcement of blocks/sanctions | Planned |
+| **4** | Chat | ✅ Socket.IO chat (handshake auth, per-event session checks), history, read receipts, unread counts, REST fallback, message reports with evidence snapshots, contact-sharing nudge, live enforcement of blocks/unmatch/sanctions, admin reports queue with audited conversation review. ⏳ Retention purge job (hardening phase) | ✅ Done |
 | **5** | Verification & moderation | Photo verification, verification & photo review queues, selfie retention job, safety centre | Planned |
 | **6** | Hardening & launch | Security review, load test, Nginx/PM2/VPS, TLS, backups & restore drill, legal pages, SMS DLT, runbooks | Planned |
 

@@ -11,6 +11,8 @@ import { EventsPage } from './pages/EventsPage';
 import { LoginPage } from './pages/LoginPage';
 import { EditOrganizerPage, NewOrganizerPage, OrganizerDetailPage } from './pages/OrganizerPages';
 import { OrganizersPage } from './pages/OrganizersPage';
+import { ReportDetailPage } from './pages/ReportDetailPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 
@@ -56,6 +58,13 @@ const router = createBrowserRouter([
             children: [
               { path: '/users', element: <UsersPage /> },
               { path: '/users/:userId', element: <UserDetailPage /> },
+            ],
+          },
+          {
+            element: <RequireAdmin permission="reports:manage" />,
+            children: [
+              { path: '/reports', element: <ReportsPage /> },
+              { path: '/reports/:reportId', element: <ReportDetailPage /> },
             ],
           },
           {

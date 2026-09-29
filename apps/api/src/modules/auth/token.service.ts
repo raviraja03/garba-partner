@@ -26,10 +26,15 @@ export interface SignedAccessToken {
   expiresAt: Date;
 }
 
+export interface VerifiedAccessToken extends AccessTokenClaims {
+  /** From the `exp` claim (used to end long-lived connections, e.g. sockets). */
+  expiresAt: Date;
+}
+
 export interface TokenService {
   sign(audience: TokenAudience, claims: AccessTokenClaims): Promise<SignedAccessToken>;
   /** Resolves null for any invalid, expired, foreign-audience or malformed token. */
-  verify(audience: TokenAudience, token: string): Promise<AccessTokenClaims | null>;
+  verify(audience: TokenAudience, token: string): Promise<VerifiedAccessToken | null>;
 }
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -77,10 +82,12 @@ export function createTokenService(env: TokenEnv): TokenService {
           audience: TOKEN_AUDIENCES[audience],
           requiredClaims: ['sub', 'sid', 'exp', 'iat'],
         });
-        const { sub, sid } = payload;
-        if (typeof sub !== 'string' || typeof sid !== 'string') return null;
+        const { sub, sid, exp } = payload;
+        if (typeof sub !== 'string' || typeof sid !== 'string' || typeof exp !== 'number') {
+          return null;
+        }
         if (!UUID_PATTERN.test(sub) || !UUID_PATTERN.test(sid)) return null;
-        return { subjectId: sub, sessionId: sid };
+        return { subjectId: sub, sessionId: sid, expiresAt: new Date(exp * 1000) };
       } catch {
         return null;
       }

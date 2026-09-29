@@ -5,8 +5,12 @@ import { createApp } from './app.js';
 import { createSequelize, databaseConfigFromEnv, pingDatabase } from './config/database.js';
 import { readEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
+import { createTokenService } from './modules/auth/token.service.js';
+import { createChatService } from './modules/chat/chat.service.js';
 import { createMediaStorage } from './providers/media/index.js';
 import { createSmsProvider } from './providers/sms/index.js';
+import { createRealtimeHub } from './realtime/hub.js';
+import { attachSocketServer } from './realtime/socket-server.js';
 
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 
@@ -33,6 +37,8 @@ function start(): void {
     },
   );
 
+  const media = createMediaStorage(env);
+  const realtime = createRealtimeHub();
   const server = createServer(
     createApp({
       env,
@@ -40,11 +46,20 @@ function start(): void {
       dependencies: {
         sequelize,
         sms: createSmsProvider(env),
-        media: createMediaStorage(env),
+        media,
+        realtime,
         pingDatabase: () => pingDatabase(sequelize),
       },
     }),
   );
+  // Socket.IO shares the HTTP server (path /socket.io) and the same services as REST.
+  const io = attachSocketServer(server, {
+    env,
+    logger,
+    tokens: createTokenService(env),
+    chat: createChatService({ sequelize, media, hub: realtime }),
+    hub: realtime,
+  });
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     const message =
@@ -74,6 +89,8 @@ function start(): void {
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
 
+    // Closes every socket, then the HTTP server.
+    void io.close();
     server.close((err) => {
       if (err) {
         logger.error({ err }, 'Error while closing HTTP server');

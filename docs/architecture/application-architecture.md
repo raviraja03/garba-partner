@@ -468,9 +468,10 @@ Example: `PublicProfileDto` (what other members receive):
 | GET | `/matches` | M | ✅ Active matches (cursor by creation; last message preview + unread flag come with chat) ([matches](../matching/matches.md)) |
 | GET | `/matches/:matchId` | M | ✅ Participant only |
 | POST | `/matches/:matchId/unmatch` | M | ✅ Participant only |
-| GET | `/matches/:matchId/messages` | M | Query: `before` cursor, `limit` (≤ 100). Participant only, active match only |
-| POST | `/matches/:matchId/messages` | M | REST fallback `{ clientMessageId, body }` |
-| POST | `/matches/:matchId/read` | M | `{ lastReadMessageId }` |
+| GET | `/chats`, `/chats/unread`, `/chats/:matchId` | M | ✅ Chat list (unread counts, last message), total unread, one chat ([chat architecture](../chat/architecture.md)) |
+| GET | `/chats/:matchId/messages` | M | ✅ (was `/matches/:matchId/messages`) `cursor` (older), `limit` (≤ 100). Participant only, active match only |
+| POST | `/chats/:matchId/messages` | M | ✅ REST fallback `{ clientMessageId, body }` |
+| POST | `/chats/:matchId/read` | M | ✅ `{ lastReadMessageId }` |
 
 ### 5.7 Safety & notifications
 
@@ -523,6 +524,8 @@ Every admin write handler calls `auditService.log({ adminId, action, targetType,
 ---
 
 ## 6. Realtime architecture (Socket.IO)
+
+> **Implemented** for chat: see [chat architecture](../chat/architecture.md) and [socket events](../chat/socket-events.md). Differences from the plan below: sanctions emit `session:ended` (not `account:status`) before disconnecting; `interest:new`, `match:new` and `notification:new` come with notifications.
 
 ### 6.1 Connection
 

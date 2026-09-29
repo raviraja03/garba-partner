@@ -14,8 +14,15 @@ describe('token service', () => {
     const member = await tokens.sign('member', claims);
     const admin = await tokens.sign('admin', claims);
 
-    expect(await tokens.verify('member', member.token)).toEqual(claims);
-    expect(await tokens.verify('admin', admin.token)).toEqual(claims);
+    // `expiresAt` comes from the exp claim (whole seconds), used to end socket connections.
+    expect(await tokens.verify('member', member.token)).toEqual({
+      ...claims,
+      expiresAt: new Date(Math.floor(member.expiresAt.getTime() / 1000) * 1000),
+    });
+    expect(await tokens.verify('admin', admin.token)).toEqual({
+      ...claims,
+      expiresAt: new Date(Math.floor(admin.expiresAt.getTime() / 1000) * 1000),
+    });
     expect(member.expiresAt.getTime()).toBeGreaterThan(Date.now());
   });
 

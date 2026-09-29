@@ -11,6 +11,18 @@ export function looksLikeContactInfo(text: string): boolean {
   return PHONE_LIKE.test(text) || EMAIL_LIKE.test(text) || URL_LIKE.test(text);
 }
 
+/** UPI payment IDs such as `name@okaxis` (no dot after the @, unlike emails). */
+const UPI_LIKE = /\b[\w.-]{2,}@[a-z]{2,}\b/i;
+
+/**
+ * Contact or payment details in a chat message: phone, email, link or UPI ID. Chat does NOT
+ * block these (adults may choose to share); the sender sees a nudge and the server records the
+ * flag as moderation context (docs/chat/safety.md#contact-sharing-nudge).
+ */
+export function looksLikeContactDetails(text: string): boolean {
+  return looksLikeContactInfo(text) || UPI_LIKE.test(text);
+}
+
 /**
  * Phone numbers or email addresses (links allowed). Guards public event and organizer text so
  * private organizer contact details are not published by accident (docs/events/organizer-management.md).

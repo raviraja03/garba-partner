@@ -10,7 +10,11 @@ export default defineConfig(({ mode }) => {
   // Load only API_* for the dev proxy target; secrets are never read here.
   const env = loadEnv(mode, envDir, 'API_');
   const apiTarget = `http://${env.API_HOST ?? '127.0.0.1'}:${env.API_PORT ?? '4000'}`;
-  const proxy = { '/api': { target: apiTarget } };
+  // Socket.IO (chat) shares the API server; `ws` forwards the WebSocket upgrade.
+  const proxy = {
+    '/api': { target: apiTarget },
+    '/socket.io': { target: apiTarget, ws: true },
+  };
 
   return {
     envDir,

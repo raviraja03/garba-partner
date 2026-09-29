@@ -65,6 +65,17 @@ export class Match extends Model<InferAttributes<Match>, InferCreationAttributes
   @Column({ type: DataType.UUID, allowNull: true })
   endedByAdminId!: CreationOptional<string | null>;
 
+  /** Chat list order (docs/chat/architecture.md). */
+  @Column({ type: DataType.DATE, allowNull: true })
+  lastMessageAt!: CreationOptional<Date | null>;
+
+  /** Each member's read position (drives unread counts and "Seen"). */
+  @Column({ type: DataType.DATE, allowNull: true })
+  userALastReadAt!: CreationOptional<Date | null>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  userBLastReadAt!: CreationOptional<Date | null>;
+
   @CreatedAt
   override createdAt!: CreationOptional<Date>;
 

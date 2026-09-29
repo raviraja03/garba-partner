@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import type { Express } from 'express';
 import { pino } from 'pino';
 import sharp from 'sharp';
@@ -11,7 +13,11 @@ import { createApp } from '../app.js';
 import { createSequelize } from '../config/database.js';
 import { hashPassword } from '../lib/passwords.js';
 import { AdminUser } from '../models/index.js';
+import { createTokenService } from '../modules/auth/token.service.js';
+import { createChatService } from '../modules/chat/chat.service.js';
 import type { MediaStorage } from '../providers/media/index.js';
+import { createRealtimeHub, type RealtimeHub } from '../realtime/hub.js';
+import { attachSocketServer } from '../realtime/socket-server.js';
 import { devSmsProvider } from '../providers/sms/dev.sms.js';
 import type { SmsProvider } from '../providers/sms/index.js';
 
@@ -76,6 +82,7 @@ export function createTestApp(options: {
   env?: ServerEnv;
   sms?: SmsProvider;
   media?: MediaStorage;
+  realtime?: RealtimeHub;
   pingDatabase?: () => Promise<boolean>;
 }): Express {
   return createApp({
@@ -85,9 +92,44 @@ export function createTestApp(options: {
       sequelize: options.sequelize,
       sms: options.sms ?? devSmsProvider,
       media: options.media ?? createFakeMediaStorage(),
+      realtime: options.realtime ?? createRealtimeHub(),
       pingDatabase: options.pingDatabase ?? (() => Promise.resolve(true)),
     },
   });
+}
+
+/**
+ * The real stack for Socket.IO tests: the Express app and a Socket.IO server on one HTTP
+ * server listening on a random local port, sharing one RealtimeHub (as in production).
+ */
+export async function startTestServer(options: {
+  sequelize: Sequelize;
+  env?: ServerEnv;
+  media?: MediaStorage;
+}): Promise<{ app: Express; url: string; hub: RealtimeHub; close: () => Promise<void> }> {
+  const env = options.env ?? createTestEnv();
+  const media = options.media ?? createFakeMediaStorage();
+  const hub = createRealtimeHub();
+  const app = createTestApp({ sequelize: options.sequelize, env, media, realtime: hub });
+  const server = createServer(app);
+  const io = attachSocketServer(server, {
+    env,
+    logger: pino({ level: 'silent' }),
+    tokens: createTokenService(env),
+    chat: createChatService({ sequelize: options.sequelize, media, hub }),
+    hub,
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const { port } = server.address() as AddressInfo;
+  return {
+    app,
+    url: `http://127.0.0.1:${String(port)}`,
+    hub,
+    close: async () => {
+      await io.close();
+      server.closeAllConnections();
+    },
+  };
 }
 
 /**
@@ -106,7 +148,7 @@ export function useTestDatabase(): () => Sequelize {
   beforeEach(async () => {
     // Reference data (cities, areas) is kept; everything user- and admin-generated is emptied.
     await sequelize?.query(
-      'TRUNCATE users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, safety_logs CASCADE',
+      'TRUNCATE users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
     );
   });
 

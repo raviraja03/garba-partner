@@ -3,7 +3,8 @@ import type { BlockedMemberDto } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
 import { Block, User, UserProfile } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
-import { endConnections, lockPair } from '../interests/connections.js';
+import type { RealtimeHub } from '../../realtime/hub.js';
+import { emitMatchEnded, endConnections, lockPair } from '../interests/connections.js';
 import type { SafetyLogger } from './safety-log.service.js';
 
 export interface BlocksService {
@@ -21,8 +22,9 @@ export function createBlocksService(deps: {
   sequelize: Sequelize;
   media: MediaStorage;
   safetyLog: SafetyLogger;
+  hub: RealtimeHub;
 }): BlocksService {
-  const { sequelize, media, safetyLog } = deps;
+  const { sequelize, media, safetyLog, hub } = deps;
 
   return {
     async block(blockerId, targetUserId, ip) {
@@ -34,22 +36,24 @@ export function createBlocksService(deps: {
       const target = await User.findByPk(targetUserId, { attributes: ['id'] });
       if (!target) throw new AppError('NOT_FOUND', { message: 'Member not found.' });
 
-      const created = await sequelize.transaction(async (transaction) => {
+      const { created, endedMatchId } = await sequelize.transaction(async (transaction) => {
         await lockPair(sequelize, blockerId, targetUserId, transaction);
         const [, isNew] = await Block.findOrCreate({
           where: { blockerId, blockedId: targetUserId },
           defaults: { blockerId, blockedId: targetUserId },
           transaction,
         });
-        // A block ends everything between the two: pending interests and any active match.
-        await endConnections(
+        // A block ends everything between the two: pending interests and any active match
+        // (so the chat closes for both, live).
+        const ended = await endConnections(
           blockerId,
           targetUserId,
           { matchStatus: 'blocked', endedByUserId: blockerId },
           transaction,
         );
-        return isNew;
+        return { created: isNew, endedMatchId: ended };
       });
+      emitMatchEnded(hub, endedMatchId, blockerId, targetUserId);
       if (created) {
         await safetyLog.record({
           eventType: 'safety.block_created',

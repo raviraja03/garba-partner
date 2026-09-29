@@ -97,5 +97,26 @@ export async function createMember(app: Express, options: MemberOptions = {}): P
   return member;
 }
 
+/** Two members who matched (mutual interest). */
+export async function createMatchedPair(
+  app: Express,
+  aOptions: MemberOptions = {},
+  bOptions: MemberOptions = {},
+): Promise<{ a: TestMember; b: TestMember; matchId: string }> {
+  const a = await createMember(app, { name: 'Asha', gender: 'woman', ...aOptions });
+  const b = await createMember(app, { name: 'Bhavin', ...bOptions });
+  await request(app)
+    .post('/api/v1/interests')
+    .set(bearer(a.accessToken))
+    .send({ receiverId: b.userId })
+    .expect(201);
+  const res = await request(app)
+    .post('/api/v1/interests')
+    .set(bearer(b.accessToken))
+    .send({ receiverId: a.userId })
+    .expect(201);
+  return { a, b, matchId: (res.body as { data: { match: { id: string } } }).data.match.id };
+}
+
 /** Upcoming IST dates, `n` days from today. */
 export const upcoming = (days: number) => addDays(todayInIndia(), days);

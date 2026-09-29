@@ -11,6 +11,7 @@ import type {
   VerificationStatus,
   VerificationType,
 } from '../../constants/enums.js';
+import type { AdminMessageDto } from './chat.dto.js';
 
 // --- Verification ---------------------------------------------------------------------------
 
@@ -76,6 +77,8 @@ export interface AdminReportListItemDto {
   reporter: AdminReportUserDto | null;
   assignedAdminId: string | null;
   openReportsAgainstUser: number;
+  /** The report is about chat messages (evidence includes a message snapshot). */
+  involvesChat: boolean;
   createdAt: string;
 }
 
@@ -88,7 +91,14 @@ export interface AdminReportDetailDto extends AdminReportListItemDto {
       bio: string | null;
       imageUrl: string | null;
     } | null;
+    /** Messages copied at report time (reported message + earlier context). */
+    messages: AdminMessageDto[];
   };
+  /**
+   * Whether a moderator may open the live conversation around the reported message: only for
+   * chat reports that are still open or in review. Every access is audited.
+   */
+  conversationAvailable: boolean;
   reportedUserHiddenFromDiscovery: boolean;
   resolution: {
     action: ReportResolutionAction;

@@ -76,10 +76,15 @@ export function MatchPage() {
       <ProfileCard profile={partner} />
 
       <section className="rounded-card bg-white p-5 shadow-sm ring-1 ring-black/5">
-        <h2 className="font-semibold">Chat is coming soon</h2>
-        <p className="mt-1 text-sm text-muted">
-          In-app chat is launching next. For your safety, keep conversations on Garba Partner,
-          don&apos;t share your phone number or address, and meet at the event.
+        <Link
+          to={`/chats/${matchId}`}
+          className="block rounded-xl bg-brand-600 px-4 py-3 text-center font-semibold text-white hover:bg-brand-700"
+        >
+          Open chat
+        </Link>
+        <p className="mt-2 text-sm text-muted">
+          For your safety, keep conversations on Garba Partner, don&apos;t share your phone number
+          or address until you trust someone, and meet at the event.
         </p>
         {event && (
           <Link

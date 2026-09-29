@@ -94,6 +94,22 @@ export const LIMITS = {
   INTERESTS_PAGE_SIZE_MAX: 50,
   ADMIN_MATCHES_SHOWN: 50,
 
+  // Chat (docs/chat/architecture.md)
+  MESSAGE_MAX_LENGTH: 1000,
+  /** Per member, across socket and REST, rolling minute. */
+  MESSAGES_PER_MINUTE: 30,
+  MESSAGES_PAGE_SIZE_DEFAULT: 30,
+  MESSAGES_PAGE_SIZE_MAX: 100,
+  CHATS_PAGE_SIZE: 30,
+  /** Messages copied into a report as evidence, before the reported one. */
+  REPORT_MESSAGE_CONTEXT: 10,
+  /** Messages a moderator can see on each side of a reported message. */
+  ADMIN_CONVERSATION_WINDOW: 25,
+  /** Largest Socket.IO payload the server accepts. */
+  SOCKET_MAX_PAYLOAD_BYTES: 16 * 1024,
+  /** Chat events per socket per minute (sends + reads). */
+  SOCKET_EVENTS_PER_MINUTE: 120,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

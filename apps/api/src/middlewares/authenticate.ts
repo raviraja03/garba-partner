@@ -35,33 +35,59 @@ function bearerToken(req: Request): string | null {
 export function createAuthenticateMember(tokens: TokenService): RequestHandler {
   return async (req, _res, next) => {
     const token = bearerToken(req);
-    const claims = token ? await tokens.verify('member', token) : null;
-    if (!claims) throw new AppError('UNAUTHENTICATED');
-
-    const session = await UserSession.findOne({
-      where: {
-        id: claims.sessionId,
-        userId: claims.subjectId,
-        revokedAt: null,
-        expiresAt: { [Op.gt]: new Date() },
-      },
-      attributes: ['id'],
-      include: [
-        { model: User, required: true, attributes: ['id', 'status', 'onboardingCompletedAt'] },
-      ],
-    });
-    const user = session?.user;
-    if (!session || !user) throw new AppError('UNAUTHENTICATED');
-    if (user.status === 'banned') throw new AppError('ACCOUNT_BANNED');
-
-    req.auth = {
-      userId: user.id,
-      sessionId: session.id,
-      status: user.status,
-      onboarded: user.onboardingCompletedAt !== null,
-    };
+    const resolved = token ? await resolveMemberSession(tokens, token) : null;
+    if (!resolved) throw new AppError('UNAUTHENTICATED');
+    const { expiresAt: _expiresAt, ...auth } = resolved;
+    req.auth = auth;
     next();
   };
+}
+
+/**
+ * Verifies a member access token AND its session/account in the database. Shared by HTTP
+ * requests and Socket.IO connections so both enforce exactly the same rules. Returns null for
+ * any invalid token or revoked/expired session; throws ACCOUNT_BANNED for banned accounts.
+ */
+export async function resolveMemberSession(
+  tokens: TokenService,
+  token: string,
+): Promise<(MemberAuthContext & { expiresAt: Date }) | null> {
+  const claims = await tokens.verify('member', token);
+  if (!claims) return null;
+
+  const session = await UserSession.findOne({
+    where: {
+      id: claims.sessionId,
+      userId: claims.subjectId,
+      revokedAt: null,
+      expiresAt: { [Op.gt]: new Date() },
+    },
+    attributes: ['id'],
+    include: [
+      { model: User, required: true, attributes: ['id', 'status', 'onboardingCompletedAt'] },
+    ],
+  });
+  const user = session?.user;
+  if (!session || !user) return null;
+  if (user.status === 'banned') throw new AppError('ACCOUNT_BANNED');
+
+  return {
+    userId: user.id,
+    sessionId: session.id,
+    status: user.status,
+    onboarded: user.onboardingCompletedAt !== null,
+    expiresAt: claims.expiresAt,
+  };
+}
+
+/** True while a member session is still valid (re-checked on every socket event). */
+export async function isMemberSessionActive(userId: string, sessionId: string): Promise<boolean> {
+  const session = await UserSession.findOne({
+    where: { id: sessionId, userId, revokedAt: null, expiresAt: { [Op.gt]: new Date() } },
+    attributes: ['id'],
+    include: [{ model: User, required: true, attributes: ['id'], where: { status: 'active' } }],
+  });
+  return session !== null;
 }
 
 /**

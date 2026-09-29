@@ -82,5 +82,6 @@ export const reportMember = (input: {
   reportedUserId: string;
   reason: ReportReason;
   details?: string;
+  messageId?: string;
   alsoBlock: boolean;
 }) => api<ReportCreatedDto>('/reports', { method: 'POST', body: input, authenticated: true });

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { APP_NAME } from '@garba-partner/shared';
 import { useAuth } from '../features/auth/auth-context';
+import { useUnreadCount } from '../features/chat/hooks';
 import { Button } from './ui/Button';
 
 const MEMBER_NAV = [
@@ -10,8 +11,31 @@ const MEMBER_NAV = [
   { to: '/discover', label: 'Discover', end: false },
   { to: '/interests', label: 'Interests', end: false },
   { to: '/matches', label: 'Matches', end: false },
+  { to: '/chats', label: 'Chats', end: false },
   { to: '/profile', label: 'My profile', end: true },
 ] as const;
+
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  isActive ? 'font-semibold text-brand-700' : 'text-muted hover:text-ink';
+
+/** "Chats" with the unread-message badge (active members only; updated live by the socket). */
+function ChatsLink({ enabled }: { enabled: boolean }) {
+  const unread = useUnreadCount(enabled);
+  const count = unread.data ?? 0;
+  return (
+    <NavLink to="/chats" className={linkClass}>
+      Chats
+      {count > 0 && (
+        <span
+          className="ml-1 rounded-full bg-brand-600 px-1.5 py-0.5 text-[11px] font-bold text-white"
+          aria-label={`${String(count)} unread messages`}
+        >
+          {count > 99 ? '99+' : count}
+        </span>
+      )}
+    </NavLink>
+  );
+}
 
 const VISITOR_NAV = [{ to: '/events', label: 'Events', end: false }] as const;
 
@@ -40,18 +64,18 @@ export function AppShell() {
           aria-label="Main"
           className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm"
         >
-          {nav.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) =>
-                isActive ? 'font-semibold text-brand-700' : 'text-muted hover:text-ink'
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
+          {nav.map((item) =>
+            item.to === '/chats' ? (
+              <ChatsLink
+                key={item.to}
+                enabled={state.status === 'authenticated' && state.user.status === 'active'}
+              />
+            ) : (
+              <NavLink key={item.to} to={item.to} end={item.end} className={linkClass}>
+                {item.label}
+              </NavLink>
+            ),
+          )}
           {authenticated && (
             <Button variant="link" loading={signingOut} onClick={() => void handleSignOut()}>
               Log out

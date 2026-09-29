@@ -44,6 +44,9 @@ flowchart LR
 | `users` | `partner_interests` | 1 : 0..n (as sender / receiver) | `sender_id`, `receiver_id` | FK + one pending per unordered pair | `CASCADE` | none (queried by user) |
 | `partner_interests` | `matches` | 0..1 : 0..1 | `matches.interest_id` | FK + `UNIQUE (interest_id)` | `SET NULL` | none |
 | `users` | `matches` | 1 : 0..n (as `user_a` or `user_b`, canonical order) | `user_a_id`, `user_b_id` | FK + one active per pair | `CASCADE` | none (`canonicalPair()` helper) |
+| `matches` | `messages` | 1 : 0..n | `messages.match_id` | FK | `CASCADE` | none (queried by match) |
+| `users` | `messages` | 1 : 0..n (sender) | `messages.sender_id` | FK + `UNIQUE (sender_id, client_message_id)` | `CASCADE` | none |
+| `messages` / `matches` | `reports` | 0..1 : 0..n | `reports.message_id`, `reports.match_id` | FK | `SET NULL` (evidence snapshot survives) | none |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.
@@ -119,4 +122,4 @@ The development seeder already follows this pattern (`src/seeders/20260925110000
 
 | Relationship | Added by |
 |---|---|
-| Users → messages, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |
+| Users → notifications, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |

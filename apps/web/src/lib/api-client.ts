@@ -32,6 +32,11 @@ export function setAccessToken(token: string | null): void {
   accessToken = token;
 }
 
+/** The current in-memory access token (the chat socket sends it in its handshake). */
+export function getAccessToken(): string | null {
+  return accessToken;
+}
+
 /** Called when a silent refresh fails, so the auth state can switch to anonymous. */
 export function setSessionExpiredHandler(handler: (() => void) | null): void {
   onSessionExpired = handler;

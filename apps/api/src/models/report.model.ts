@@ -32,6 +32,18 @@ export interface ReportEvidence {
   profile?: { name: string; bio: string | null; imagePublicId: string | null } | null;
   /** System reports: what triggered them (e.g. `identity_verification`). */
   trigger?: string;
+  /**
+   * Chat reports: the reported message(s) plus up to `LIMITS.REPORT_MESSAGE_CONTEXT` earlier
+   * messages, copied at report time so they survive unmatch or deletion.
+   */
+  messages?: {
+    id: string;
+    senderRole: 'reporter' | 'reported';
+    body: string;
+    createdAt: string;
+    reported: boolean;
+    containsContactInfo: boolean;
+  }[];
 }
 
 /** A report about a member (docs/safety/reporting.md). */
@@ -100,6 +112,14 @@ export class Report extends Model<InferAttributes<Report>, InferCreationAttribut
 
   @Column({ type: DataType.DATE, allowNull: true })
   resolvedAt!: CreationOptional<Date | null>;
+
+  /** Chat reports: the reported message (null once the conversation is deleted). */
+  @Column({ type: DataType.UUID, allowNull: true })
+  messageId!: CreationOptional<string | null>;
+
+  /** Chat reports: the conversation (null once deleted). */
+  @Column({ type: DataType.UUID, allowNull: true })
+  matchId!: CreationOptional<string | null>;
 
   @CreatedAt
   override createdAt!: CreationOptional<Date>;

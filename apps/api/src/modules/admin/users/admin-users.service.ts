@@ -28,6 +28,7 @@ import {
   UserVerification,
 } from '../../../models/index.js';
 import type { MediaStorage } from '../../../providers/media/index.js';
+import type { RealtimeHub } from '../../../realtime/hub.js';
 import {
   computeCompletion,
   toOwnProfileDto,
@@ -66,8 +67,9 @@ export function createAdminUsersService(deps: {
   sequelize: Sequelize;
   env: ServerEnv;
   media: MediaStorage;
+  hub: RealtimeHub;
 }): AdminUsersService {
-  const { sequelize, env, media } = deps;
+  const { sequelize, env, media, hub } = deps;
 
   /** Builds the search condition. Phone searches match the HMAC — the number is never stored or returned. */
   function searchWhere(q: string): WhereOptions {
@@ -235,6 +237,8 @@ export function createAdminUsersService(deps: {
         transaction,
       );
     });
+    // Live connections end now too: the member can't keep chatting on an open socket.
+    if (transition.to === 'suspended') hub.disconnectUser(userId, 'account_restricted');
     return getDetail(userId);
   }
 

@@ -4,7 +4,8 @@ import type { ServerEnv } from '@garba-partner/config/server';
 import { LIMITS, type AdminMatchDto } from '@garba-partner/shared';
 import { AppError } from '../../../lib/app-error.js';
 import { Event, Match, User, UserProfile } from '../../../models/index.js';
-import { endConnections, lockPair } from '../../interests/connections.js';
+import type { RealtimeHub } from '../../../realtime/hub.js';
+import { emitMatchEnded, endConnections, lockPair } from '../../interests/connections.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 import type { AdminActor } from '../users/admin-users.service.js';
 
@@ -19,8 +20,9 @@ export interface AdminMatchesService {
 export function createAdminMatchesService(deps: {
   sequelize: Sequelize;
   env: ServerEnv;
+  hub: RealtimeHub;
 }): AdminMatchesService {
-  const { sequelize, env } = deps;
+  const { sequelize, env, hub } = deps;
 
   async function toDtos(userId: string, matches: Match[]): Promise<AdminMatchDto[]> {
     const partnerIds = matches.map((m) => (m.userAId === userId ? m.userBId : m.userAId));
@@ -86,6 +88,7 @@ export function createAdminMatchesService(deps: {
           transaction,
         );
       });
+      emitMatchEnded(hub, matchId, match.userAId, match.userBId);
       const closed = await Match.findByPk(matchId, {
         include: [{ model: Event, attributes: ['name'] }],
       });

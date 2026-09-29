@@ -2,7 +2,7 @@
 
 > **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
 
-Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `partner_interests`, `matches`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `partner_interests`, `matches`, `messages`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
 
 ## 1. ERD
 
@@ -30,6 +30,19 @@ erDiagram
     users ||--o{ partner_interests : "sends / receives"
     events |o--o{ partner_interests : "context"
     partner_interests |o--o| matches : "creates"
+    matches ||--o{ messages : "chat"
+    users ||--o{ messages : "sends"
+    messages |o--o{ reports : "reported in"
+
+    messages {
+        uuid id PK
+        uuid match_id FK
+        uuid sender_id FK
+        uuid client_message_id "unique per sender"
+        varchar1000 body "immutable"
+        boolean contains_contact_info "moderation only"
+        timestamptz created_at
+    }
     users ||--o{ matches : "user_a / user_b"
     admin_users |o--o{ matches : "closes"
 
@@ -601,13 +614,33 @@ Migration `20260929120100-create-matches`. See [matches](../matching/matches.md)
 | `ended_at` | timestamptz | yes | | Check: set exactly when not `active` |
 | `ended_by_user_id` | uuid | yes | | FK → `users.id` `ON DELETE SET NULL`. Internal only |
 | `ended_by_admin_id` | uuid | yes | | FK → `admin_users.id` `ON DELETE RESTRICT` (moderation) |
+| `last_message_at` | timestamptz | yes | | Chat list order (added by `20260929130000-create-messages`) |
+| `user_a_last_read_at` / `user_b_last_read_at` | timestamptz | yes | | Each member's read position (unread counts, "Seen"). Only move forward |
 | `created_at` / `updated_at` | timestamptz | no | `now()` | `updated_at` trigger |
 
-Indexes: **`matches_one_active_per_pair_unique (user_a_id, user_b_id) WHERE status = 'active'`**, `(user_a_id, created_at DESC, id DESC)`, `(user_b_id, created_at DESC, id DESC)`, partial `(event_id)`, partial `(ended_by_admin_id)`.
+Indexes: **`matches_one_active_per_pair_unique (user_a_id, user_b_id) WHERE status = 'active'`**, `(user_a_id, created_at DESC, id DESC)`, `(user_b_id, created_at DESC, id DESC)`, partial `(event_id)`, partial `(ended_by_admin_id)`; chat lists `(user_a_id, COALESCE(last_message_at, created_at) DESC, id DESC) WHERE status = 'active'` and the same for `user_b_id`; retention `(ended_at) WHERE status <> 'active'`.
 
 Migration `20260929120200-add-interaction-restrictions` also adds **`users.interactions_restricted_at`** (admin safety restriction: can't send or accept interests) and allows audit `target_type = 'match'`.
 
-### 4.16 Safety tables: `blocks`, `reports`, `safety_logs`
+### 4.16 `messages`
+
+Migration `20260929130000-create-messages`. See [chat architecture](../chat/architecture.md).
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `match_id` | uuid | no | | FK → `matches.id` `ON DELETE CASCADE` |
+| `sender_id` | uuid | no | | FK → `users.id` `ON DELETE CASCADE` |
+| `client_message_id` | uuid | no | | Client idempotency key. **`UNIQUE (sender_id, client_message_id)`** |
+| `body` | varchar(1000) | no | | Plain text. Check: not blank |
+| `contains_contact_info` | boolean | no | `false` | Moderation context only; never returned to members |
+| `created_at` | timestamptz | no | `now()` | No `updated_at`: messages are **immutable** (trigger `messages_immutable` rejects UPDATE) |
+
+Index: `(match_id, created_at DESC, id DESC)` (history, unread counts).
+
+Migration `20260929130100-add-report-message-context` adds `reports.message_id` (FK → messages `SET NULL`) and `reports.match_id` (FK → matches `SET NULL`) with partial indexes; the evidence itself is copied into `reports.evidence.messages` ([chat moderation](../chat/moderation.md)).
+
+### 4.17 Safety tables: `blocks`, `reports`, `safety_logs`
 
 Created by the safety-phase migrations `20260928110100-create-blocks`, `…110200-create-reports`, `…110300-create-safety-logs`. Blocks and reports are served by the API from the discovery phase on ([discovery §3](../matching/discovery.md#block-and-report-wired-in-this-phase)).
 
@@ -617,7 +650,7 @@ Created by the safety-phase migrations `20260928110100-create-blocks`, `…11020
 | `reports` | `source` (`member`\|`system`), `reporter_id` (FK `SET NULL`), `reported_user_id` (FK `RESTRICT`), `reason`, `priority` 0–2, `details`, `evidence` jsonb (profile snapshot), `status` (`open`\|`in_review`\|`resolved`\|`dismissed`), assignment/resolution columns (FK → admin_users `RESTRICT`) | Reason/priority/status/resolution checks, partial unique **one open report per pair**, queue index `(status, priority, created_at, id)`, `(reported_user_id, created_at DESC)`, `(reporter_id, created_at DESC)`, `reports_reporter_reported_idx` (discovery) |
 | `safety_logs` | `event_type`, `severity`, `user_id`, `admin_id` (no FKs: kept after deletion), `ip_hash` (HMAC), `metadata` | **Append-only** trigger; indexes on `created_at`, `(user_id, created_at)`, `(event_type, created_at)`, critical events |
 
-### 4.17 Discovery indexes
+### 4.18 Discovery indexes
 
 Migration `20260929110100-add-discovery-indexes` ([matching logic §6](../matching/matching-logic.md#6-query-and-indexes)):
 
@@ -628,7 +661,7 @@ Migration `20260929110100-add-discovery-indexes` ([matching logic §6](../matchi
 | `user_profiles_available_dates_gin_idx` | `user_profiles USING gin (available_dates)` |
 | `reports_reporter_reported_idx` | `reports (reporter_id, reported_user_id) WHERE reporter_id IS NOT NULL` |
 
-### 4.18 Bookkeeping tables
+### 4.19 Bookkeeping tables
 
 | Table | Created by | Content |
 |---|---|---|

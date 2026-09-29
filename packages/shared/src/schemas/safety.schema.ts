@@ -43,6 +43,11 @@ export const createReportSchema = z.strictObject({
   ),
   /** Also block the member (default true in the app). */
   alsoBlock: z.optional(z.boolean()),
+  /**
+   * Report a specific chat message. It must be a message the REPORTED member sent in a chat the
+   * reporter belongs to; it and up to 10 earlier messages are copied into the report as evidence.
+   */
+  messageId: z.optional(z.uuid('Invalid message.')),
 });
 export type CreateReportInput = z.input<typeof createReportSchema>;
 

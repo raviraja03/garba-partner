@@ -333,6 +333,8 @@ Result: a chat thread opens for both users, starting with the safety reminder.
 
 ## 8. Chat flow
 
+> **Implemented** ([chat architecture](../chat/architecture.md), [socket events](../chat/socket-events.md), [chat safety](../chat/safety.md)). REST paths live under `/api/v1/chats/:matchId/…`; "Chats" and "Matches" are separate screens.
+
 1:1 chat is available **only for active matches**. Text only in the MVP.
 
 ### 8.1 Opening a chat

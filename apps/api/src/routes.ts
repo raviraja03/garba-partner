@@ -16,6 +16,8 @@ import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.
 import { createAdminEventsRouter } from './modules/admin/events/admin-events.routes.js';
 import { createAdminMatchesRouter } from './modules/admin/matches/admin-matches.routes.js';
 import { createAdminMatchesService } from './modules/admin/matches/admin-matches.service.js';
+import { createAdminReportsRouter } from './modules/admin/reports/admin-reports.routes.js';
+import { createAdminReportsService } from './modules/admin/reports/admin-reports.service.js';
 import { createAdminEventsService } from './modules/admin/events/admin-events.service.js';
 import { createAdminOrganizersRouter } from './modules/admin/organizers/admin-organizers.routes.js';
 import { createAdminOrganizersService } from './modules/admin/organizers/admin-organizers.service.js';
@@ -25,6 +27,8 @@ import { createMemberAuthController } from './modules/auth/auth.controller.js';
 import { createMemberAuthRouter } from './modules/auth/auth.routes.js';
 import { createMemberAuthService } from './modules/auth/auth.service.js';
 import { createTokenService } from './modules/auth/token.service.js';
+import { createChatRouter } from './modules/chat/chat.routes.js';
+import { createChatService } from './modules/chat/chat.service.js';
 import { createDiscoveryRouter } from './modules/discovery/discovery.routes.js';
 import { createDiscoveryService } from './modules/discovery/discovery.service.js';
 import {
@@ -54,6 +58,7 @@ import { createReportsService } from './modules/safety/reports.service.js';
 import { createSafetyLogger } from './modules/safety/safety-log.service.js';
 import { createSafetyRouters } from './modules/safety/safety.routes.js';
 import type { MediaStorage } from './providers/media/index.js';
+import type { RealtimeHub } from './realtime/hub.js';
 import type { SmsProvider } from './providers/sms/index.js';
 
 /** External dependencies, injected so tests can supply their own (test database, fake SMS). */
@@ -61,6 +66,8 @@ export interface ApiDependencies extends HealthDependencies {
   sequelize: Sequelize;
   sms: SmsProvider;
   media: MediaStorage;
+  /** Socket.IO seam: emits and disconnects (no-ops until a socket server is attached). */
+  realtime: RealtimeHub;
 }
 
 /** Routes mounted under `/api/v1`. */
@@ -70,7 +77,7 @@ export function createApiRouter(options: {
   dependencies: ApiDependencies;
 }): Router {
   const { env, logger, dependencies } = options;
-  const { sequelize, sms, media } = dependencies;
+  const { sequelize, sms, media, realtime: hub } = dependencies;
 
   const tokens = createTokenService(env);
   const limiters = createAuthRateLimiters();
@@ -122,7 +129,7 @@ export function createApiRouter(options: {
   router.use(
     '/admin/users',
     createAdminUsersRouter({
-      service: createAdminUsersService({ sequelize, env, media }),
+      service: createAdminUsersService({ sequelize, env, media, hub }),
       authenticateAdmin,
     }),
   );
@@ -158,7 +165,7 @@ export function createApiRouter(options: {
   const safetyLog = createSafetyLogger({ ipHashSecret: env.OTP_HMAC_SECRET, logger });
 
   // Interests and matches (docs/matching/interests.md, docs/matching/matches.md).
-  const matches = createMatchesService({ sequelize, media });
+  const matches = createMatchesService({ sequelize, media, hub });
   const interestLimiter = createMemberRateLimiter({
     windowMs: 60 * 1000,
     limit: LIMITS.INTEREST_ACTIONS_PER_MINUTE,
@@ -176,8 +183,8 @@ export function createApiRouter(options: {
     createMatchesRouter({ service: matches, authenticateMember, limiter: interestLimiter }),
   );
   const safety = createSafetyRouters({
-    blocks: createBlocksService({ sequelize, media, safetyLog }),
-    reports: createReportsService({ sequelize, safetyLog }),
+    blocks: createBlocksService({ sequelize, media, safetyLog, hub }),
+    reports: createReportsService({ sequelize, safetyLog, hub }),
     authenticateMember,
     blockLimiter: createMemberRateLimiter({ windowMs: HOUR_MS, limit: LIMITS.BLOCKS_PER_HOUR }),
     reportLimiter: createMemberRateLimiter({
@@ -187,6 +194,26 @@ export function createApiRouter(options: {
   });
   router.use('/blocks', safety.blocks);
   router.use('/reports', safety.reports);
+
+  // Chat (docs/chat/architecture.md). Sending is rate-limited in the service (shared with sockets).
+  router.use(
+    '/chats',
+    createChatRouter({
+      service: createChatService({ sequelize, media, hub }),
+      authenticateMember,
+      limiter: createMemberRateLimiter({
+        windowMs: 60 * 1000,
+        limit: LIMITS.SOCKET_EVENTS_PER_MINUTE,
+      }),
+    }),
+  );
+  router.use(
+    '/admin/reports',
+    createAdminReportsRouter({
+      service: createAdminReportsService({ sequelize, env, media, hub }),
+      authenticateAdmin,
+    }),
+  );
 
   router.use(
     '/events',
@@ -201,7 +228,7 @@ export function createApiRouter(options: {
   router.use(
     '/admin',
     createAdminMatchesRouter({
-      service: createAdminMatchesService({ sequelize, env }),
+      service: createAdminMatchesService({ sequelize, env, hub }),
       authenticateAdmin,
     }),
   );

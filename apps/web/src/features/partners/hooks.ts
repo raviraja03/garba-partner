@@ -70,6 +70,7 @@ function useSafetyMutation<TInput, TResult>(mutationFn: (input: TInput) => Promi
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: partnerKeys.all }),
         queryClient.invalidateQueries({ queryKey: ['connections'] }),
+        queryClient.invalidateQueries({ queryKey: ['chats'] }),
       ]);
     },
   });

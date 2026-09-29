@@ -13,7 +13,8 @@ import { decodeCursor, encodeCursor } from '../../lib/pagination.js';
 import { Event, Match } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
 import { loadPublicProfiles } from '../profiles/public-profiles.js';
-import { lockPair } from './connections.js';
+import type { RealtimeHub } from '../../realtime/hub.js';
+import { emitMatchEnded, lockPair } from './connections.js';
 
 export interface MatchesService {
   list(
@@ -57,8 +58,9 @@ export async function loadEvents(ids: (string | null)[]): Promise<Map<string, Sh
 export function createMatchesService(deps: {
   sequelize: Sequelize;
   media: MediaStorage;
+  hub: RealtimeHub;
 }): MatchesService {
-  const { sequelize, media } = deps;
+  const { sequelize, media, hub } = deps;
 
   async function rows(
     userId: string,
@@ -155,7 +157,7 @@ export function createMatchesService(deps: {
         attributes: ['id', 'userAId', 'userBId'],
       });
       if (!match) throw notFound();
-      await sequelize.transaction(async (transaction) => {
+      const endedNow = await sequelize.transaction(async (transaction) => {
         await lockPair(sequelize, match.userAId, match.userBId, transaction);
         const [ended] = await Match.update(
           { status: 'unmatched', endedAt: new Date(), endedByUserId: userId },
@@ -166,7 +168,10 @@ export function createMatchesService(deps: {
           const current = await Match.findByPk(matchId, { attributes: ['status'], transaction });
           if (current?.status !== 'unmatched') throw notFound();
         }
+        return ended > 0;
       });
+      // The chat closes live for both members (no reason is given).
+      if (endedNow) emitMatchEnded(hub, matchId, match.userAId, match.userBId);
     },
   };
 }

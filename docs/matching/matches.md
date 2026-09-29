@@ -99,7 +99,7 @@ Every code path that creates or ends a match holds the pair's advisory lock, and
 | Route | Contents |
 |---|---|
 | `/matches` | Active matches with partner, event and match date |
-| `/matches/:id` | "It's a match!" (right after matching) or "You and X", the partner's profile, "Chat is coming soon" with advice to keep conversations on the platform and meet at the event, safety tips, **Unmatch** (confirm), **Block**, **Report** |
+| `/matches/:id` | "It's a match!" (right after matching) or "You and X", the partner's profile, **Open chat** ([chat](../chat/architecture.md)) with advice to keep conversations on the platform and meet at the event, safety tips, **Unmatch** (confirm), **Block**, **Report** |
 
 ## 8. Testing
 
@@ -107,6 +107,6 @@ See [interests §8](interests.md#8-testing), plus `apps/api/src/modules/admin/ma
 
 ## 9. Known limitations
 
-- Chat, read receipts and match notifications come with the chat phase.
+- Chat and read receipts are live ([chat](../chat/architecture.md)); match notifications come with notifications.
 - Suspending a member hides their matches but doesn't end them; ban flows (and ending matches on ban) come with the moderation phase.
 - The admin match list shows the latest 50 matches per member.
