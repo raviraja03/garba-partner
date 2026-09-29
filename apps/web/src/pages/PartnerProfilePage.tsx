@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { Alert } from '../components/ui/Alert';
-import { Button } from '../components/ui/Button';
 import { FullPageSpinner } from '../components/FullPageSpinner';
+import { InterestActions } from '../features/connections/components/InterestActions';
 import { Highlights } from '../features/partners/components/PartnerCard';
 import { SafetyActions } from '../features/partners/components/SafetyActions';
 import { usePartner } from '../features/partners/hooks';
@@ -14,7 +14,6 @@ export function PartnerProfilePage() {
   const { userId = '' } = useParams();
   const partner = usePartner(userId);
   const [done, setDone] = useState<string | null>(null);
-  const [interestNote, setInterestNote] = useState(false);
 
   if (done) {
     return (
@@ -78,21 +77,7 @@ export function PartnerProfilePage() {
         </section>
       )}
 
-      <section className="space-y-3">
-        <Button
-          onClick={() => {
-            setInterestNote(true);
-          }}
-        >
-          Send interest
-        </Button>
-        {interestNote && (
-          <Alert tone="info">
-            Sending interests is launching soon. If {profile.name} accepts, a chat will open. No one
-            can message you without your consent.
-          </Alert>
-        )}
-      </section>
+      <InterestActions partner={partner.data} />
 
       <SafetyActions userId={profile.id} name={profile.name} onDone={setDone} />
 

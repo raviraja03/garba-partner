@@ -459,15 +459,15 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/interests` | M | `{ receiverId, eventId? }` → `{ interest, matched: boolean, match? }` |
-| GET | `/interests/received` | M | Pending received (cursor) |
-| GET | `/interests/sent` | M | Pending sent (cursor) |
-| POST | `/interests/:interestId/accept` | M | Receiver only → `{ match }` |
-| POST | `/interests/:interestId/decline` | M | Receiver only → `204`-style success |
-| POST | `/interests/:interestId/withdraw` | M | Sender only |
-| GET | `/matches` | M | Active matches with last message preview + unread flag (cursor by last activity) |
-| GET | `/matches/:matchId` | M | Participant only |
-| POST | `/matches/:matchId/unmatch` | M | Participant only |
+| POST | `/interests` | M | ✅ `{ receiverId, eventId? }` → `{ interestId, matched, match, alreadySent }` ([interests](../matching/interests.md)) |
+| GET | `/interests/received` | M | ✅ Pending received (cursor) |
+| GET | `/interests/sent` | M | ✅ Pending sent (cursor) |
+| POST | `/interests/:interestId/accept` | M | ✅ Receiver only → `MatchDto` |
+| POST | `/interests/:interestId/reject` | M | ✅ Receiver only (was `decline`; status `declined`) |
+| DELETE | `/interests/:interestId` | M | ✅ Sender only: withdraw (was `POST …/withdraw`) |
+| GET | `/matches` | M | ✅ Active matches (cursor by creation; last message preview + unread flag come with chat) ([matches](../matching/matches.md)) |
+| GET | `/matches/:matchId` | M | ✅ Participant only |
+| POST | `/matches/:matchId/unmatch` | M | ✅ Participant only |
 | GET | `/matches/:matchId/messages` | M | Query: `before` cursor, `limit` (≤ 100). Participant only, active match only |
 | POST | `/matches/:matchId/messages` | M | REST fallback `{ clientMessageId, body }` |
 | POST | `/matches/:matchId/read` | M | `{ lastReadMessageId }` |

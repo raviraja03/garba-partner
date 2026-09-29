@@ -1,9 +1,10 @@
-import { QueryTypes } from 'sequelize';
+import { Op, QueryTypes } from 'sequelize';
 import type { Sequelize } from 'sequelize-typescript';
 import {
   LIMITS,
   calculateAge,
   todayInIndia,
+  type ConnectionDto,
   type PaginationMeta,
   type PartnerDto,
   type PartnerListQueryData,
@@ -11,16 +12,15 @@ import {
 } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
 import {
-  Area,
-  City,
   Event,
   EventAttendance,
-  User,
+  Match,
+  PartnerInterest,
   UserPreference,
   UserProfile,
 } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
-import { toPublicProfileDto } from '../profiles/profile.mapper.js';
+import { loadPublicProfiles } from '../profiles/public-profiles.js';
 import {
   buildCandidateQuery,
   decodePartnerCursor,
@@ -37,9 +37,15 @@ export interface DiscoveryService {
     query: PartnerListQueryData,
   ): Promise<{ items: PartnerDto[]; meta: PaginationMeta }>;
   get(viewerId: string, partnerId: string): Promise<PartnerDto>;
+  /**
+   * True when `targetId` passes every hard eligibility rule for `viewerId` (account state,
+   * blocks, reports, restrictions, recent decline, mutual preferences). Used by interests.
+   */
+  isEligible(viewerId: string, targetId: string): Promise<boolean>;
 }
 
 const notFound = () => new AppError('NOT_FOUND', { message: 'Profile not found.' });
+const NO_CONNECTION: ConnectionDto = { status: 'none', interestId: null, matchId: null };
 
 /** Partner discovery (docs/matching/discovery.md). */
 export function createDiscoveryService(deps: {
@@ -87,6 +93,21 @@ export function createDiscoveryService(deps: {
     return sequelize.query<CandidateRow>(sql, { replacements, type: QueryTypes.SELECT });
   }
 
+  /** One candidate against the member's saved preferences only (no optional filters). */
+  async function findEligible(viewerId: string, targetId: string, today: string) {
+    const { viewer, preferences } = await loadViewer(viewerId, today);
+    const rows = await runQuery({
+      viewer,
+      today,
+      minAge: preferences.ageMin,
+      maxAge: preferences.ageMax,
+      verifiedOnly: false,
+      targetId,
+      limit: 1,
+    });
+    return { viewer, row: rows[0] };
+  }
+
   /** Upcoming events both members are looking for a partner at (reciprocal), soonest first. */
   async function sharedEvents(viewerId: string, ids: string[]) {
     const byUser = new Map<string, SharedEventDto[]>();
@@ -117,36 +138,66 @@ export function createDiscoveryService(deps: {
     return byUser;
   }
 
+  /** Pending interests and active matches between the viewer and these members. */
+  async function connections(viewerId: string, ids: string[]) {
+    const byUser = new Map<string, ConnectionDto>();
+    if (ids.length === 0) return byUser;
+    const [interests, matches] = await Promise.all([
+      PartnerInterest.findAll({
+        where: {
+          status: 'pending',
+          expiresAt: { [Op.gt]: new Date() },
+          [Op.or]: [
+            { senderId: viewerId, receiverId: ids },
+            { receiverId: viewerId, senderId: ids },
+          ],
+        },
+        attributes: ['id', 'senderId', 'receiverId'],
+      }),
+      Match.findAll({
+        where: {
+          status: 'active',
+          [Op.or]: [
+            { userAId: viewerId, userBId: ids },
+            { userBId: viewerId, userAId: ids },
+          ],
+        },
+        attributes: ['id', 'userAId', 'userBId'],
+      }),
+    ]);
+    for (const interest of interests) {
+      const sent = interest.senderId === viewerId;
+      byUser.set(sent ? interest.receiverId : interest.senderId, {
+        status: sent ? 'interest_sent' : 'interest_received',
+        interestId: interest.id,
+        matchId: null,
+      });
+    }
+    for (const match of matches) {
+      byUser.set(match.userAId === viewerId ? match.userBId : match.userAId, {
+        status: 'matched',
+        interestId: null,
+        matchId: match.id,
+      });
+    }
+    return byUser;
+  }
+
   /** Builds DTOs through the public allow-list mapper, in ranking order. */
   async function hydrate(viewer: Viewer, rows: CandidateRow[], today: string) {
     const ids = rows.map((row) => row.id);
     if (ids.length === 0) return [];
-    const [users, profiles, preferences, events] = await Promise.all([
-      User.findAll({
-        where: { id: ids },
-        attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt'],
-      }),
-      UserProfile.findAll({
-        where: { userId: ids },
-        include: [
-          { model: City, attributes: ['id', 'name'] },
-          { model: Area, attributes: ['id', 'name'] },
-        ],
-      }),
-      UserPreference.findAll({ where: { userId: ids }, attributes: ['userId', 'showArea'] }),
+    const [profiles, events, connected] = await Promise.all([
+      loadPublicProfiles(ids, media, today),
       sharedEvents(viewer.id, ids),
+      connections(viewer.id, ids),
     ]);
-    const userById = new Map(users.map((user) => [user.id, user]));
-    const profileById = new Map(profiles.map((profile) => [profile.userId, profile]));
-    const preferenceById = new Map(preferences.map((pref) => [pref.userId, pref]));
-
     return rows.flatMap((row): PartnerDto[] => {
-      const user = userById.get(row.id);
-      const profile = profileById.get(row.id);
-      if (!user || !profile) return [];
+      const profile = profiles.get(row.id);
+      if (!profile) return [];
       return [
         {
-          profile: toPublicProfileDto(user, profile, preferenceById.get(row.id), media, today),
+          profile,
           highlights: matchHighlights({
             sameEvent: row.same_event,
             sharedDates: row.shared_dates,
@@ -157,6 +208,7 @@ export function createDiscoveryService(deps: {
           }),
           sharedDates: sharedUpcomingDates(profile.availableDates, viewer.availableDates, today),
           sharedEvents: events.get(row.id) ?? [],
+          connection: connected.get(row.id) ?? NO_CONNECTION,
         },
       ];
     });
@@ -187,6 +239,7 @@ export function createDiscoveryService(deps: {
         cityId: query.cityId,
         garbaLevels: query.garbaLevels,
         date: query.date,
+        excludeConnected: true,
         cursor: query.cursor ? decodePartnerCursor(query.cursor) : undefined,
         limit: limit + 1,
       });
@@ -202,21 +255,19 @@ export function createDiscoveryService(deps: {
     async get(viewerId, partnerId) {
       if (viewerId === partnerId) throw notFound();
       const today = todayInIndia();
-      const { viewer, preferences } = await loadViewer(viewerId, today);
       // The same eligibility rules as the list (no optional filters). Anyone who is blocked,
-      // reported, hidden, inactive or outside the mutual preferences is a plain 404.
-      const rows = await runQuery({
-        viewer,
-        today,
-        minAge: preferences.ageMin,
-        maxAge: preferences.ageMax,
-        verifiedOnly: false,
-        targetId: partnerId,
-        limit: 1,
-      });
-      const [partner] = await hydrate(viewer, rows, today);
+      // reported, hidden, inactive or outside the mutual preferences is a plain 404. Members
+      // already matched or with a pending interest ARE shown (with their connection status).
+      const { viewer, row } = await findEligible(viewerId, partnerId, today);
+      const [partner] = await hydrate(viewer, row ? [row] : [], today);
       if (!partner) throw notFound();
       return partner;
+    },
+
+    async isEligible(viewerId, targetId) {
+      if (viewerId === targetId) return false;
+      const { row } = await findEligible(viewerId, targetId, todayInIndia());
+      return row !== undefined;
     },
   };
 }

@@ -45,7 +45,7 @@ Tests assert the exact response key sets and that phone numbers, dates of birth,
 - **Mutual preferences:** a member is only shown to people whose gender and age fit **their** preferences, and vice versa. Filters can narrow but never widen the viewer's own preferences.
 - **Opt-in:** only members with discovery turned on appear.
 - **Blocks** hide both members from each other everywhere discovery and profiles are served (`/partners`, `/partners/:id`, `/users/:id/profile`). The blocked member is never told: every unavailable profile returns the same `404`.
-- **Reports:** the reporter never sees the reported member again (even without blocking). Serious reports (`underage`, `safety_threat`) or three reporters within seven days hide the member from **everyone** until a moderator reviews.
+- **Reports:** the two members never see each other again (even without blocking), and any pending interest or match between them ends. Serious reports (`underage`, `safety_threat`) or three reporters within seven days hide the member from **everyone** until a moderator reviews.
 - **Sanctions:** suspended, banned and pending-deletion members neither appear nor can browse.
 
 ## 5. Abuse and scraping controls

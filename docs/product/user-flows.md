@@ -275,6 +275,8 @@ The viewer must also be eligible: active and onboarded. If `discovery_enabled = 
 
 ## 7. Interest and matching flow
 
+> **Implemented** ([interests](../matching/interests.md), [matches](../matching/matches.md)). Differences: `decline` is `POST /interests/:id/reject`, withdraw is `DELETE /interests/:id`, and the pending-interest uniqueness covers the **unordered** pair. Notifications and chat arrive in later phases.
+
 The model is **request → accept**. The receiver decides whether a conversation happens.
 
 ```mermaid

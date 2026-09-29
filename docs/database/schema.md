@@ -2,7 +2,7 @@
 
 > **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
 
-Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `partner_interests`, `matches`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
 
 ## 1. ERD
 
@@ -27,6 +27,31 @@ erDiagram
     users ||--o{ event_attendances : "attends"
     users ||--o{ blocks : "blocks / is blocked"
     users ||--o{ reports : "reports / is reported"
+    users ||--o{ partner_interests : "sends / receives"
+    events |o--o{ partner_interests : "context"
+    partner_interests |o--o| matches : "creates"
+    users ||--o{ matches : "user_a / user_b"
+    admin_users |o--o{ matches : "closes"
+
+    partner_interests {
+        uuid id PK
+        uuid sender_id FK
+        uuid receiver_id FK
+        uuid event_id FK "nullable"
+        varchar20 status "one pending per unordered pair"
+        timestamptz expires_at
+        timestamptz responded_at
+    }
+
+    matches {
+        uuid id PK
+        uuid user_a_id FK "user_a_id < user_b_id"
+        uuid user_b_id FK
+        uuid interest_id FK "unique"
+        uuid event_id FK "nullable"
+        varchar20 status "one active per pair"
+        timestamptz ended_at
+    }
 
     event_attendances {
         uuid id PK
@@ -284,6 +309,7 @@ Account record. Personal details live in `user_profiles`, and settings in `user_
 | `photo_verified_at` | timestamptz | yes | | Cached projection of an approved photo verification |
 | `hidden_from_discovery` | boolean | no | `false` | Auto-hide after reports |
 | `hidden_reason` | varchar(30) | yes | | `p0_report`, `report_threshold`, `no_visible_photo` |
+| `interactions_restricted_at` | timestamptz | yes | | Admin safety restriction: can't send or accept interests ([matches §5](../matching/matches.md#5-admin-moderation)) |
 | `terms_version` / `terms_accepted_at` | varchar(20) / timestamptz | yes | | Both set or both null |
 | `last_active_at` | timestamptz | yes | | Never exposed precisely to other members |
 | `deletion_requested_at` | timestamptz | yes | | Start of the 30-day grace period |
@@ -545,7 +571,43 @@ Migration `20260929110000-create-event-attendances`. See [discovery](../matching
 
 Constraints: `event_attendances_event_user_unique (event_id, user_id)`, status check. Indexes: `event_attendances_looking_event_idx (event_id, user_id) WHERE looking_for_partner` (event mode), `event_attendances_looking_user_idx (user_id, event_id) WHERE looking_for_partner` (same-event signal), `(user_id, created_at DESC)`.
 
-### 4.14 Safety tables: `blocks`, `reports`, `safety_logs`
+### 4.14 `partner_interests`
+
+Migration `20260929120000-create-partner-interests`. See [interests](../matching/interests.md).
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `sender_id` / `receiver_id` | uuid | no | | FK → `users.id` `ON DELETE CASCADE`. Check: not the same |
+| `event_id` | uuid | yes | | FK → `events.id` `ON DELETE SET NULL`. Only when both were looking for a partner at it |
+| `status` | varchar(20) | no | `'pending'` | `pending` \| `accepted` \| `declined` \| `withdrawn` \| `cancelled` \| `expired` |
+| `expires_at` | timestamptz | no | | created + 14 days. Check: after `created_at` |
+| `responded_at` | timestamptz | yes | | Check: set exactly when `status <> 'pending'` |
+| `created_at` / `updated_at` | timestamptz | no | `now()` | `updated_at` trigger |
+
+Indexes: **`partner_interests_one_pending_per_pair_unique`** on `(LEAST(sender_id, receiver_id), GREATEST(sender_id, receiver_id)) WHERE status = 'pending'` (one pending interest per unordered pair); `(receiver_id, created_at DESC, id DESC) WHERE pending` and `(sender_id, created_at DESC, id DESC) WHERE pending` (lists); `(sender_id, created_at DESC)` (daily limit); `(sender_id, receiver_id, responded_at) WHERE declined` (cooldown); partial `(event_id)`.
+
+### 4.15 `matches`
+
+Migration `20260929120100-create-matches`. See [matches](../matching/matches.md).
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `user_a_id` / `user_b_id` | uuid | no | | FK → `users.id` `ON DELETE CASCADE`. Check **`user_a_id < user_b_id`** (canonical order) |
+| `interest_id` | uuid | yes | | FK → `partner_interests.id` `ON DELETE SET NULL`. **Unique** |
+| `event_id` | uuid | yes | | FK → `events.id` `ON DELETE SET NULL` |
+| `status` | varchar(20) | no | `'active'` | `active` \| `unmatched` \| `blocked` \| `closed` |
+| `ended_at` | timestamptz | yes | | Check: set exactly when not `active` |
+| `ended_by_user_id` | uuid | yes | | FK → `users.id` `ON DELETE SET NULL`. Internal only |
+| `ended_by_admin_id` | uuid | yes | | FK → `admin_users.id` `ON DELETE RESTRICT` (moderation) |
+| `created_at` / `updated_at` | timestamptz | no | `now()` | `updated_at` trigger |
+
+Indexes: **`matches_one_active_per_pair_unique (user_a_id, user_b_id) WHERE status = 'active'`**, `(user_a_id, created_at DESC, id DESC)`, `(user_b_id, created_at DESC, id DESC)`, partial `(event_id)`, partial `(ended_by_admin_id)`.
+
+Migration `20260929120200-add-interaction-restrictions` also adds **`users.interactions_restricted_at`** (admin safety restriction: can't send or accept interests) and allows audit `target_type = 'match'`.
+
+### 4.16 Safety tables: `blocks`, `reports`, `safety_logs`
 
 Created by the safety-phase migrations `20260928110100-create-blocks`, `…110200-create-reports`, `…110300-create-safety-logs`. Blocks and reports are served by the API from the discovery phase on ([discovery §3](../matching/discovery.md#block-and-report-wired-in-this-phase)).
 
@@ -555,7 +617,7 @@ Created by the safety-phase migrations `20260928110100-create-blocks`, `…11020
 | `reports` | `source` (`member`\|`system`), `reporter_id` (FK `SET NULL`), `reported_user_id` (FK `RESTRICT`), `reason`, `priority` 0–2, `details`, `evidence` jsonb (profile snapshot), `status` (`open`\|`in_review`\|`resolved`\|`dismissed`), assignment/resolution columns (FK → admin_users `RESTRICT`) | Reason/priority/status/resolution checks, partial unique **one open report per pair**, queue index `(status, priority, created_at, id)`, `(reported_user_id, created_at DESC)`, `(reporter_id, created_at DESC)`, `reports_reporter_reported_idx` (discovery) |
 | `safety_logs` | `event_type`, `severity`, `user_id`, `admin_id` (no FKs: kept after deletion), `ip_hash` (HMAC), `metadata` | **Append-only** trigger; indexes on `created_at`, `(user_id, created_at)`, `(event_type, created_at)`, critical events |
 
-### 4.15 Discovery indexes
+### 4.17 Discovery indexes
 
 Migration `20260929110100-add-discovery-indexes` ([matching logic §6](../matching/matching-logic.md#6-query-and-indexes)):
 
@@ -566,7 +628,7 @@ Migration `20260929110100-add-discovery-indexes` ([matching logic §6](../matchi
 | `user_profiles_available_dates_gin_idx` | `user_profiles USING gin (available_dates)` |
 | `reports_reporter_reported_idx` | `reports (reporter_id, reported_user_id) WHERE reporter_id IS NOT NULL` |
 
-### 4.16 Bookkeeping tables
+### 4.18 Bookkeeping tables
 
 | Table | Created by | Content |
 |---|---|---|

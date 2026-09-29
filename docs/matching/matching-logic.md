@@ -19,7 +19,10 @@ A candidate appears only if **all** of these hold:
 | 4 | Not hidden pending review (P0 report or 3 reporters in 7 days) | `NOT u.hidden_from_discovery` |
 | 5 | Opted in to discovery | `pr.discovery_enabled` |
 | 6 | **No block in either direction** | `NOT EXISTS (blocks …)` both ways |
-| 7 | Not reported by the viewer (any status) | `NOT EXISTS (reports WHERE reporter = viewer AND reported = candidate)` |
+| 7 | No report between the two, in either direction (any status) | `NOT EXISTS (reports …)` both ways |
+| 7a | Not under an admin interaction restriction | `u.interactions_restricted_at IS NULL` |
+| 7b | The viewer's interest to them wasn't declined in the last 30 days | `NOT EXISTS (partner_interests … status = 'declined' AND responded_at > now() − 30 days)` |
+| 7c | **List only:** not already matched, and no pending interest from the viewer | `NOT EXISTS (matches …)`, `NOT EXISTS (partner_interests … pending)`. The profile endpoint still shows them, with their `connection` |
 | 8 | **Mutual gender preference** | candidate's gender ∈ viewer's preference **and** viewer's gender ∈ candidate's preference |
 | 9 | **Mutual age preference** | candidate's age ∈ viewer's range (optionally narrowed by filters) **and** viewer's age ∈ candidate's range |
 | 10 | Filters (optional) | city, Garba levels, available date, verified only, event mode |

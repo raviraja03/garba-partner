@@ -106,7 +106,7 @@ export function useTestDatabase(): () => Sequelize {
   beforeEach(async () => {
     // Reference data (cities, areas) is kept; everything user- and admin-generated is emptied.
     await sequelize?.query(
-      'TRUNCATE users, otp_requests, admin_users, events, event_organizers, event_attendances, safety_logs CASCADE',
+      'TRUNCATE users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, safety_logs CASCADE',
     );
   });
 

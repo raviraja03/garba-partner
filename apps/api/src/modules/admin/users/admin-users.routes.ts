@@ -49,5 +49,25 @@ export function createAdminUsersRouter(deps: {
     ok(res, await service.reactivate(actor(req), userId, reason), 'User reactivated');
   });
 
+  router.post('/:userId/restrict-interactions', ...canSanction, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const { reason } = parseInput(adminUserActionSchema, req.body);
+    ok(
+      res,
+      await service.restrictInteractions(actor(req), userId, reason),
+      'Interactions restricted',
+    );
+  });
+
+  router.post('/:userId/lift-interaction-restriction', ...canSanction, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const { reason } = parseInput(adminUserActionSchema, req.body);
+    ok(
+      res,
+      await service.liftInteractionRestriction(actor(req), userId, reason),
+      'Restriction lifted',
+    );
+  });
+
   return router;
 }

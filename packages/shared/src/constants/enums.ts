@@ -140,6 +140,7 @@ export const SAFETY_EVENT_TYPES = [
   'safety.report_created',
   'safety.report_limit_reached',
   'safety.auto_hidden',
+  'interest.limit_reached',
   'verification.start_limit_reached',
   'verification.webhook_rejected',
   'verification.underage_detected',
@@ -186,3 +187,33 @@ export const MATCH_HIGHLIGHTS = [
   'verified',
 ] as const;
 export type MatchHighlight = (typeof MATCH_HIGHLIGHTS)[number];
+
+// --- Interests & matches (docs/matching/interests.md, docs/matching/matches.md) --------------
+
+/**
+ * `pending` → `accepted` (match created) | `declined` (receiver said no; the sender is never
+ * told) | `withdrawn` (sender took it back) | `cancelled` (block, report, restriction or
+ * ineligibility) | `expired` (no answer within `LIMITS.INTEREST_EXPIRY_DAYS`).
+ */
+export const INTEREST_STATUSES = [
+  'pending',
+  'accepted',
+  'declined',
+  'withdrawn',
+  'cancelled',
+  'expired',
+] as const;
+export type InterestStatus = (typeof INTEREST_STATUSES)[number];
+
+/** `unmatched` = a member ended it; `blocked` = ended by a block; `closed` = report or moderation. */
+export const MATCH_STATUSES = ['active', 'unmatched', 'blocked', 'closed'] as const;
+export type MatchStatus = (typeof MATCH_STATUSES)[number];
+
+/** The viewer's relationship with another member, as shown on a partner profile. */
+export const CONNECTION_STATUSES = [
+  'none',
+  'interest_sent',
+  'interest_received',
+  'matched',
+] as const;
+export type ConnectionStatus = (typeof CONNECTION_STATUSES)[number];

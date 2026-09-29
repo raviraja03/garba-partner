@@ -14,6 +14,8 @@ import { createAdminAuthController } from './modules/admin/auth/admin-auth.contr
 import { createAdminAuthRouter } from './modules/admin/auth/admin-auth.routes.js';
 import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.js';
 import { createAdminEventsRouter } from './modules/admin/events/admin-events.routes.js';
+import { createAdminMatchesRouter } from './modules/admin/matches/admin-matches.routes.js';
+import { createAdminMatchesService } from './modules/admin/matches/admin-matches.service.js';
 import { createAdminEventsService } from './modules/admin/events/admin-events.service.js';
 import { createAdminOrganizersRouter } from './modules/admin/organizers/admin-organizers.routes.js';
 import { createAdminOrganizersService } from './modules/admin/organizers/admin-organizers.service.js';
@@ -33,6 +35,12 @@ import { createAttendanceService } from './modules/events/attendance.service.js'
 import { createEventsRouter } from './modules/events/events.routes.js';
 import { createEventsService } from './modules/events/events.service.js';
 import type { HealthDependencies } from './modules/health/health.controller.js';
+import {
+  createInterestsRouter,
+  createMatchesRouter,
+} from './modules/interests/interests.routes.js';
+import { createInterestsService } from './modules/interests/interests.service.js';
+import { createMatchesService } from './modules/interests/matches.service.js';
 import { createHealthRouter } from './modules/health/health.routes.js';
 import { createLocationsRouter } from './modules/locations/locations.routes.js';
 import { createProfileController } from './modules/profiles/profile.controller.js';
@@ -133,10 +141,11 @@ export function createApiRouter(options: {
     }),
   );
   router.use('/me', createMyAttendanceRouter({ service: attendance, authenticateMember }));
+  const discovery = createDiscoveryService({ sequelize, media });
   router.use(
     '/partners',
     createDiscoveryRouter({
-      service: createDiscoveryService({ sequelize, media }),
+      service: discovery,
       authenticateMember,
       limiter: createMemberRateLimiter({
         windowMs: 60 * 1000,
@@ -147,6 +156,25 @@ export function createApiRouter(options: {
 
   // Blocking and reporting (docs/safety): required before any member-to-member feature.
   const safetyLog = createSafetyLogger({ ipHashSecret: env.OTP_HMAC_SECRET, logger });
+
+  // Interests and matches (docs/matching/interests.md, docs/matching/matches.md).
+  const matches = createMatchesService({ sequelize, media });
+  const interestLimiter = createMemberRateLimiter({
+    windowMs: 60 * 1000,
+    limit: LIMITS.INTEREST_ACTIONS_PER_MINUTE,
+  });
+  router.use(
+    '/interests',
+    createInterestsRouter({
+      service: createInterestsService({ sequelize, media, discovery, matches, safetyLog }),
+      authenticateMember,
+      limiter: interestLimiter,
+    }),
+  );
+  router.use(
+    '/matches',
+    createMatchesRouter({ service: matches, authenticateMember, limiter: interestLimiter }),
+  );
   const safety = createSafetyRouters({
     blocks: createBlocksService({ sequelize, media, safetyLog }),
     reports: createReportsService({ sequelize, safetyLog }),
@@ -168,6 +196,13 @@ export function createApiRouter(options: {
         windowMs: 60 * 1000,
         limit: LIMITS.PUBLIC_EVENT_REQUESTS_PER_MINUTE,
       }),
+    }),
+  );
+  router.use(
+    '/admin',
+    createAdminMatchesRouter({
+      service: createAdminMatchesService({ sequelize, env }),
+      authenticateAdmin,
     }),
   );
   router.use(

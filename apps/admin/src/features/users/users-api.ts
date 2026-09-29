@@ -1,4 +1,5 @@
 import type {
+  AdminMatchDto,
   AdminUserDetailDto,
   AdminUserListItemDto,
   ApiSuccess,
@@ -43,6 +44,22 @@ export const suspendUser = (userId: string, reason: string) =>
     body: { reason },
     authenticated: true,
   });
+
+export const fetchUserMatches = (userId: string) =>
+  api<AdminMatchDto[]>(`/admin/users/${userId}/matches`, { authenticated: true });
+
+export const closeMatch = (matchId: string, reason: string) =>
+  api<AdminMatchDto>(`/admin/matches/${matchId}/close`, {
+    method: 'POST',
+    body: { reason },
+    authenticated: true,
+  });
+
+export const setInteractionRestriction = (userId: string, restrict: boolean, reason: string) =>
+  api<AdminUserDetailDto>(
+    `/admin/users/${userId}/${restrict ? 'restrict-interactions' : 'lift-interaction-restriction'}`,
+    { method: 'POST', body: { reason }, authenticated: true },
+  );
 
 export const reactivateUser = (userId: string, reason: string) =>
   api<AdminUserDetailDto>(`/admin/users/${userId}/reactivate`, {

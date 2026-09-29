@@ -87,6 +87,10 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   })
   hiddenReason!: CreationOptional<HiddenReason | null>;
 
+  /** Admin safety restriction: cannot send or accept interests (docs/matching/matches.md). */
+  @Column({ type: DataType.DATE, allowNull: true })
+  interactionsRestrictedAt!: CreationOptional<Date | null>;
+
   @Column({ type: DataType.STRING(20), allowNull: true })
   termsVersion!: CreationOptional<string | null>;
 

@@ -27,8 +27,10 @@ export interface CandidateQuery {
   cityId?: string | undefined;
   garbaLevels?: readonly GarbaLevel[] | undefined;
   date?: string | undefined;
-  /** Partner detail: restrict to one candidate. */
+  /** Partner detail / eligibility checks: restrict to one candidate. */
   targetId?: string | undefined;
+  /** List mode: leave out active matches and pending interests the viewer already sent. */
+  excludeConnected?: boolean | undefined;
   cursor?: PartnerCursor | undefined;
   limit: number;
 }
@@ -115,6 +117,7 @@ export function buildCandidateQuery(query: CandidateQuery): {
     minAge: query.minAge,
     maxAgePlusOne: query.maxAge + 1,
     similarAge: LIMITS.SIMILAR_AGE_YEARS,
+    declineCooldownDays: LIMITS.INTEREST_DECLINE_COOLDOWN_DAYS,
     limit: query.limit,
   };
 
@@ -132,9 +135,16 @@ export function buildCandidateQuery(query: CandidateQuery): {
     `NOT EXISTS (SELECT 1 FROM blocks b
        WHERE (b.blocker_id = :viewerId AND b.blocked_id = u.id)
           OR (b.blocker_id = u.id AND b.blocked_id = :viewerId))`,
-    // Never suggest someone the viewer has reported.
+    // No report between the two, in either direction (a report separates them like a block).
     `NOT EXISTS (SELECT 1 FROM reports r
-       WHERE r.reporter_id = :viewerId AND r.reported_user_id = u.id)`,
+       WHERE (r.reporter_id = :viewerId AND r.reported_user_id = u.id)
+          OR (r.reporter_id = u.id AND r.reported_user_id = :viewerId))`,
+    // Not under an admin interaction restriction (they can't send or accept interests).
+    'u.interactions_restricted_at IS NULL',
+    // The viewer's interest to this member was declined recently: leave them out silently.
+    `NOT EXISTS (SELECT 1 FROM partner_interests di
+       WHERE di.sender_id = :viewerId AND di.receiver_id = u.id AND di.status = 'declined'
+         AND di.responded_at > now() - make_interval(days => :declineCooldownDays))`,
     // Mutual gender preference.
     'p.gender IN (:acceptedGenders)',
     'pr.partner_gender_preference IN (:acceptingPreferences)',
@@ -165,6 +175,19 @@ export function buildCandidateQuery(query: CandidateQuery): {
     where.push(`EXISTS (SELECT 1 FROM event_attendances ea
        WHERE ea.event_id = :eventId AND ea.user_id = u.id AND ea.looking_for_partner)`);
     replacements.eventId = query.eventId;
+  }
+  if (query.excludeConnected) {
+    // List mode: members already matched with the viewer, or with a pending interest FROM the
+    // viewer, appear in Matches / Sent instead.
+    where.push(
+      `NOT EXISTS (SELECT 1 FROM matches m
+         WHERE m.status = 'active'
+           AND m.user_a_id = LEAST(CAST(:viewerId AS uuid), u.id)
+           AND m.user_b_id = GREATEST(CAST(:viewerId AS uuid), u.id))`,
+      `NOT EXISTS (SELECT 1 FROM partner_interests si
+         WHERE si.sender_id = :viewerId AND si.receiver_id = u.id AND si.status = 'pending'
+           AND si.expires_at > now())`,
+    );
   }
   if (query.targetId) {
     where.push('u.id = :targetId');

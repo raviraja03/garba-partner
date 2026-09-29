@@ -54,6 +54,25 @@ export const ERROR_CODES = {
     httpStatus: 409,
     message: "Turn on 'Looking for a partner' for this event to see who else is.",
   },
+
+  // Interests & matches (docs/matching/interests.md)
+  /** Generic on purpose: never reveals a block, report, decline or sanction. */
+  USER_UNAVAILABLE: { httpStatus: 404, message: 'This member is not available.' },
+  DISCOVERY_DISABLED: {
+    httpStatus: 403,
+    message: 'Turn on discovery in your preferences to send interests.',
+  },
+  INTERACTIONS_RESTRICTED: {
+    httpStatus: 403,
+    message:
+      "You can't send or accept interests right now. Contact support if you think this is a mistake.",
+  },
+  INTEREST_LIMIT_REACHED: {
+    httpStatus: 429,
+    message: "You've sent a lot of interests today. Please try again tomorrow.",
+  },
+  INTEREST_NOT_PENDING: { httpStatus: 409, message: 'This interest is no longer pending.' },
+  ALREADY_MATCHED: { httpStatus: 409, message: 'You have already matched with this member.' },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

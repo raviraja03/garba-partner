@@ -4,6 +4,7 @@ import type {
   VerificationStatus,
   VerificationType,
 } from '../../constants/enums.js';
+import type { AdminConnectionSummaryDto } from './interest.dto.js';
 import type { OwnProfileDto, PreferencesDto, ProfileCompletionDto } from './profile.dto.js';
 
 /** Row of `GET /api/v1/admin/users`. Never contains the phone number. */
@@ -31,6 +32,9 @@ export interface AdminUserDetailDto {
   /** Open or in-review reports against this member. */
   openReportCount: number;
   hiddenFromDiscovery: boolean;
+  /** Admin safety restriction: cannot send or accept interests (docs/matching/matches.md). */
+  interactionsRestricted: boolean;
+  connections: AdminConnectionSummaryDto;
   termsVersion: string | null;
   createdAt: string;
   lastActiveAt: string | null;

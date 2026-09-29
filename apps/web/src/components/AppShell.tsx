@@ -8,6 +8,8 @@ const MEMBER_NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/events', label: 'Events', end: false },
   { to: '/discover', label: 'Discover', end: false },
+  { to: '/interests', label: 'Interests', end: false },
+  { to: '/matches', label: 'Matches', end: false },
   { to: '/profile', label: 'My profile', end: true },
 ] as const;
 
@@ -34,7 +36,10 @@ export function AppShell() {
         <Link to={authenticated ? '/' : '/events'} className="text-lg font-bold text-brand-700">
           {APP_NAME}
         </Link>
-        <nav aria-label="Main" className="flex items-center gap-4 text-sm">
+        <nav
+          aria-label="Main"
+          className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm"
+        >
           {nav.map((item) => (
             <NavLink
               key={item.to}

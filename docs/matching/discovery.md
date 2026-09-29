@@ -123,7 +123,7 @@ Suspended members can still block and report. Blocks and reports take effect in 
 | Route | Contents |
 |---|---|
 | `/discover` | Filters (event you're looking at, city with "All cities", available date, age min/max, Garba level, **Verified only**), partner cards, "Show more". Filters live in the URL. A note explains that suggestions are simple signals, not a verdict on compatibility or safety. Members browsing with discovery off see a "you're hidden" notice |
-| `/partners/:id` | Profile card (public fields and badges), "Why you're seeing …" (highlights, shared events and dates), **Send interest** (shows "launching soon" until interests ship), **Block** (confirm), **Report** (reason, details, "also block"), safety tips |
+| `/partners/:id` | Profile card (public fields and badges), "Why you're seeing …" (highlights, shared events and dates), **Send interest** / pending / Accept / Decline / view match ([interests](interests.md)), **Block** (confirm), **Report** (reason, details, "also block"), safety tips |
 | `/events/:slug/find-partner` | Going / Interested + "I'm looking for a partner for this event" → "See who's looking for a partner here" (event-mode Discover) |
 
 Blocked, hidden or unavailable profiles show "This profile isn't available". After blocking or reporting, the member disappears from Discover.
@@ -163,7 +163,7 @@ npm run test -w @garba-partner/shared
 
 ## 8. Known limitations
 
-- Interests, matches and chat are not built yet, so "Send interest" is a placeholder and the "no active match / pending interest / recent decline" exclusions from [user flows §6.1](../product/user-flows.md#61-eligibility-filter-applied-server-side-to-every-candidate-in-both-modes) are not applied yet.
+- Chat is not built yet. Interests and matches are covered in [interests](interests.md) and [matches](matches.md); since then the list also leaves out active matches, pending sent interests and recent declines, and every `PartnerDto` carries a `connection` (`none` | `interest_sent` | `interest_received` | `matched`).
 - Photo moderation doesn't exist yet; "has a photo" is the photo rule for now.
 - The admin reports queue, the safety centre and the `docs/safety/` documents are still pending from the safety phase.
 - Ranking uses one query per page with the score computed per request. Fine for launch-city volumes; revisit with real data (see [matching logic §7](matching-logic.md#7-scaling-notes)).

@@ -8,6 +8,7 @@ import {
 } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
 import { Block, Report, User, UserProfile } from '../../models/index.js';
+import { endConnections, lockPair } from '../interests/connections.js';
 import type { SafetyLogger } from './safety-log.service.js';
 import { hideFromDiscovery } from './sanctions.js';
 
@@ -66,6 +67,7 @@ export function createReportsService(deps: {
       const alsoBlock = input.alsoBlock ?? true;
 
       const outcome = await sequelize.transaction(async (transaction) => {
+        await lockPair(sequelize, reporterId, input.reportedUserId, transaction);
         const existing = await Report.findOne({
           where: {
             reporterId,
@@ -114,6 +116,14 @@ export function createReportsService(deps: {
           });
           blocked = true;
         }
+        // A report separates the two members (like a block): pending interests are cancelled
+        // and any active match ends, whether or not the reporter also blocked.
+        await endConnections(
+          reporterId,
+          input.reportedUserId,
+          { matchStatus: blocked ? 'blocked' : 'closed', endedByUserId: reporterId },
+          transaction,
+        );
 
         let hiddenReason: 'p0_report' | 'report_threshold' | null = null;
         if (!existing) {

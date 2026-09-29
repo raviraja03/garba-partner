@@ -13,6 +13,7 @@ export const AUDIT_TARGET_TYPES = [
   'area',
   'sanction',
   'organizer',
+  'match',
 ] as const;
 export type AuditTargetType = (typeof AUDIT_TARGET_TYPES)[number];
 

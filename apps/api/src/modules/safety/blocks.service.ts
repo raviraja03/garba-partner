@@ -3,6 +3,7 @@ import type { BlockedMemberDto } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
 import { Block, User, UserProfile } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
+import { endConnections, lockPair } from '../interests/connections.js';
 import type { SafetyLogger } from './safety-log.service.js';
 
 export interface BlocksService {
@@ -21,7 +22,7 @@ export function createBlocksService(deps: {
   media: MediaStorage;
   safetyLog: SafetyLogger;
 }): BlocksService {
-  const { media, safetyLog } = deps;
+  const { sequelize, media, safetyLog } = deps;
 
   return {
     async block(blockerId, targetUserId, ip) {
@@ -33,9 +34,21 @@ export function createBlocksService(deps: {
       const target = await User.findByPk(targetUserId, { attributes: ['id'] });
       if (!target) throw new AppError('NOT_FOUND', { message: 'Member not found.' });
 
-      const [, created] = await Block.findOrCreate({
-        where: { blockerId, blockedId: targetUserId },
-        defaults: { blockerId, blockedId: targetUserId },
+      const created = await sequelize.transaction(async (transaction) => {
+        await lockPair(sequelize, blockerId, targetUserId, transaction);
+        const [, isNew] = await Block.findOrCreate({
+          where: { blockerId, blockedId: targetUserId },
+          defaults: { blockerId, blockedId: targetUserId },
+          transaction,
+        });
+        // A block ends everything between the two: pending interests and any active match.
+        await endConnections(
+          blockerId,
+          targetUserId,
+          { matchStatus: 'blocked', endedByUserId: blockerId },
+          transaction,
+        );
+        return isNew;
       });
       if (created) {
         await safetyLog.record({

@@ -7,7 +7,9 @@ import { City } from './city.model.js';
 import { EventAttendance } from './event-attendance.model.js';
 import { EventOrganizer } from './event-organizer.model.js';
 import { Event } from './event.model.js';
+import { Match } from './match.model.js';
 import { OtpRequest } from './otp-request.model.js';
+import { PartnerInterest } from './partner-interest.model.js';
 import { Report } from './report.model.js';
 import { SafetyLog } from './safety-log.model.js';
 import { UserPreference } from './user-preference.model.js';
@@ -29,7 +31,9 @@ export { City } from './city.model.js';
 export { EventAttendance } from './event-attendance.model.js';
 export { EventOrganizer, ORGANIZER_PUBLIC_ATTRIBUTES } from './event-organizer.model.js';
 export { Event } from './event.model.js';
+export { canonicalPair, Match } from './match.model.js';
 export { OtpRequest } from './otp-request.model.js';
+export { PartnerInterest } from './partner-interest.model.js';
 export { Report, type ReportEvidence } from './report.model.js';
 export { SafetyLog } from './safety-log.model.js';
 export { User, USER_PHONE_ATTRIBUTES } from './user.model.js';
@@ -57,4 +61,6 @@ export const MODELS = [
   EventOrganizer,
   Event,
   EventAttendance,
+  PartnerInterest,
+  Match,
 ];

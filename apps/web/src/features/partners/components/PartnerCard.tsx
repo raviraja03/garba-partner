@@ -44,6 +44,9 @@ export function PartnerCard({ partner }: { partner: PartnerDto }) {
             {profile.area ? `${profile.area.name}, ` : ''}
             {profile.city.name}
           </p>
+          {partner.connection.status === 'interest_received' && (
+            <p className="text-sm font-semibold text-accent-700">Interested in you</p>
+          )}
           <Highlights highlights={partner.highlights} />
           {partner.sharedEvents[0] && (
             <p className="text-xs text-muted">Also looking at {partner.sharedEvents[0].name}</p>

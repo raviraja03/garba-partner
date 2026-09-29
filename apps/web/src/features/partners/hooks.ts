@@ -58,13 +58,19 @@ export function useSaveAttendance(eventId: string) {
   });
 }
 
-/** Blocking/reporting removes the member from every list straight away. */
+/**
+ * Blocking/reporting removes the member from every list straight away (discovery, interests
+ * and matches: the server cancels pending interests and ends the match).
+ */
 function useSafetyMutation<TInput, TResult>(mutationFn: (input: TInput) => Promise<TResult>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: partnerKeys.all });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: partnerKeys.all }),
+        queryClient.invalidateQueries({ queryKey: ['connections'] }),
+      ]);
     },
   });
 }

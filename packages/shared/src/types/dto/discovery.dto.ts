@@ -1,4 +1,5 @@
 import type { AttendanceStatus, MatchHighlight } from '../../constants/enums.js';
+import type { ConnectionDto } from './interest.dto.js';
 import type { PublicProfileDto } from './profile.dto.js';
 
 /** An upcoming event both members are looking for a partner at (reciprocal opt-in). */
@@ -23,6 +24,8 @@ export interface PartnerDto {
   sharedDates: string[];
   /** At most `LIMITS.SHARED_EVENTS_SHOWN`, soonest first. */
   sharedEvents: SharedEventDto[];
+  /** Pending interest or active match between the viewer and this member. */
+  connection: ConnectionDto;
 }
 
 /** The member's own attendance for one event (`GET/PUT /api/v1/events/:eventId/attendance`). */

@@ -11,7 +11,10 @@ import { EventDetailPage } from './pages/EventDetailPage';
 import { EventsPage } from './pages/EventsPage';
 import { FindPartnerPage } from './pages/FindPartnerPage';
 import { HomePage } from './pages/HomePage';
+import { InterestsPage } from './pages/InterestsPage';
 import { LoginPage } from './pages/LoginPage';
+import { MatchesPage } from './pages/MatchesPage';
+import { MatchPage } from './pages/MatchPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { PartnerProfilePage } from './pages/PartnerProfilePage';
@@ -59,6 +62,9 @@ const router = createBrowserRouter([
               { path: '/events/:idOrSlug/find-partner', element: <FindPartnerPage /> },
               { path: '/discover', element: <DiscoverPage /> },
               { path: '/partners/:userId', element: <PartnerProfilePage /> },
+              { path: '/interests', element: <InterestsPage /> },
+              { path: '/matches', element: <MatchesPage /> },
+              { path: '/matches/:matchId', element: <MatchPage /> },
             ],
           },
         ],

@@ -184,11 +184,13 @@ describe.skipIf(!hasTestDatabase)('partner discovery (integration)', () => {
       const res = await partners(viewer.accessToken);
       const [partner] = res.body.data as PartnerDto[];
       expect(Object.keys(partner ?? {}).sort()).toEqual([
+        'connection',
         'highlights',
         'profile',
         'sharedDates',
         'sharedEvents',
       ]);
+      expect(partner?.connection).toEqual({ status: 'none', interestId: null, matchId: null });
       expect(Object.keys(partner?.profile ?? {}).sort()).toEqual(PUBLIC_PROFILE_KEYS);
       expect(partner?.profile.area).toBeNull();
 
@@ -200,8 +202,9 @@ describe.skipIf(!hasTestDatabase)('partner discovery (integration)', () => {
         expect(serialized).not.toContain(candidate.phone);
         expect(serialized).not.toContain('secret.handle');
         expect(serialized).not.toContain(dobForAge(27));
+        // (`connection.status` is the viewer's own relationship, not the member's account status.)
         expect(serialized).not.toMatch(
-          /score|dateOfBirth|instagram|preferences|lastActive|status/i,
+          /score|dateOfBirth|instagram|preferences|lastActive|accountStatus|hidden|restricted/i,
         );
       }
     });

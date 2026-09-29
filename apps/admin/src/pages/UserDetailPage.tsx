@@ -5,6 +5,7 @@ import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { FullPageSpinner } from '../components/FullPageSpinner';
 import { useAdminAuth } from '../features/auth/auth-context';
+import { ConnectionsPanel } from '../features/users/ConnectionsPanel';
 import { useUser, useUserStatusAction } from '../features/users/hooks';
 import { AccountStatusBadge, ProfileStatusBadge } from '../features/users/StatusBadge';
 
@@ -197,6 +198,8 @@ export function UserDetailPage() {
               ['Onboarded', formatDateTime(data.onboardingCompletedAt)],
               ['Photo verified', data.photoVerified ? 'Yes' : 'No'],
               ['Hidden from discovery', data.hiddenFromDiscovery ? 'Yes' : 'No'],
+              ['Interactions restricted', data.interactionsRestricted ? 'Yes' : 'No'],
+              ['Open reports', String(data.openReportCount)],
               ['Terms version', data.termsVersion ?? '—'],
               ['Active sessions', String(data.activeSessionCount)],
               ['Deletion requested', formatDateTime(data.deletionRequestedAt)],
@@ -234,6 +237,8 @@ export function UserDetailPage() {
           )}
         </Section>
       </div>
+
+      <ConnectionsPanel user={data} canSanction={canSanction} />
 
       <p className="text-xs text-muted">
         The member&apos;s mobile number is never shown here. Revealing it is a separate,

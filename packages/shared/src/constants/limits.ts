@@ -83,6 +83,17 @@ export const LIMITS = {
   SHARED_EVENTS_SHOWN: 3,
   ATTENDANCE_CHANGES_PER_HOUR: 60,
 
+  // Interests and matches (docs/matching/interests.md)
+  /** Rolling 24 hours, enforced in the database. */
+  INTERESTS_PER_DAY: 25,
+  INTEREST_EXPIRY_DAYS: 14,
+  /** After a decline, the sender can't see or contact that member again for this long. */
+  INTEREST_DECLINE_COOLDOWN_DAYS: 30,
+  INTEREST_ACTIONS_PER_MINUTE: 30,
+  INTERESTS_PAGE_SIZE_DEFAULT: 20,
+  INTERESTS_PAGE_SIZE_MAX: 50,
+  ADMIN_MATCHES_SHOWN: 50,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

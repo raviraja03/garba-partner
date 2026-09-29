@@ -5,6 +5,7 @@ import {
   LIMITS,
   normalizeIndianMobile,
   todayInIndia,
+  type AdminConnectionSummaryDto,
   type AdminUserDetailDto,
   type AdminUserListItemDto,
   type AdminUserListQueryData,
@@ -17,6 +18,8 @@ import { escapeLike } from '../../../lib/sql.js';
 import {
   Area,
   City,
+  Match,
+  PartnerInterest,
   Report,
   User,
   UserPreference,
@@ -30,6 +33,7 @@ import {
   toOwnProfileDto,
   toPreferencesDto,
 } from '../../profiles/profile.mapper.js';
+import { cancelPendingInterestsOf } from '../../interests/connections.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -46,6 +50,16 @@ export interface AdminUsersService {
   get(userId: string): Promise<AdminUserDetailDto>;
   suspend(actor: AdminActor, userId: string, reason: string): Promise<AdminUserDetailDto>;
   reactivate(actor: AdminActor, userId: string, reason: string): Promise<AdminUserDetailDto>;
+  restrictInteractions(
+    actor: AdminActor,
+    userId: string,
+    reason: string,
+  ): Promise<AdminUserDetailDto>;
+  liftInteractionRestriction(
+    actor: AdminActor,
+    userId: string,
+    reason: string,
+  ): Promise<AdminUserDetailDto>;
 }
 
 export function createAdminUsersService(deps: {
@@ -63,11 +77,76 @@ export function createAdminUsersService(deps: {
     return { '$profile.display_name$': { [Op.iLike]: `%${escapeLike(q)}%` } };
   }
 
+  /** Counts only: moderators see the shape of a member's activity, never private content. */
+  async function connectionSummary(userId: string): Promise<AdminConnectionSummaryDto> {
+    const now = new Date();
+    const [activeMatches, pendingInterestsSent, pendingInterestsReceived, interestsSentLast24h] =
+      await Promise.all([
+        Match.count({
+          where: { status: 'active', [Op.or]: [{ userAId: userId }, { userBId: userId }] },
+        }),
+        PartnerInterest.count({
+          where: { senderId: userId, status: 'pending', expiresAt: { [Op.gt]: now } },
+        }),
+        PartnerInterest.count({
+          where: { receiverId: userId, status: 'pending', expiresAt: { [Op.gt]: now } },
+        }),
+        PartnerInterest.count({
+          where: {
+            senderId: userId,
+            createdAt: { [Op.gt]: new Date(now.getTime() - 24 * 60 * 60 * 1000) },
+          },
+        }),
+      ]);
+    return { activeMatches, pendingInterestsSent, pendingInterestsReceived, interestsSentLast24h };
+  }
+
+  /** Admin safety restriction: no sending or accepting interests (docs/matching/matches.md). */
+  async function setInteractionRestriction(
+    actor: AdminActor,
+    userId: string,
+    reason: string,
+    restricted: boolean,
+  ): Promise<AdminUserDetailDto> {
+    await sequelize.transaction(async (transaction) => {
+      const user = await User.findByPk(userId, { lock: transaction.LOCK.UPDATE, transaction });
+      if (!user) throw new AppError('NOT_FOUND', { message: 'User not found.' });
+      if ((user.interactionsRestrictedAt !== null) === restricted) {
+        throw new AppError('CONFLICT', {
+          message: restricted
+            ? 'This member is already restricted.'
+            : 'This member is not restricted.',
+        });
+      }
+      await user.update(
+        { interactionsRestrictedAt: restricted ? new Date() : null },
+        { transaction },
+      );
+      // Pending interests to and from a restricted member are cancelled straight away.
+      const cancelledInterests = restricted
+        ? await cancelPendingInterestsOf(userId, transaction)
+        : 0;
+      await recordAdminAction(
+        {
+          adminId: actor.adminId,
+          action: restricted ? 'user.restrict_interactions' : 'user.lift_interaction_restriction',
+          targetType: 'user',
+          targetId: userId,
+          metadata: { reason, cancelledInterests },
+          ip: actor.ip,
+        },
+        env.OTP_HMAC_SECRET,
+        transaction,
+      );
+    });
+    return getDetail(userId);
+  }
+
   async function getDetail(userId: string): Promise<AdminUserDetailDto> {
     const user = await User.findByPk(userId);
     if (!user) throw new AppError('NOT_FOUND', { message: 'User not found.' });
 
-    const [profile, preferences, activeSessionCount, verifications, openReportCount] =
+    const [profile, preferences, activeSessionCount, verifications, openReportCount, connections] =
       await Promise.all([
         UserProfile.findOne({
           where: { userId },
@@ -87,6 +166,7 @@ export function createAdminUsersService(deps: {
           limit: 10,
         }),
         Report.count({ where: { reportedUserId: userId, status: ['open', 'in_review'] } }),
+        connectionSummary(userId),
       ]);
 
     const today = todayInIndia();
@@ -100,6 +180,8 @@ export function createAdminUsersService(deps: {
       identityVerified: user.identityVerifiedAt !== null,
       openReportCount,
       hiddenFromDiscovery: user.hiddenFromDiscovery,
+      interactionsRestricted: user.interactionsRestrictedAt !== null,
+      connections,
       termsVersion: user.termsVersion,
       createdAt: user.createdAt.toISOString(),
       lastActiveAt: user.lastActiveAt?.toISOString() ?? null,
@@ -239,5 +321,11 @@ export function createAdminUsersService(deps: {
         to: 'active',
         action: 'user.reactivate',
       }),
+
+    restrictInteractions: (actor, userId, reason) =>
+      setInteractionRestriction(actor, userId, reason, true),
+
+    liftInteractionRestriction: (actor, userId, reason) =>
+      setInteractionRestriction(actor, userId, reason, false),
   };
 }
