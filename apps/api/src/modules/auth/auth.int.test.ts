@@ -364,6 +364,21 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
       expect((await refresh(rotated)).status).toBe(200);
     });
 
+    it('records member activity at most once an hour (dashboard "active users")', async () => {
+      const { cookie } = await login();
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      await User.update({ lastActiveAt: twoHoursAgo }, { where: {} });
+      const rotated = getCookie(await refresh(cookie), MEMBER_REFRESH_COOKIE);
+      const after = (await User.findOne())?.lastActiveAt?.getTime() ?? 0;
+      expect(after).toBeGreaterThan(Date.now() - 60 * 1000);
+
+      // Within the hour, refreshes don't write again.
+      const recent = new Date(Date.now() - 10 * 60 * 1000);
+      await User.update({ lastActiveAt: recent }, { where: {} });
+      await refresh(rotated).expect(200);
+      expect((await User.findOne())?.lastActiveAt?.getTime()).toBe(recent.getTime());
+    });
+
     it('detects reuse of a rotated-out token and revokes the session', async () => {
       const { cookie } = await login();
       const rotated = getCookie(await refresh(cookie), MEMBER_REFRESH_COOKIE);

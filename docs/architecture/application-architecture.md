@@ -495,7 +495,7 @@ Example: `PublicProfileDto` (what other members receive):
 | POST | `/admin/auth/setup` | *(planned)* challenge (first login): new password + TOTP enrolment confirm |
 | POST | `/admin/auth/refresh` ✅, `/admin/auth/logout` ✅ | cookie (+ `X-Requested-With: gp-admin`) / any admin |
 | GET | `/admin/auth/me` ✅ | any admin → `AdminMeDto` (incl. permissions) |
-| GET | `/admin/dashboard` | `dashboard:view` |
+| GET | `/admin/dashboard/summary`, `/trends`, `/events`, `/events/export` | ✅ `dashboard:view` + per-section permissions ([dashboard](../admin/dashboard.md)) |
 | GET | `/admin/users` ✅, `/admin/users/:id` ✅ | `users:view` |
 | POST | `/admin/users/:id/suspend` ✅, `/admin/users/:id/reactivate` ✅ | `users:sanction`: `{ reason }`, audited |
 | POST | `/admin/users/:id/sanctions` | `users:sanction` — `{ type: 'warning'\|'suspension'\|'ban', durationDays?, reason, reportId? }` |

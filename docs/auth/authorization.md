@@ -62,6 +62,8 @@ Defined once in `packages/shared/src/constants/admin.ts` (`ROLE_PERMISSIONS`). *
 | `safety_logs:view` | ✅ | ✅ | ❌ |
 | `admins:manage` | ✅ | ❌ | ❌ |
 
+The [admin dashboard](../admin/dashboard.md) is open to every role (`dashboard:view`), but each section needs the permission that governs its data (e.g. revenue needs `payments:view`).
+
 `GET /api/v1/admin/auth/me` returns the admin's `permissions`. The admin panel shows only permitted navigation items, and `RequireAdmin permission="…"` redirects on the client. This is UX only.
 
 ## 4. User/admin separation

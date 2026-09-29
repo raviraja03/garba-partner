@@ -144,6 +144,14 @@ export const LIMITS = {
   PAYMENT_VERIFICATIONS_PER_MINUTE: 30,
   BOOKINGS_PAGE_SIZE: 20,
 
+  // Admin dashboard (docs/admin/dashboard.md)
+  DASHBOARD_DEFAULT_RANGE_DAYS: 30,
+  DASHBOARD_MAX_RANGE_DAYS: 366,
+  /** Longer ranges are charted by week. */
+  DASHBOARD_DAILY_BUCKET_MAX_DAYS: 92,
+  DASHBOARD_EXPORT_MAX_ROWS: 1000,
+  DASHBOARD_EXPORTS_PER_HOUR: 20,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

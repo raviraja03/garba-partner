@@ -141,6 +141,45 @@ export async function api<TData>(path: string, options: RequestOptions = {}): Pr
   }
 }
 
+/**
+ * Authenticated file download (e.g. a CSV export). The access token stays in memory, so a plain
+ * link can't be used; this fetches the file with it and refreshes once on 401.
+ */
+export async function apiDownload(path: string): Promise<{ blob: Blob; filename: string | null }> {
+  const attempt = async () => {
+    try {
+      return await fetch(`${env.apiBaseUrl}${path}`, {
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+        credentials: 'same-origin',
+      });
+    } catch {
+      throw new ApiClientError('Unable to reach the server.', 'NETWORK_ERROR', 0);
+    }
+  };
+  let response = await attempt();
+  if (response.status === 401) {
+    try {
+      await refreshSession();
+    } catch {
+      setAccessToken(null);
+      onSessionExpired?.();
+      throw new ApiClientError('Your session has expired.', 'UNAUTHENTICATED', 401);
+    }
+    response = await attempt();
+  }
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as ApiResponse<unknown> | null;
+    throw body && !body.success
+      ? new ApiClientError(body.message, body.error.code, response.status)
+      : new ApiClientError('The download failed.', 'INTERNAL_ERROR', response.status);
+  }
+  const disposition = response.headers.get('content-disposition') ?? '';
+  return {
+    blob: await response.blob(),
+    filename: /filename="([^"]+)"/.exec(disposition)?.[1] ?? null,
+  };
+}
+
 /** Backwards-compatible GET helper. */
 export function apiGet<TData>(path: string, options: { signal?: AbortSignal } = {}) {
   return api<TData>(path, options);

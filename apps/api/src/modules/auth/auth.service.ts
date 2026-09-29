@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import type { Transaction } from 'sequelize';
+import { Op, type Transaction } from 'sequelize';
 import type { Sequelize } from 'sequelize-typescript';
 import type { ServerEnv } from '@garba-partner/config/server';
 import {
@@ -240,6 +240,20 @@ export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuth
               ipHash: hashIp(client.ip),
             },
             { transaction },
+          );
+          // Activity for the admin dashboard ("active users"): at most one write per hour.
+          await User.update(
+            { lastActiveAt: now },
+            {
+              where: {
+                id: user.id,
+                [Op.or]: [
+                  { lastActiveAt: null },
+                  { lastActiveAt: { [Op.lt]: new Date(now.getTime() - 60 * 60 * 1000) } },
+                ],
+              },
+              transaction,
+            },
           );
           return {
             kind: 'success',

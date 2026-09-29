@@ -13,6 +13,8 @@ import {
 import { createAdminAuthController } from './modules/admin/auth/admin-auth.controller.js';
 import { createAdminAuthRouter } from './modules/admin/auth/admin-auth.routes.js';
 import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.js';
+import { createAdminDashboardRouter } from './modules/admin/dashboard/admin-dashboard.routes.js';
+import { createAdminDashboardService } from './modules/admin/dashboard/admin-dashboard.service.js';
 import { createAdminEventsRouter } from './modules/admin/events/admin-events.routes.js';
 import { createAdminLogsRouter } from './modules/admin/log-viewer/admin-logs.routes.js';
 import { createAdminLogsService } from './modules/admin/log-viewer/admin-logs.service.js';
@@ -294,6 +296,19 @@ export function createApiRouter(options: {
       limiter: createMemberRateLimiter({
         windowMs: 60 * 1000,
         limit: LIMITS.NOTIFICATION_ACTIONS_PER_MINUTE,
+      }),
+    }),
+  );
+  router.use(
+    '/admin/dashboard',
+    createAdminDashboardRouter({
+      service: createAdminDashboardService({ sequelize }),
+      sequelize,
+      env,
+      authenticateAdmin,
+      exportLimiter: createIpRateLimiter({
+        windowMs: HOUR_MS,
+        limit: LIMITS.DASHBOARD_EXPORTS_PER_HOUR,
       }),
     }),
   );
