@@ -25,6 +25,7 @@ import {
 } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
 import { assertValidLocation } from '../locations/locations.service.js';
+import { isBlockedEitherWay } from '../safety/sanctions.js';
 import {
   computeCompletion,
   toOwnProfileDto,
@@ -40,7 +41,7 @@ export interface ProfileService {
   uploadImage(userId: string, file: Buffer): Promise<MyProfileDto>;
   deleteImage(userId: string): Promise<MyProfileDto>;
   getPreview(userId: string): Promise<PublicProfileDto>;
-  getPublicProfile(targetUserId: string): Promise<PublicProfileDto>;
+  getPublicProfile(viewerId: string, targetUserId: string): Promise<PublicProfileDto>;
 }
 
 const PROFILE_INCLUDE = [
@@ -352,7 +353,7 @@ export function createProfileService(deps: {
       return toPublicProfileDto(user, profile, preferences, media, todayInIndia());
     },
 
-    async getPublicProfile(targetUserId) {
+    async getPublicProfile(viewerId, targetUserId) {
       const today = todayInIndia();
       // Soft-deleted users are excluded by the paranoid default scope.
       const user = await User.findOne({
@@ -360,8 +361,14 @@ export function createProfileService(deps: {
         attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt'],
       });
       const profile = user ? await loadProfile(user.id) : null;
-      // Unknown, inactive and incomplete profiles all look the same: 404.
-      if (!user || !profile || computeCompletion(profile, today).status !== 'complete') {
+      // Unknown, inactive, incomplete and blocked (either direction) profiles all look the
+      // same: 404, so a block is never revealed.
+      if (
+        !user ||
+        !profile ||
+        computeCompletion(profile, today).status !== 'complete' ||
+        (await isBlockedEitherWay(viewerId, targetUserId))
+      ) {
         throw new AppError('NOT_FOUND', { message: 'Profile not found.' });
       }
       const preferences = await UserPreference.findOne({ where: { userId: user.id } });

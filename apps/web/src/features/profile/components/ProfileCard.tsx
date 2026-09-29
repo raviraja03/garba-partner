@@ -27,6 +27,14 @@ export function ProfileCard({ profile }: { profile: PublicProfileDto }) {
                 Photo verified
               </span>
             )}
+            {profile.identityVerified && (
+              <span
+                className="ml-2 rounded-full bg-green-100 px-2 py-0.5 align-middle text-xs font-semibold text-green-800"
+                title="This member completed an identity check with a licensed provider. Verification does not guarantee a person's intentions or safety."
+              >
+                ID verified
+              </span>
+            )}
           </h3>
           <p className="text-sm text-muted">
             {GENDER_LABELS[profile.gender]} · {profile.area ? `${profile.area.name}, ` : ''}

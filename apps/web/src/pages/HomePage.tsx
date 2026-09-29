@@ -10,7 +10,7 @@ const STATUS_NOTICE: Partial<Record<string, string>> = {
   pending_deletion: 'Your account is scheduled for deletion.',
 };
 
-/** Signed-in home. Partner discovery arrives in a later phase. */
+/** Signed-in home: profile completion, then entry points to Discover and Events. */
 export function HomePage() {
   const { state } = useAuth();
   const myProfile = useMyProfile();
@@ -38,8 +38,14 @@ export function HomePage() {
         <section className="rounded-card bg-white p-6 shadow-sm ring-1 ring-black/5">
           <h2 className="font-semibold text-brand-700">You're all set</h2>
           <p className="mt-2 text-sm text-muted">
-            Partner discovery is coming in the next release. In the meantime, see what&apos;s on.
+            Find a Garba partner in your city, or pick an event and see who else is looking.
           </p>
+          <Link
+            to="/discover"
+            className="mt-4 inline-block rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700"
+          >
+            Discover partners
+          </Link>
         </section>
       )}
       <Link

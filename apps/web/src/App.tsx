@@ -5,6 +5,7 @@ import { AuthProvider } from './features/auth/AuthProvider';
 import { PublicOnly, RequireAuth } from './features/auth/guards';
 import { RequireProfile } from './features/profile/RequireProfile';
 import { ApiClientError } from './lib/api-client';
+import { DiscoverPage } from './pages/DiscoverPage';
 import { EditProfilePage } from './pages/EditProfilePage';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { EventsPage } from './pages/EventsPage';
@@ -13,6 +14,7 @@ import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OnboardingPage } from './pages/OnboardingPage';
+import { PartnerProfilePage } from './pages/PartnerProfilePage';
 import { PreferencesPage } from './pages/PreferencesPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { VerifyOtpPage } from './pages/VerifyOtpPage';
@@ -55,6 +57,8 @@ const router = createBrowserRouter([
               { path: '/profile/edit', element: <EditProfilePage /> },
               { path: '/profile/preferences', element: <PreferencesPage /> },
               { path: '/events/:idOrSlug/find-partner', element: <FindPartnerPage /> },
+              { path: '/discover', element: <DiscoverPage /> },
+              { path: '/partners/:userId', element: <PartnerProfilePage /> },
             ],
           },
         ],

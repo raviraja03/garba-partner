@@ -23,6 +23,13 @@ import { createMemberAuthController } from './modules/auth/auth.controller.js';
 import { createMemberAuthRouter } from './modules/auth/auth.routes.js';
 import { createMemberAuthService } from './modules/auth/auth.service.js';
 import { createTokenService } from './modules/auth/token.service.js';
+import { createDiscoveryRouter } from './modules/discovery/discovery.routes.js';
+import { createDiscoveryService } from './modules/discovery/discovery.service.js';
+import {
+  createAttendanceRouter,
+  createMyAttendanceRouter,
+} from './modules/events/attendance.routes.js';
+import { createAttendanceService } from './modules/events/attendance.service.js';
 import { createEventsRouter } from './modules/events/events.routes.js';
 import { createEventsService } from './modules/events/events.service.js';
 import type { HealthDependencies } from './modules/health/health.controller.js';
@@ -34,6 +41,10 @@ import {
   createPublicProfileRouter,
 } from './modules/profiles/profile.routes.js';
 import { createProfileService } from './modules/profiles/profile.service.js';
+import { createBlocksService } from './modules/safety/blocks.service.js';
+import { createReportsService } from './modules/safety/reports.service.js';
+import { createSafetyLogger } from './modules/safety/safety-log.service.js';
+import { createSafetyRouters } from './modules/safety/safety.routes.js';
 import type { MediaStorage } from './providers/media/index.js';
 import type { SmsProvider } from './providers/sms/index.js';
 
@@ -107,6 +118,48 @@ export function createApiRouter(options: {
       authenticateAdmin,
     }),
   );
+  const attendance = createAttendanceService();
+  const HOUR_MS = 60 * 60 * 1000;
+  // Member-only attendance routes are mounted before the public event router.
+  router.use(
+    '/events',
+    createAttendanceRouter({
+      service: attendance,
+      authenticateMember,
+      limiter: createMemberRateLimiter({
+        windowMs: HOUR_MS,
+        limit: LIMITS.ATTENDANCE_CHANGES_PER_HOUR,
+      }),
+    }),
+  );
+  router.use('/me', createMyAttendanceRouter({ service: attendance, authenticateMember }));
+  router.use(
+    '/partners',
+    createDiscoveryRouter({
+      service: createDiscoveryService({ sequelize, media }),
+      authenticateMember,
+      limiter: createMemberRateLimiter({
+        windowMs: 60 * 1000,
+        limit: LIMITS.DISCOVERY_REQUESTS_PER_MINUTE,
+      }),
+    }),
+  );
+
+  // Blocking and reporting (docs/safety): required before any member-to-member feature.
+  const safetyLog = createSafetyLogger({ ipHashSecret: env.OTP_HMAC_SECRET, logger });
+  const safety = createSafetyRouters({
+    blocks: createBlocksService({ sequelize, media, safetyLog }),
+    reports: createReportsService({ sequelize, safetyLog }),
+    authenticateMember,
+    blockLimiter: createMemberRateLimiter({ windowMs: HOUR_MS, limit: LIMITS.BLOCKS_PER_HOUR }),
+    reportLimiter: createMemberRateLimiter({
+      windowMs: HOUR_MS,
+      limit: LIMITS.REPORTS_PER_DAY,
+    }),
+  });
+  router.use('/blocks', safety.blocks);
+  router.use('/reports', safety.reports);
+
   router.use(
     '/events',
     createEventsRouter({

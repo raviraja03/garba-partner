@@ -230,6 +230,8 @@ Visitors can see the public event listing and event details, with counts, but no
 
 ## 6. Partner discovery flow
 
+> **Implemented** as `GET /api/v1/partners` and `/partners/:id` ([discovery](../matching/discovery.md), [matching logic](../matching/matching-logic.md)). Rules 6–8 (matches, pending and declined interests) apply once interests exist. Ordering uses the ranking in the matching-logic document (shared event, shared dates, city, age, level, verified), then last-active day and ID.
+
 Discovery shows a paginated list of profile cards. There are two modes.
 
 | Mode | Entry point | Who appears |

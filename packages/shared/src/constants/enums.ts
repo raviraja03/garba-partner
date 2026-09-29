@@ -166,3 +166,23 @@ export type EventSort = (typeof EVENT_SORTS)[number];
 /** Admin event list ordering. */
 export const ADMIN_EVENT_SORTS = ['date_asc', 'date_desc', 'created_desc', 'name_asc'] as const;
 export type AdminEventSort = (typeof ADMIN_EVENT_SORTS)[number];
+
+// --- Attendance & discovery (docs/matching/discovery.md) -------------------------------------
+
+/** A member's attendance at an event. */
+export const ATTENDANCE_STATUSES = ['going', 'interested'] as const;
+export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
+
+/**
+ * Why a partner was suggested. Shown instead of a score: the ranking is a simple heuristic and
+ * never a measure or guarantee of compatibility (docs/matching/matching-logic.md).
+ */
+export const MATCH_HIGHLIGHTS = [
+  'same_event',
+  'shared_dates',
+  'same_city',
+  'similar_age',
+  'same_level',
+  'verified',
+] as const;
+export type MatchHighlight = (typeof MATCH_HIGHLIGHTS)[number];

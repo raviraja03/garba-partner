@@ -65,7 +65,7 @@ export function createProfileController(service: ProfileService): ProfileControl
     async getPublic(req, res) {
       const userId = parseInput(uuidParamSchema, req.params.userId);
       res.setHeader('Cache-Control', 'private, no-store');
-      ok(res, await service.getPublicProfile(userId));
+      ok(res, await service.getPublicProfile(memberAuth(req).userId, userId));
     },
   };
 }

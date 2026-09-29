@@ -47,6 +47,13 @@ export const ERROR_CODES = {
     httpStatus: 400,
     message: 'Please upload a JPEG, PNG or WebP photo of at least 400×400 pixels.',
   },
+
+  // Events & discovery (docs/matching/discovery.md)
+  EVENT_NOT_OPEN: { httpStatus: 409, message: 'This event is not open for attendance.' },
+  PARTNER_TOGGLE_REQUIRED: {
+    httpStatus: 409,
+    message: "Turn on 'Looking for a partner' for this event to see who else is.",
+  },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

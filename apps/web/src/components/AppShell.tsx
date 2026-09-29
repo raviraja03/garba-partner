@@ -7,6 +7,7 @@ import { Button } from './ui/Button';
 const MEMBER_NAV = [
   { to: '/', label: 'Home', end: true },
   { to: '/events', label: 'Events', end: false },
+  { to: '/discover', label: 'Discover', end: false },
   { to: '/profile', label: 'My profile', end: true },
 ] as const;
 

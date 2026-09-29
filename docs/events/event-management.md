@@ -14,7 +14,7 @@ What is in this phase:
 | Web | Public events page with city/date filters and sorting, event cards, event detail, verified organizer/event badges, **Find a partner** and **Get pass** calls to action |
 | API | Public list/detail, admin CRUD + lifecycle, cursor pagination, filtering, sorting, permission checks, audit log |
 
-**Not yet:** attendance (Going/Interested), "looking for a partner" and event-mode discovery, attendee notifications, cancellation with notice, pass purchase. The **Find a partner** button leads to a "coming soon" page for signed-in members with a profile.
+**Not yet:** attendee notifications, cancellation with notice, pass purchase. Since the discovery phase, **Find a partner** lets signed-in members set their attendance and turn on "looking for a partner", then opens event-mode discovery ([discovery](../matching/discovery.md)).
 
 ## 2. Architecture
 
@@ -180,7 +180,7 @@ Manual check: `npm run db:seed` loads four fictional events (three published, on
 
 ## 12. Known limitations
 
-- No attendance, partner discovery for events, or notifications yet (next phases). "Find a partner" is a placeholder page.
+- No attendance counts on event pages or attendee notifications yet. Attendance and event-mode discovery are covered in [discovery](../matching/discovery.md).
 - No cancellation state with a reason/notice; unpublish or archive instead.
 - Public responses are cached for up to 60 seconds, so an unpublished event may stay visible briefly.
 - Admins cannot manage cities/areas from the panel yet (seeded by migration).

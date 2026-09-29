@@ -451,7 +451,8 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/discovery` | M | Query: `mode=event\|city`, `eventId` (event mode), `cityId` (city mode, defaults to own), `garbaLevel[]`, `ageMin`, `ageMax`, `verifiedOnly`, `cursor`, `limit` → `PublicProfileDto[]`. Rate limit 60/min |
+| GET | `/partners` | M | ✅ (was `/discovery`) Query: `eventId` (event mode), `cityId`, `minAge`, `maxAge`, `garbaLevels`, `date`, `verifiedOnly`, `cursor`, `limit` → `PartnerDto[]` (profile + highlights, **no score**). Rate limit 60/min. See [discovery](../matching/discovery.md) |
+| GET | `/partners/:id` | M | ✅ One `PartnerDto`, same eligibility rules; otherwise `404` |
 | GET | `/users/:userId/profile` ✅ | M | `PublicProfileDto` (allow-list). `404` if unknown, inactive or incomplete (and, once blocking exists, blocked) |
 
 ### 5.6 Interests, matches, chat
@@ -475,10 +476,10 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | `/blocks` | U** | `{ userId }` (**allowed for suspended users too, so they can still protect themselves) |
+| POST | `/blocks` ✅ | U** | `{ userId }` (**allowed for suspended users too, so they can still protect themselves) |
 | GET | `/blocks` | U | Blocked members (id, displayName, primary photo) |
 | DELETE | `/blocks/:userId` | U | Unblock |
-| POST | `/reports` | U** | `{ reportedUserId, messageId?, reason, details?, alsoBlock }` |
+| POST | `/reports` ✅ | U** | `{ reportedUserId, messageId?, reason, details?, alsoBlock }` (`messageId` comes with chat) |
 | GET | `/notifications` | U | Cursor list |
 | GET | `/notifications/unread-count` | U | `{ count }` |
 | POST | `/notifications/read` | U | `{ ids?: uuid[], all?: true }` |

@@ -73,6 +73,16 @@ export const LIMITS = {
   /** Active organizers returned by the admin picker. */
   ORGANIZER_OPTIONS_MAX: 500,
 
+  // Partner discovery and attendance (docs/matching/discovery.md)
+  DISCOVERY_PAGE_SIZE_DEFAULT: 20,
+  DISCOVERY_PAGE_SIZE_MAX: 50,
+  DISCOVERY_REQUESTS_PER_MINUTE: 60,
+  /** Ages within this many years count as "similar age". */
+  SIMILAR_AGE_YEARS: 5,
+  /** Shared events listed per partner. */
+  SHARED_EVENTS_SHOWN: 3,
+  ATTENDANCE_CHANGES_PER_HOUR: 60,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

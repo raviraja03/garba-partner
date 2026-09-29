@@ -2,7 +2,7 @@
 
 > **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
 
-Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
 
 ## 1. ERD
 
@@ -23,6 +23,18 @@ erDiagram
     areas |o--o{ events : "area (same city)"
     admin_users ||--o{ events : "creates / updates"
     admin_users ||--o{ event_organizers : "creates / updates"
+    events ||--o{ event_attendances : "has"
+    users ||--o{ event_attendances : "attends"
+    users ||--o{ blocks : "blocks / is blocked"
+    users ||--o{ reports : "reports / is reported"
+
+    event_attendances {
+        uuid id PK
+        uuid event_id FK
+        uuid user_id FK
+        varchar20 status "going|interested"
+        boolean looking_for_partner "private unless reciprocal"
+    }
 
     event_organizers {
         uuid id PK
@@ -518,7 +530,43 @@ Migration `20260929100100-create-events`. See [event management](../events/event
 
 Indexes: `events_published_city_starts_at_idx` `(city_id, starts_at, id) WHERE status = 'published'`, `events_published_starts_at_idx` `(starts_at, id) WHERE status = 'published'` (public list), `(status, starts_at, id)` and `(created_at DESC, id DESC)` (admin list), `(organizer_id, ends_at)`, partial `(area_id)`, admin FK indexes.
 
-### 4.13 Bookkeeping tables
+### 4.13 `event_attendances`
+
+Migration `20260929110000-create-event-attendances`. See [discovery](../matching/discovery.md#event-attendance) and [discovery privacy §3](../matching/privacy.md#3-event-attendance-is-reciprocal).
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `event_id` | uuid | no | | FK → `events.id` `ON DELETE RESTRICT` (published events are never hard-deleted) |
+| `user_id` | uuid | no | | FK → `users.id` `ON DELETE CASCADE` |
+| `status` | varchar(20) | no | | `going` \| `interested` |
+| `looking_for_partner` | boolean | no | `false` | Opt-in to event-mode discovery. **Private** unless both members opt in for the same event |
+| `created_at` / `updated_at` | timestamptz | no | `now()` | `updated_at` trigger |
+
+Constraints: `event_attendances_event_user_unique (event_id, user_id)`, status check. Indexes: `event_attendances_looking_event_idx (event_id, user_id) WHERE looking_for_partner` (event mode), `event_attendances_looking_user_idx (user_id, event_id) WHERE looking_for_partner` (same-event signal), `(user_id, created_at DESC)`.
+
+### 4.14 Safety tables: `blocks`, `reports`, `safety_logs`
+
+Created by the safety-phase migrations `20260928110100-create-blocks`, `…110200-create-reports`, `…110300-create-safety-logs`. Blocks and reports are served by the API from the discovery phase on ([discovery §3](../matching/discovery.md#block-and-report-wired-in-this-phase)).
+
+| Table | Key columns | Constraints / indexes |
+|---|---|---|
+| `blocks` | `blocker_id`, `blocked_id` (both FK → users `CASCADE`), `created_at` | `blocks_pair_unique (blocker_id, blocked_id)`, not-self check, `(blocked_id)` |
+| `reports` | `source` (`member`\|`system`), `reporter_id` (FK `SET NULL`), `reported_user_id` (FK `RESTRICT`), `reason`, `priority` 0–2, `details`, `evidence` jsonb (profile snapshot), `status` (`open`\|`in_review`\|`resolved`\|`dismissed`), assignment/resolution columns (FK → admin_users `RESTRICT`) | Reason/priority/status/resolution checks, partial unique **one open report per pair**, queue index `(status, priority, created_at, id)`, `(reported_user_id, created_at DESC)`, `(reporter_id, created_at DESC)`, `reports_reporter_reported_idx` (discovery) |
+| `safety_logs` | `event_type`, `severity`, `user_id`, `admin_id` (no FKs: kept after deletion), `ip_hash` (HMAC), `metadata` | **Append-only** trigger; indexes on `created_at`, `(user_id, created_at)`, `(event_type, created_at)`, critical events |
+
+### 4.15 Discovery indexes
+
+Migration `20260929110100-add-discovery-indexes` ([matching logic §6](../matching/matching-logic.md#6-query-and-indexes)):
+
+| Index | Definition |
+|---|---|
+| `users_discoverable_idx` | `users (id) WHERE status = 'active' AND deleted_at IS NULL AND NOT hidden_from_discovery AND onboarding_completed_at IS NOT NULL` |
+| `user_profiles_discovery_idx` | `user_profiles (city_id, gender, date_of_birth) WHERE image_public_id IS NOT NULL` |
+| `user_profiles_available_dates_gin_idx` | `user_profiles USING gin (available_dates)` |
+| `reports_reporter_reported_idx` | `reports (reporter_id, reported_user_id) WHERE reporter_id IS NOT NULL` |
+
+### 4.16 Bookkeeping tables
 
 | Table | Created by | Content |
 |---|---|---|
@@ -547,6 +595,8 @@ Indexes: `events_published_city_starts_at_idx` `(city_id, starts_at, id) WHERE s
 | IP addresses | `user_sessions`, `admin_sessions`, `otp_requests` | HMAC only |
 | OTP codes | `otp_requests` | HMAC only; never logged |
 | Admin passwords | `admin_users` | Argon2id only; excluded from the default scope |
+| Event attendance | `event_attendances` | Never on event pages. Visible to another member only when both have `looking_for_partner` for the same event ([discovery privacy](../matching/privacy.md)) |
+| Blocks and reports | `blocks`, `reports` | Never shown to the other member; unavailable profiles all return the same 404 |
 | Organizer contact details | `event_organizers` | Admin-only columns; never selected by public queries; hidden from admins without `events:manage`; never written to audit metadata |
 | Identity documents | — | **Not stored anywhere.** Verification rows hold metadata only, and the DB rejects Aadhaar-like values |
 | Verification evidence | Private storage (later phase) | Referenced by an opaque pointer and purged after the retention period |

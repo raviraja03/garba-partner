@@ -37,6 +37,10 @@ flowchart LR
 | `areas` | `events` | 0..1 : 0..n | `(events.area_id, city_id)` | **Composite FK** → `areas (id, city_id)` | `RESTRICT` | `Event.belongsTo(Area)` as `area` |
 | `admin_users` | `events` | 1 : 0..n (creator / last editor) | `events.created_by_admin_id`, `updated_by_admin_id` | FK | `RESTRICT` | `Event.belongsTo(AdminUser)` as `createdBy` / `updatedBy` |
 | `admin_users` | `event_organizers` | 1 : 0..n (creator / last editor) | `event_organizers.created_by_admin_id`, `updated_by_admin_id` | FK | `RESTRICT` | `EventOrganizer.belongsTo(AdminUser)` as `createdBy` |
+| `events` | `event_attendances` | 1 : 0..n | `event_attendances.event_id` | FK + `UNIQUE (event_id, user_id)` | `RESTRICT` | `EventAttendance.belongsTo(Event)` as `event` |
+| `users` | `event_attendances` | 1 : 0..n | `event_attendances.user_id` | FK | `CASCADE` | none (queried by user ID) |
+| `users` | `blocks` | 1 : 0..n (as blocker and as blocked) | `blocks.blocker_id`, `blocked_id` | FK + `UNIQUE (blocker_id, blocked_id)` | `CASCADE` | `Block.belongsTo(User)` as `blocked` |
+| `users` | `reports` | 1 : 0..n (as reporter / reported) | `reports.reporter_id`, `reported_user_id` | FK | `SET NULL` / `RESTRICT` | `Report.belongsTo(User)` as `reporter` / `reportedUser` |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.
@@ -112,4 +116,4 @@ The development seeder already follows this pattern (`src/seeders/20260925110000
 
 | Relationship | Added by |
 |---|---|
-| Users → event attendances, interests, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |
+| Users → interests, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |
