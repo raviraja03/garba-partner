@@ -268,6 +268,7 @@ export const up: MigrationFn<SeederContext> = async ({ context: { sequelize, env
             failureReason: seed.verification.failureReason ?? null,
             submittedAt: new Date(now - 12 * DAY_MS),
             decidedAt: decided ? new Date(now - 10 * DAY_MS) : null,
+            verifiedAt: verified ? new Date(now - 10 * DAY_MS) : null,
           },
           { transaction },
         );

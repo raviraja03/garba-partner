@@ -51,13 +51,13 @@ export function createFakeMediaStorage(): FakeMediaStorage {
     stored: new Map(),
     destroyed: [],
     failNextUpload: false,
-    upload(image) {
+    upload(image, folder) {
       if (storage.failNextUpload) {
         storage.failNextUpload = false;
         return Promise.reject(new Error('upload failed'));
       }
       counter += 1;
-      const publicId = `test/profile-images/img${String(counter)}`;
+      const publicId = `test/${folder}/img${String(counter)}`;
       storage.stored.set(publicId, image.buffer);
       return Promise.resolve({ publicId, width: image.width, height: image.height });
     },
@@ -104,8 +104,10 @@ export function useTestDatabase(): () => Sequelize {
     await sequelize?.close();
   });
   beforeEach(async () => {
-    // Reference data (cities, areas) is kept; everything user-generated is emptied.
-    await sequelize?.query('TRUNCATE users, otp_requests, admin_users CASCADE');
+    // Reference data (cities, areas) is kept; everything user- and admin-generated is emptied.
+    await sequelize?.query(
+      'TRUNCATE users, otp_requests, admin_users, events, event_organizers, safety_logs CASCADE',
+    );
   });
 
   return () => {

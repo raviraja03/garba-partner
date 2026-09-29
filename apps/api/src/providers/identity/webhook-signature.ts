@@ -33,7 +33,8 @@ export function verifyWebhookSignature(
   if (!timestampHeader || !signatureHeader || !/^\d{1,12}$/.test(timestampHeader)) throw invalid();
 
   const timestamp = Number(timestampHeader);
-  if (Math.abs(now / 1000 - timestamp) > LIMITS.VERIFICATION_WEBHOOK_TOLERANCE_SECONDS) throw invalid();
+  if (Math.abs(now / 1000 - timestamp) > LIMITS.VERIFICATION_WEBHOOK_TOLERANCE_SECONDS)
+    throw invalid();
 
   const match = /^sha256=([0-9a-f]{64})$/.exec(signatureHeader);
   const expected = hmacSha256Hex(secret, `${timestampHeader}.${rawBody.toString('utf8')}`);

@@ -91,7 +91,7 @@ export function toOwnProfileDto(
  * member opted in with `showArea`.
  */
 export function toPublicProfileDto(
-  user: Pick<User, 'id' | 'photoVerifiedAt'>,
+  user: Pick<User, 'id' | 'photoVerifiedAt' | 'identityVerifiedAt'>,
   profile: UserProfile,
   preferences: UserPreference | null | undefined,
   storage: MediaStorage,
@@ -110,6 +110,9 @@ export function toPublicProfileDto(
     garbaLevel: profile.garbaLevel,
     availableDates: upcomingDates(profile.availableDates, today),
     image: toImageDto(profile, storage),
+    // Every member signs in with a one-time code, so the phone number is always verified.
+    phoneVerified: true,
+    identityVerified: user.identityVerifiedAt !== null,
     photoVerified: user.photoVerifiedAt !== null,
   };
 }

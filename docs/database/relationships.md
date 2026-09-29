@@ -15,6 +15,10 @@ flowchart LR
     A[admin_users] -->|1 : 0..n| AS[admin_sessions]
     A -.->|reviews 0..n| V
     O[otp_requests]
+    EO[event_organizers] -->|1 : 0..n| E[events]
+    C[cities] -->|1 : 0..n| E
+    A -.->|creates / updates| E
+    A -.->|creates / updates| EO
 ```
 
 | Parent | Child | Cardinality | FK column | DB constraint | `ON DELETE` | Sequelize association |
@@ -28,6 +32,11 @@ flowchart LR
 | `cities` | `user_profiles` | 1 : 0..n | `user_profiles.city_id` | FK | `RESTRICT` | `UserProfile.belongsTo(City)` as `city` |
 | `areas` | `user_profiles` | 0..1 : 0..n | `(user_profiles.area_id, city_id)` | **Composite FK** → `areas (id, city_id)` | `RESTRICT` | `UserProfile.belongsTo(Area)` as `area` |
 | `admin_users` | `admin_audit_logs` | 1 : 0..n | `admin_audit_logs.admin_id` | FK | `RESTRICT` | none (written through `recordAdminAction()`) |
+| `event_organizers` | `events` | 1 : 0..n | `events.organizer_id` | FK | `RESTRICT` (organizers are archived, never deleted) | `Event.belongsTo(EventOrganizer)` as `organizer` |
+| `cities` | `events` | 1 : 0..n | `events.city_id` | FK | `RESTRICT` | `Event.belongsTo(City)` as `city` |
+| `areas` | `events` | 0..1 : 0..n | `(events.area_id, city_id)` | **Composite FK** → `areas (id, city_id)` | `RESTRICT` | `Event.belongsTo(Area)` as `area` |
+| `admin_users` | `events` | 1 : 0..n (creator / last editor) | `events.created_by_admin_id`, `updated_by_admin_id` | FK | `RESTRICT` | `Event.belongsTo(AdminUser)` as `createdBy` / `updatedBy` |
+| `admin_users` | `event_organizers` | 1 : 0..n (creator / last editor) | `event_organizers.created_by_admin_id`, `updated_by_admin_id` | FK | `RESTRICT` | `EventOrganizer.belongsTo(AdminUser)` as `createdBy` |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.
@@ -78,6 +87,9 @@ Rules:
 | **Soft delete** of a user (`deleted_at` set, phone data nulled in the same `UPDATE`) | None automatically. The erasure service deletes the profile and preferences, revokes sessions and purges verification evidence **in the same transaction** |
 | **Hard delete** of a user (`DELETE FROM users`, e.g. dev seed undo, tests) | Profile, preferences, sessions and verifications are removed by `ON DELETE CASCADE` |
 | Delete a profile/preference row | No effect on the user row |
+| Hard delete of an event (only never-published events) | Row removed; its image is deleted from storage after commit. Published events are archived instead |
+| Delete an organizer | Refused by `RESTRICT` while events reference it. Organizers are archived instead |
+| Delete an admin who created events/organizers | Refused by `RESTRICT` (admins are disabled, never deleted) |
 
 Sequelize `paranoid` on `User` means ordinary queries exclude soft-deleted users. Use `{ paranoid: false }` only in admin/audit code.
 
@@ -91,6 +103,7 @@ Use a managed transaction (`sequelize.transaction(async (t) => …)`) and pass `
 | Approve photo verification | `user_verifications` (status, decided_at) + `users.photo_verified_at` |
 | Revoke verification on primary-photo change | `user_verifications.status = 'revoked'` + `users.photo_verified_at = null` |
 | Sanction / logout-all | `users.status` + all `user_sessions.revoked_*` |
+| Event / organizer admin actions (implemented) | Row lock (`FOR UPDATE`) + change + `admin_audit_logs` entry |
 | Account erasure | Delete profile + preferences, revoke sessions, purge evidence, then null phone + set `deleted_at` (single `UPDATE`) |
 
 The development seeder already follows this pattern (`src/seeders/20260925110000-dev-users.ts`).
@@ -99,4 +112,4 @@ The development seeder already follows this pattern (`src/seeders/20260925110000
 
 | Relationship | Added by |
 |---|---|
-| Users → events, attendances, interests, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |
+| Users → event attendances, interests, matches, messages, blocks, reports, sanctions | Their respective phases (see [database architecture](../architecture/database-architecture.md)) |

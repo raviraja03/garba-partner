@@ -514,6 +514,8 @@ Triggered from a report resolution or directly from the user detail page (with a
 
 ### 12.6 Event management (event manager)
 
+> **Implemented** (see [event management](../events/event-management.md)) with these refinements: organizers are managed as records with a verified badge and private contact details ([organizer management](../events/organizer-management.md)); events can be unpublished, verified, archived/restored, and deleted only if never published; `cancel` with attendee notice arrives with attendance.
+
 1. **Events list**: filter by status (`draft`, `published`, `cancelled`), city and date.
 2. **Create event**: title, description, city, area, venue name, venue address, map URL, start/end (IST input, stored UTC), organiser name, price info text, external pass link (optional), cover image. Saved as `draft`.
 3. **Preview** → **Publish** (sets `published_at`). Validation: `ends_at > starts_at` and `starts_at` in the future.

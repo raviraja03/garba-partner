@@ -56,7 +56,11 @@ export class Report extends Model<InferAttributes<Report>, InferCreationAttribut
   @Column({ type: DataType.UUID, allowNull: false })
   reportedUserId!: string;
 
-  @Column({ type: DataType.STRING(30), allowNull: false, validate: { isIn: [[...REPORT_REASONS]] } })
+  @Column({
+    type: DataType.STRING(30),
+    allowNull: false,
+    validate: { isIn: [[...REPORT_REASONS]] },
+  })
   reason!: ReportReason;
 
   @Column({ type: DataType.SMALLINT, allowNull: false, validate: { min: 0, max: 2 } })

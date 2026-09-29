@@ -355,6 +355,7 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
         provider: 'internal_review',
         status: 'approved',
         decidedAt: new Date(),
+        verifiedAt: new Date(),
       });
 
       const res = await upload(accessToken, await makeImage({ width: 600, height: 600 }));
@@ -449,8 +450,10 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
       'garbaLevel',
       'gender',
       'id',
+      'identityVerified',
       'image',
       'name',
+      'phoneVerified',
       'photoVerified',
     ];
 
@@ -474,7 +477,10 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
       expect(serialized).not.toContain(target.phone);
       expect(serialized).not.toContain('priya.garba'); // Instagram handle
       expect(serialized).not.toContain(validProfile().dateOfBirth);
-      expect(serialized).not.toMatch(/phone|dateOfBirth|instagram|preferences|accountStatus/i);
+      // `phoneVerified: true` is a badge (every member signs in by OTP), not phone data.
+      expect(serialized.replace('"phoneVerified":true', '')).not.toMatch(
+        /phone|dateOfBirth|instagram|preferences|accountStatus/i,
+      );
     });
 
     it('shows the area only when the member opted in', async () => {

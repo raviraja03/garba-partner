@@ -4,6 +4,8 @@ import { AdminUser } from './admin-user.model.js';
 import { Area } from './area.model.js';
 import { Block } from './block.model.js';
 import { City } from './city.model.js';
+import { EventOrganizer } from './event-organizer.model.js';
+import { Event } from './event.model.js';
 import { OtpRequest } from './otp-request.model.js';
 import { Report } from './report.model.js';
 import { SafetyLog } from './safety-log.model.js';
@@ -23,6 +25,8 @@ export { AdminUser } from './admin-user.model.js';
 export { Area } from './area.model.js';
 export { Block } from './block.model.js';
 export { City } from './city.model.js';
+export { EventOrganizer, ORGANIZER_PUBLIC_ATTRIBUTES } from './event-organizer.model.js';
+export { Event } from './event.model.js';
 export { OtpRequest } from './otp-request.model.js';
 export { Report, type ReportEvidence } from './report.model.js';
 export { SafetyLog } from './safety-log.model.js';
@@ -48,4 +52,6 @@ export const MODELS = [
   Block,
   Report,
   SafetyLog,
+  EventOrganizer,
+  Event,
 ];

@@ -11,6 +11,14 @@ export function looksLikeContactInfo(text: string): boolean {
   return PHONE_LIKE.test(text) || EMAIL_LIKE.test(text) || URL_LIKE.test(text);
 }
 
+/**
+ * Phone numbers or email addresses (links allowed). Guards public event and organizer text so
+ * private organizer contact details are not published by accident (docs/events/organizer-management.md).
+ */
+export function containsPhoneOrEmail(text: string): boolean {
+  return PHONE_LIKE.test(text) || EMAIL_LIKE.test(text);
+}
+
 /** NFKC-normalises, trims and collapses internal whitespace. */
 export function normalizeText(value: string): string {
   return value.normalize('NFKC').trim().replace(/\s+/g, ' ');

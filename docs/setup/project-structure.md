@@ -23,14 +23,15 @@ garba-partner/
 │   │   │   ├── migrations/          timestamped, transactional SQL migrations
 │   │   │   ├── seeders/             development seed data
 │   │   │   ├── scripts/db.ts        db CLI (migrate, undo, status, seed, reset)
-│   │   │   ├── lib/                 app-error, response, logger, request-id, crypto, passwords, cookies, validation, pii-guards, migration-helpers
+│   │   │   ├── lib/                 app-error, response, logger, request-id, crypto, passwords, cookies, validation, pagination (cursor + sortable keyset), sql, pii-guards, migration-helpers
 │   │   │   ├── middlewares/         authenticate, authorize, csrf, rate-limit, not-found, error-handler
 │   │   │   ├── modules/
 │   │   │   │   ├── health/          GET /api/v1/health (API + database)
 │   │   │   │   ├── auth/            member OTP auth: routes, controller, service, otp.service, token.service
 │   │   │   │   ├── profiles/        own profile, preferences, image upload, public profile (allow-list mappers)
 │   │   │   │   ├── locations/       cities and areas (reference data)
-│   │   │   │   └── admin/           auth/ (login…), users/ (list, detail, suspend/reactivate), audit/ (audit log)
+│   │   │   │   ├── events/          public event list/detail, event mappers, slug
+│   │   │   │   └── admin/           auth/ (login…), users/ (list, detail, suspend/reactivate), events/, organizers/, audit/ (audit log)
 │   │   │   ├── providers/sms/       SmsProvider interface + development provider
 │   │   │   ├── providers/media/     MediaStorage: Cloudinary + local (development only)
 │   │   │   ├── scripts/             db.ts (db CLI), create-admin.ts

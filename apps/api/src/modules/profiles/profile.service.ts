@@ -79,7 +79,10 @@ export function createProfileService(deps: {
   async function buildMyProfile(userId: string, transaction?: Transaction): Promise<MyProfileDto> {
     const options = transaction ? { transaction } : {};
     const [user, profile, preferences] = await Promise.all([
-      User.findByPk(userId, { attributes: ['id', 'status', 'photoVerifiedAt'], ...options }),
+      User.findByPk(userId, {
+        attributes: ['id', 'status', 'photoVerifiedAt', 'identityVerifiedAt'],
+        ...options,
+      }),
       loadProfile(userId, transaction),
       UserPreference.findOne({ where: { userId }, ...options }),
     ]);
@@ -92,6 +95,7 @@ export function createProfileService(deps: {
       completion,
       accountStatus: user.status,
       photoVerified: user.photoVerifiedAt !== null,
+      identityVerified: user.identityVerifiedAt !== null,
       profile: profile ? toOwnProfileDto(profile, media, today) : null,
       preferences: toPreferencesDto(preferences),
     };
@@ -339,7 +343,7 @@ export function createProfileService(deps: {
 
     async getPreview(userId) {
       const [user, profile, preferences] = await Promise.all([
-        User.findByPk(userId, { attributes: ['id', 'photoVerifiedAt'] }),
+        User.findByPk(userId, { attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt'] }),
         loadProfile(userId),
         UserPreference.findOne({ where: { userId } }),
       ]);
@@ -353,7 +357,7 @@ export function createProfileService(deps: {
       // Soft-deleted users are excluded by the paranoid default scope.
       const user = await User.findOne({
         where: { id: targetUserId, status: 'active' },
-        attributes: ['id', 'photoVerifiedAt'],
+        attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt'],
       });
       const profile = user ? await loadProfile(user.id) : null;
       // Unknown, inactive and incomplete profiles all look the same: 404.

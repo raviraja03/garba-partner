@@ -13,9 +13,11 @@ import {
 import { AppError } from '../../../lib/app-error.js';
 import { hashPhone } from '../../../lib/crypto.js';
 import { decodeCursor, encodeCursor } from '../../../lib/pagination.js';
+import { escapeLike } from '../../../lib/sql.js';
 import {
   Area,
   City,
+  Report,
   User,
   UserPreference,
   UserProfile,
@@ -46,10 +48,6 @@ export interface AdminUsersService {
   reactivate(actor: AdminActor, userId: string, reason: string): Promise<AdminUserDetailDto>;
 }
 
-function escapeLike(value: string): string {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
-}
-
 export function createAdminUsersService(deps: {
   sequelize: Sequelize;
   env: ServerEnv;
@@ -69,25 +67,27 @@ export function createAdminUsersService(deps: {
     const user = await User.findByPk(userId);
     if (!user) throw new AppError('NOT_FOUND', { message: 'User not found.' });
 
-    const [profile, preferences, activeSessionCount, verifications] = await Promise.all([
-      UserProfile.findOne({
-        where: { userId },
-        include: [
-          { model: City, attributes: ['id', 'name', 'state'] },
-          { model: Area, attributes: ['id', 'cityId', 'name'] },
-        ],
-      }),
-      UserPreference.findOne({ where: { userId } }),
-      UserSession.count({
-        where: { userId, revokedAt: null, expiresAt: { [Op.gt]: new Date() } },
-      }),
-      UserVerification.findAll({
-        where: { userId },
-        attributes: ['type', 'status', 'createdAt', 'decidedAt'],
-        order: [['createdAt', 'DESC']],
-        limit: 10,
-      }),
-    ]);
+    const [profile, preferences, activeSessionCount, verifications, openReportCount] =
+      await Promise.all([
+        UserProfile.findOne({
+          where: { userId },
+          include: [
+            { model: City, attributes: ['id', 'name', 'state'] },
+            { model: Area, attributes: ['id', 'cityId', 'name'] },
+          ],
+        }),
+        UserPreference.findOne({ where: { userId } }),
+        UserSession.count({
+          where: { userId, revokedAt: null, expiresAt: { [Op.gt]: new Date() } },
+        }),
+        UserVerification.findAll({
+          where: { userId },
+          attributes: ['type', 'status', 'createdAt', 'decidedAt'],
+          order: [['createdAt', 'DESC']],
+          limit: 10,
+        }),
+        Report.count({ where: { reportedUserId: userId, status: ['open', 'in_review'] } }),
+      ]);
 
     const today = todayInIndia();
     const completion = computeCompletion(profile, today);
@@ -97,6 +97,8 @@ export function createAdminUsersService(deps: {
       profileStatus: completion.status,
       completion,
       photoVerified: user.photoVerifiedAt !== null,
+      identityVerified: user.identityVerifiedAt !== null,
+      openReportCount,
       hiddenFromDiscovery: user.hiddenFromDiscovery,
       termsVersion: user.termsVersion,
       createdAt: user.createdAt.toISOString(),

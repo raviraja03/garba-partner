@@ -49,7 +49,7 @@ URL-encode special characters in the password (e.g. `@` → `%40`). See [environ
 
 ```bash
 npm run db:migrate          # create the schema
-npm run db:seed             # fictional development users
+npm run db:seed             # fictional development users, admins, organizers and events
 npm run db:migrate:status   # everything should be "executed"
 npm run dev:api
 curl http://127.0.0.1:4000/api/v1/health
@@ -76,6 +76,10 @@ curl http://127.0.0.1:4000/api/v1/health
 IDs are fixed (`a1f0c3de-000N-4000-8000-00000000000N`), so `db:seed:undo` removes exactly these rows.
 
 `20260925120000-dev-admins` adds three admins (`superadmin@`, `moderator@` and `events@garbapartner.test`). They share the development password `garba-dev-admin-2026` and exist **only** in development databases ([authentication §5](../auth/authentication.md#5-local-development)).
+
+`20260929100000-dev-events` adds two fictional organizers (one verified) and four events created by the dev event manager: three **published** (Ahmedabad, overnight 20:00–01:00 and verified; Vadodara; Mumbai) and one **draft**. Event dates are relative to the day the seeder runs (2–8 days ahead), so the public list always has upcoming events. IDs are fixed (`e0c0a1b2-…` organizers, `e0e0a1b2-…` events). See [event management](../events/event-management.md).
+
+> Seed undo removes the dev admins last. If you used the dev admins to perform audited actions (e.g. created your own events, suspended a user), their audit entries are append-only and reference the admins, so `db:seed:undo`/`db:reset` stops with a foreign-key error. Recreate the development database instead (§1.2).
 
 ## 3. How the API connects
 

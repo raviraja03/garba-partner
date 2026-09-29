@@ -48,6 +48,8 @@ interface RequestOptions {
   headers?: Record<string, string>;
   /** Attach the access token and retry once after a silent refresh on 401. */
   authenticated?: boolean;
+  /** Return the whole success envelope (e.g. to read pagination `meta`) instead of `data`. */
+  envelope?: boolean;
 }
 
 async function send<TData>(path: string, options: RequestOptions): Promise<TData> {
@@ -86,7 +88,7 @@ async function send<TData>(path: string, options: RequestOptions): Promise<TData
       body.error.details ?? [],
     );
   }
-  return body.data;
+  return options.envelope ? (body as unknown as TData) : body.data;
 }
 
 // --- Session refresh (single flight, serialised across tabs) --------------------------------

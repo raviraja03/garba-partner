@@ -4,7 +4,7 @@ import { createCloudinaryStorage } from './cloudinary.storage.js';
 import { createLocalStorage } from './local.storage.js';
 import type { MediaStorage } from './media.storage.js';
 
-export type { MediaStorage, MediaVariant, StoredMedia } from './media.storage.js';
+export type { MediaFolder, MediaStorage, MediaVariant, StoredMedia } from './media.storage.js';
 export { LOCAL_MEDIA_ROUTE } from './local.storage.js';
 
 /** `apps/api/.local-media` (git-ignored). Same depth from `src/providers/media` and `dist/…`. */

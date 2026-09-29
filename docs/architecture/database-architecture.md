@@ -212,32 +212,18 @@ Provider/reference/status metadata only. See [schema.md §4.5](../database/schem
 
 ### 3.3 Events
 
-#### `events`
+#### `event_organizers` and `events` — ✅ implemented
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `slug` | varchar(140) | **Unique**. Generated from the title + short random suffix |
-| `title` | varchar(120) | |
-| `description` | text | ≤ 5000 chars (validated in the app) |
-| `city_id` | uuid FK → cities `ON DELETE RESTRICT` | |
-| `area_id` | uuid null FK → areas | |
-| `venue_name` | varchar(150) | |
-| `venue_address` | varchar(300) | Public venue address |
-| `map_url` | varchar(500) null | Validated `https://` URL |
-| `starts_at` / `ends_at` | timestamptz | CHECK `ends_at > starts_at` |
-| `organizer_name` | varchar(150) null | |
-| `price_info` | varchar(200) null | Free text, e.g. "₹499 onwards" |
-| `external_pass_url` | varchar(500) null | Validated `https://` URL |
-| `cover_public_id` | varchar(255) null | |
-| `status` | varchar(20) | `draft` \| `published` \| `cancelled` |
-| `cancellation_reason` | varchar(300) null | |
-| `published_at` / `cancelled_at` | timestamptz null | |
-| `created_by_admin_id` / `updated_by_admin_id` | uuid FK → admin_users | |
+See [schema.md §4.11–4.12](../database/schema.md#411-event_organizers) and [event management](../events/event-management.md). Summary of how the implementation refines this design:
 
-Indexes: `(city_id, status, starts_at)`, `(status, ends_at)`.
+- **Organizers are a table** (`event_organizers`) instead of an `organizer_name` column: public profile (name, description, website, Instagram), **private** contact fields and notes (admin only), `is_verified`, `active`/`archived`.
+- **Schedule** is stored as `event_date` + `start_time` + `end_time` in IST (an end time earlier than the start means after midnight). `starts_at` / `ends_at` are **generated columns**, so they can never disagree with the entered values.
+- `name` (was `title`), `ticket_url` (was `external_pass_url`), `image_public_id` (was `cover_public_id`). `map_url` and `price_info` are not stored; the web links to a maps search for the public venue.
+- **Statuses:** `draft` | `published` | `archived` (archive = soft delete). `cancelled` with a reason and attendee notice comes with attendance. `first_published_at` is never cleared; only never-published events can be hard-deleted.
+- `is_verified` / `verified_at` per event, cleared automatically when a material field changes.
+- Indexes: partial `(city_id, starts_at, id)` and `(starts_at, id)` `WHERE status = 'published'`, `(status, starts_at, id)`, `(created_at DESC, id DESC)`.
 
-"Ended" is derived (`ends_at < now()`). There is no `completed` status and no job is needed.
+"Ended" is derived (`ends_at <= now()`). There is no `completed` status and no job is needed.
 
 #### `event_attendances`
 

@@ -145,3 +145,24 @@ export const SAFETY_EVENT_TYPES = [
   'verification.underage_detected',
 ] as const;
 export type SafetyEventType = (typeof SAFETY_EVENT_TYPES)[number];
+
+// --- Events (docs/events/event-management.md) ---------------------------------------------
+
+/**
+ * Event lifecycle. `draft` = not visible to members; `published` = listed publicly;
+ * `archived` = soft-deleted (hidden everywhere, kept for history). "Ended" is derived from the
+ * end time, never stored.
+ */
+export const EVENT_STATUSES = ['draft', 'published', 'archived'] as const;
+export type EventStatus = (typeof EVENT_STATUSES)[number];
+
+export const ORGANIZER_STATUSES = ['active', 'archived'] as const;
+export type OrganizerStatus = (typeof ORGANIZER_STATUSES)[number];
+
+/** Public event list ordering (by start time). */
+export const EVENT_SORTS = ['date_asc', 'date_desc'] as const;
+export type EventSort = (typeof EVENT_SORTS)[number];
+
+/** Admin event list ordering. */
+export const ADMIN_EVENT_SORTS = ['date_asc', 'date_desc', 'created_desc', 'name_asc'] as const;
+export type AdminEventSort = (typeof ADMIN_EVENT_SORTS)[number];

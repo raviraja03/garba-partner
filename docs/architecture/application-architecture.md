@@ -441,8 +441,8 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/events` | P | Query: `cityId` (required), `from`, `to`, `cursor`, `limit`. Published, not ended. Counts only |
-| GET | `/events/:idOrSlug` | P | Event detail. If authenticated, includes `myAttendance` |
+| GET | `/events` | P | ✅ Query: `cityId` (optional), `from`, `to`, `sort` (`date_asc`|`date_desc`), `cursor`, `limit`. Published, not ended. Rate limit 120/min/IP. Counts come with attendance |
+| GET | `/events/:idOrSlug` | P | ✅ Event detail with the public organizer profile. `myAttendance` comes with attendance |
 | PUT | `/events/:eventId/attendance` | M | `{ status: 'going' \| 'interested', lookingForPartner: boolean }` |
 | DELETE | `/events/:eventId/attendance` | M | Remove attendance (also removes it from event discovery) |
 | GET | `/me/events` | M | Own attendances (upcoming + past) |
@@ -506,10 +506,12 @@ Example: `PublicProfileDto` (what other members receive):
 | POST | `/admin/verifications/:id/approve` / `reject` | `verifications:review` |
 | GET | `/admin/photos` | `photos:review` |
 | POST | `/admin/photos/:id/approve` / `reject` | `photos:review` |
-| GET/POST | `/admin/events` | `events:view` / `events:manage` |
-| GET/PATCH | `/admin/events/:id` | `events:view` / `events:manage` |
-| POST | `/admin/events/:id/cover` | `events:manage` (multipart) |
-| POST | `/admin/events/:id/publish` / `cancel` | `events:manage` |
+| GET/POST | `/admin/events` | `events:view` / `events:manage` ✅ |
+| GET/PATCH/DELETE | `/admin/events/:id` | `events:view` / `events:manage` ✅ (DELETE: never-published only) |
+| POST/DELETE | `/admin/events/:id/image` | `events:manage` (multipart) ✅ |
+| POST | `/admin/events/:id/publish` / `unpublish` / `verify` / `unverify` / `archive` / `restore` | `events:manage` ✅ (`cancel` comes with attendance) |
+| GET/POST/PATCH | `/admin/organizers`, `/admin/organizers/options`, `/admin/organizers/:id` | `events:view` / `events:manage` ✅ (contact details only with `events:manage`) |
+| POST | `/admin/organizers/:id/verify` / `unverify` / `archive` / `restore` | `events:manage` ✅ |
 | GET/POST/PATCH | `/admin/cities`, `/admin/cities/:id`, `/admin/cities/:id/areas`, `/admin/areas/:id` | `locations:manage` |
 | GET | `/admin/audit-logs` | `audit:view` |
 | GET/POST/PATCH | `/admin/admins`, `/admin/admins/:id` | `admins:manage` |

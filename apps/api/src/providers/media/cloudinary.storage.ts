@@ -59,7 +59,7 @@ export function createCloudinaryStorage(config: CloudinaryConfig): MediaStorage 
       return cloudinary.url(publicId, {
         secure: true,
         transformation: [
-          { width: size.width, height: size.height, crop: 'fill', gravity: 'face' },
+          { width: size.width, height: size.height, crop: 'fill', gravity: size.gravity },
           { fetch_format: 'auto', quality: 'auto' },
         ],
       });

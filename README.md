@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation, database, authentication and the **user profile system** are complete: OTP login, onboarding with an 18+ gate, profile and preferences, Cloudinary photo upload (EXIF stripped), profile completion and status, public profiles, and admin user management (list, detail, suspend/reactivate). Next: events. Matching, chat and payments come in later phases. See the [roadmap](#development-roadmap).
+> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). Identity verification and the safety system (block/report) are partly built and not yet wired in. Attendance, matching, chat and payments come in later phases. See the [roadmap](#development-roadmap).
 
 ---
 
@@ -85,7 +85,7 @@ Full reference: [docs/setup/environment-variables.md](docs/setup/environment-var
 
 ```bash
 npm run db:migrate    # create the schema
-npm run db:seed       # fictional development users (never runs in production)
+npm run db:seed       # fictional development users, admins, organizers and events (never runs in production)
 ```
 
 Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-setup.md](docs/database/database-setup.md).
@@ -93,7 +93,8 @@ Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-
 ## Logging in locally
 
 - **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
-- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`.
+- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. The event manager (`events@…`) manages events and organizers; moderators can view them only.
+- **Events** (http://localhost:5173/events): public, no login needed. The seed adds three published events and one draft.
 - **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password.
 
 Details: [docs/auth/authentication.md](docs/auth/authentication.md).
@@ -126,9 +127,9 @@ Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/s
 
 | App | Workspace | Dev URL | Description |
 |---|---|---|---|
-| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: health, member auth (`/auth/send-otp`, `/auth/verify-otp`, `/auth/refresh`, `/auth/logout`, `/auth/me`) and admin auth (`/admin/auth/*`) |
-| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login/OTP, 3-step onboarding, profile preview, edit profile, photo upload, preferences |
-| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, role-based navigation, users list/search, user detail, suspend/reactivate |
+| **API** | `@garba-partner/api` | http://127.0.0.1:4000/api/v1 | Express REST API + PostgreSQL. Currently: health, member auth (`/auth/*`), profiles (`/me/*`, `/users/:id/profile`), cities, public events (`/events`), admin auth, users, events and organizers (`/admin/*`) |
+| **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login/OTP, onboarding, profile, photo upload, preferences, **public events list and detail** (city/date filters, verified badges, Find a partner / Get pass) |
+| **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, role-based navigation, users, **events** (create/edit/publish/verify/archive, image upload) and **organizers** |
 
 Both Vite dev servers proxy `/api` to the API, so the apps use same-origin requests, as they will in production behind Nginx.
 
@@ -189,6 +190,14 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Cloudinary](docs/users/cloudinary.md) | Image pipeline, EXIF stripping, configuration, local dev storage |
 | [Privacy rules](docs/users/privacy-rules.md) | Who can see what, enforcement, checklist for new features |
 
+### Events
+
+| Document | Contents |
+|---|---|
+| [Event management](docs/events/event-management.md) | Fields, lifecycle (draft/published/archived), verification, web and admin screens, security, edge cases, tests |
+| [Organizer management](docs/events/organizer-management.md) | Public vs private organizer fields, how private info is protected, verification, archiving |
+| [Event API](docs/events/event-api.md) | **API reference**: public list/detail, admin events and organizers, pagination/filtering/sorting, examples, errors |
+
 ### Database
 
 | Document | Contents |
@@ -237,7 +246,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | — | Architecture & docs | Product, architecture and development documentation | ✅ Done |
 | **0** | Foundation | Monorepo, `packages/config` & `packages/shared`, TypeScript/ESLint/Prettier, API skeleton (health, envelope, error handling, redacted logging, tests), web/admin shells, setup docs | ✅ Done. Still open from the planned scope: CI workflow, PR template |
 | **1** | Member auth & profile | ✅ Database layer. ✅ Authentication (member OTP, admin password, sessions, middleware). ✅ **Profiles:** onboarding with 18+ gate, profile + preferences API, Cloudinary photo upload with EXIF stripping, completion % and status, public profile, cities/areas, admin user list/detail/suspend/reactivate + audit log. ⏳ **Remaining:** account deletion, "log out of all devices" UI | 🟡 Nearly done |
-| **2** | Admin foundation & events | Admin TOTP 2FA + forced password change (login/roles already done), audit log, admin management, cities/areas CRUD, events CRUD/publish/cancel, member events & attendance, in-app notifications | Planned |
+| **2** | Admin foundation & events | ✅ **Events:** organizers (public profile + private contact, verify, archive), events CRUD, publish/unpublish, verify, archive/restore, image upload, public list/detail with filters, sorting and pagination, web events pages. ⏳ **Remaining:** admin TOTP 2FA + forced password change, admin management, cities/areas CRUD, attendance ("going"/"looking for a partner"), event cancellation with notice, in-app notifications | 🟡 In progress |
 | **3** | Discovery, interests, matches & safety core | Event & city discovery, interests, matches, unmatch, block, report user, auto-hide, report queue, sanctions, user management | Planned |
 | **4** | Chat | Socket.IO chat, history, read receipts, message reports, contact-sharing nudge, realtime enforcement of blocks/sanctions | Planned |
 | **5** | Verification & moderation | Photo verification, verification & photo review queues, selfie retention job, safety centre | Planned |

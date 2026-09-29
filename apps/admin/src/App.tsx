@@ -5,7 +5,12 @@ import { PublicOnly, RequireAdmin } from './features/auth/guards';
 import { ApiClientError } from './lib/api-client';
 import { AdminLayout } from './pages/AdminLayout';
 import { DashboardPage } from './pages/DashboardPage';
+import { EventDetailPage } from './pages/EventDetailPage';
+import { EditEventPage, NewEventPage } from './pages/EventFormPage';
+import { EventsPage } from './pages/EventsPage';
 import { LoginPage } from './pages/LoginPage';
+import { EditOrganizerPage, NewOrganizerPage, OrganizerDetailPage } from './pages/OrganizerPages';
+import { OrganizersPage } from './pages/OrganizersPage';
 import { UserDetailPage } from './pages/UserDetailPage';
 import { UsersPage } from './pages/UsersPage';
 
@@ -51,6 +56,24 @@ const router = createBrowserRouter([
             children: [
               { path: '/users', element: <UsersPage /> },
               { path: '/users/:userId', element: <UserDetailPage /> },
+            ],
+          },
+          {
+            element: <RequireAdmin permission="events:view" />,
+            children: [
+              { path: '/events', element: <EventsPage /> },
+              { path: '/events/:eventId', element: <EventDetailPage /> },
+              { path: '/organizers', element: <OrganizersPage /> },
+              { path: '/organizers/:organizerId', element: <OrganizerDetailPage /> },
+            ],
+          },
+          {
+            element: <RequireAdmin permission="events:manage" />,
+            children: [
+              { path: '/events/new', element: <NewEventPage /> },
+              { path: '/events/:eventId/edit', element: <EditEventPage /> },
+              { path: '/organizers/new', element: <NewOrganizerPage /> },
+              { path: '/organizers/:organizerId/edit', element: <EditOrganizerPage /> },
             ],
           },
         ],

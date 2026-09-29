@@ -72,7 +72,9 @@ export function createBlocksService(deps: {
         return {
           userId: block.blockedId,
           name: profile?.displayName ?? null,
-          thumbnailUrl: profile?.imagePublicId ? media.url(profile.imagePublicId, 'thumbnail') : null,
+          thumbnailUrl: profile?.imagePublicId
+            ? media.url(profile.imagePublicId, 'thumbnail')
+            : null,
           blockedAt: block.createdAt.toISOString(),
         };
       });

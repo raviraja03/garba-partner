@@ -52,6 +52,27 @@ export const LIMITS = {
   ADMIN_RESOLUTION_NOTE_MIN: 5,
   ADMIN_RESOLUTION_NOTE_MAX: 2000,
 
+  // Events and organizers (docs/events/event-management.md)
+  EVENT_NAME_MIN: 3,
+  EVENT_NAME_MAX: 120,
+  EVENT_DESCRIPTION_MIN: 10,
+  EVENT_DESCRIPTION_MAX: 5000,
+  EVENT_VENUE_NAME_MAX: 150,
+  EVENT_VENUE_ADDRESS_MAX: 300,
+  /** Events can be scheduled at most this many days ahead. */
+  EVENT_MAX_DAYS_AHEAD: 730,
+  EVENT_URL_MAX: 500,
+  EVENT_PAGE_SIZE_DEFAULT: 12,
+  EVENT_PAGE_SIZE_MAX: 50,
+  PUBLIC_EVENT_REQUESTS_PER_MINUTE: 120,
+  ORGANIZER_NAME_MIN: 2,
+  ORGANIZER_NAME_MAX: 150,
+  ORGANIZER_DESCRIPTION_MAX: 1000,
+  ORGANIZER_CONTACT_NAME_MAX: 100,
+  ORGANIZER_NOTES_MAX: 2000,
+  /** Active organizers returned by the admin picker. */
+  ORGANIZER_OPTIONS_MAX: 500,
+
   // General API rate limit (per client IP)
   API_REQUESTS_PER_MINUTE: 300,
 

@@ -12,7 +12,10 @@ import {
  * plain references without foreign keys so entries survive account erasure.
  */
 @Table({ tableName: 'safety_logs', updatedAt: false })
-export class SafetyLog extends Model<InferAttributes<SafetyLog>, InferCreationAttributes<SafetyLog>> {
+export class SafetyLog extends Model<
+  InferAttributes<SafetyLog>,
+  InferCreationAttributes<SafetyLog>
+> {
   @Column({ type: DataType.UUID, primaryKey: true, defaultValue: DataType.UUIDV4 })
   override id!: CreationOptional<string>;
 

@@ -39,6 +39,7 @@ Failure handling:
 - **Server-side signed uploads only:** the API secret never leaves the server. The browser never gets an upload preset or signature.
 - **Processed in memory:** uploads are never written to the API server's disk.
 - Delivered images are transformed renditions (`card` 600×800 face-crop, `thumbnail` 160×160) with `f_auto,q_auto`.
+- **Event images** ([event management](../events/event-management.md)) use the same validation and EXIF/GPS stripping, uploaded by admins via `POST /api/v1/admin/events/:id/image`, delivered as `event_card` 800×450 and `event_banner` 1600×900 (`g_auto` crop).
 
 ## 3. Configuration
 
@@ -48,7 +49,7 @@ Failure handling:
 | `CLOUDINARY_CLOUD_NAME` | — | Required when `MEDIA_STORAGE=cloudinary` |
 | `CLOUDINARY_API_KEY` | — | Required when `MEDIA_STORAGE=cloudinary` |
 | `CLOUDINARY_API_SECRET` | — | Required when `MEDIA_STORAGE=cloudinary`. **Secret, server only** (never `VITE_*`) |
-| `CLOUDINARY_FOLDER_PREFIX` | `garba-partner` | Assets go to `<prefix>/<APP_ENV>/profile-images/<random>` |
+| `CLOUDINARY_FOLDER_PREFIX` | `garba-partner` | Assets go to `<prefix>/<APP_ENV>/profile-images/<random>` and event images to `<prefix>/<APP_ENV>/event-images/<random>` |
 
 ### Cloudinary account setup
 

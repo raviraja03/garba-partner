@@ -93,7 +93,11 @@ export function createReportsService(deps: {
               // Evidence survives later edits or deletion of the reported profile.
               evidence: {
                 profile: profile
-                  ? { name: profile.displayName, bio: profile.bio, imagePublicId: profile.imagePublicId }
+                  ? {
+                      name: profile.displayName,
+                      bio: profile.bio,
+                      imagePublicId: profile.imagePublicId,
+                    }
                   : null,
               },
             },
