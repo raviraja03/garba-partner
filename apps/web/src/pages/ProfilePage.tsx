@@ -31,12 +31,15 @@ export function ProfilePage() {
         </Alert>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Link to="/profile/edit" className={LINK_CLASS}>
           Edit profile
         </Link>
         <Link to="/profile/edit#photo" className={LINK_CLASS}>
           {profile.image ? 'Change photo' : 'Add photo'}
+        </Link>
+        <Link to="/profile/blocked" className={LINK_CLASS}>
+          Blocked members
         </Link>
         <Link to="/profile/preferences" className={LINK_CLASS}>
           Preferences

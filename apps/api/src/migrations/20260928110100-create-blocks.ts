@@ -2,7 +2,7 @@ import type { MigrationFn } from 'umzug';
 import type { MigrationContext } from '../config/umzug.js';
 import { runInTransaction } from '../lib/migration-helpers.js';
 
-/** Member blocks (docs/safety/blocking.md). Effects are symmetric and enforced in every query. */
+/** Member blocks (docs/safety/abuse-prevention.md#2-blocking). Effects are symmetric and enforced in every query. */
 export const up: MigrationFn<MigrationContext> = async ({ context: { sequelize } }) => {
   await runInTransaction(sequelize, [
     `CREATE TABLE blocks (

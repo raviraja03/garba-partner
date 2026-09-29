@@ -44,6 +44,10 @@ export function createAdminReportsRouter(deps: {
     ok(res, await service.conversation(actor(req), reportId(req)));
   });
 
+  router.post('/:reportId/assign', async (req, res) => {
+    ok(res, await service.assign(actor(req), reportId(req)), 'Report assigned to you');
+  });
+
   router.post('/:reportId/resolve', async (req, res) => {
     const input = parseInput(adminResolveReportSchema, req.body);
     ok(res, await service.resolve(actor(req), reportId(req), input), 'Report resolved');

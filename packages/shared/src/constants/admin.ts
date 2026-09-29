@@ -13,6 +13,7 @@ export const ADMIN_PERMISSIONS = [
   'users:view',
   'users:sanction',
   'users:reveal_phone',
+  'users:unban',
   'reports:manage',
   'verifications:review',
   'photos:review',
@@ -20,6 +21,7 @@ export const ADMIN_PERMISSIONS = [
   'events:manage',
   'locations:manage',
   'audit:view',
+  'safety_logs:view',
   'admins:manage',
 ] as const;
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -31,6 +33,7 @@ export const ROLE_PERMISSIONS: Readonly<Record<AdminRole, readonly AdminPermissi
     'users:view',
     'users:sanction',
     'reports:manage',
+    'safety_logs:view',
     'verifications:review',
     'photos:review',
     'events:view',

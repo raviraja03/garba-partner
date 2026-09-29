@@ -15,7 +15,7 @@ import {
 } from 'sequelize-typescript';
 import { User } from './user.model.js';
 
-/** `blocker` blocked `blocked`. Effects are symmetric (docs/safety/blocking.md). */
+/** `blocker` blocked `blocked`. Effects are symmetric (docs/safety/abuse-prevention.md#2-blocking). */
 @Table({ tableName: 'blocks', updatedAt: false })
 export class Block extends Model<InferAttributes<Block>, InferCreationAttributes<Block>> {
   @Column({ type: DataType.UUID, primaryKey: true, defaultValue: DataType.UUIDV4 })

@@ -40,10 +40,11 @@ Permission: **`reports:manage`** (moderators, super admins). Event managers get 
 
 | Method | Path | Description |
 |---|---|---|
-| GET | `/api/v1/admin/reports` | Queue: open and in-review by default (`status`, `priority` filters), ordered **P0 first, then oldest**. Items include `involvesChat` and the number of open reports against the member |
+| GET | `/api/v1/admin/reports` | Queue: open and in-review by default (`status`, `priority`, `reason`, `source` filters), ordered **P0 first, then oldest**. Items include `involvesChat`, `trigger` (automated flags) and the number of open reports against the member |
 | GET | `/api/v1/admin/reports/:id` | Detail: reporter's details, profile snapshot, **message snapshot**, other reports about the member, whether the conversation may be opened, resolution. Opening a report does **not** open the conversation |
 | GET | `/api/v1/admin/reports/:id/conversation` | **Audited.** Live conversation around the reported message |
-| POST | `/api/v1/admin/reports/:id/resolve` | `{ action, note, clearAutoHide? }` |
+| POST | `/api/v1/admin/reports/:id/assign` | Review: `in_review`, assigned to you. Audited `report.assign` |
+| POST | `/api/v1/admin/reports/:id/resolve` | `{ action, note, durationDays?, clearAutoHide? }` ([admin actions](../safety/admin-actions.md#3-resolving-a-report)) |
 
 ### Conversation access
 
@@ -63,16 +64,17 @@ In the admin UI the conversation opens only on an explicit **Open conversation (
 | Action | Effect |
 |---|---|
 | `dismiss` | Report `dismissed`. Optionally `clearAutoHide` shows the member in discovery again |
-| `warn` | Report `resolved` (recorded; warning notifications come later). Optionally `clearAutoHide` |
-| `suspend` | Account `suspended`, **all sessions revoked**, open sockets disconnected (`session:ended`) |
-| `ban` | Account `banned`, sessions revoked, **every active match closed** (`match:ended` to partners), pending interests cancelled, sockets disconnected |
+| `warn` | Report `resolved`; the member gets an in-app **warning** citing the guideline and must acknowledge it. Optionally `clearAutoHide` |
+| `restrict_chat` | The member can read but **not send** messages (`CHAT_RESTRICTED`), optionally for 1/3/7/30 days |
+| `suspend` | Account `suspended` (optionally timed), **all sessions revoked**, open sockets disconnected (`session:ended`) |
+| `ban` | Only on a report **in review**. Account `banned`, sessions revoked, **every active match closed** (`match:ended` to partners), pending interests cancelled, sockets disconnected |
 
-Every resolution requires a note (5–2000 characters) and is audited as `report.resolve`. A report can be resolved once (`409` afterwards).
+Every resolution requires a note (5–2000 characters) and is audited as `report.resolve`; sanctions are recorded in `user_sanctions` and audited as `user.*` ([admin actions](../safety/admin-actions.md)). A report can be resolved once (`409` afterwards).
 
 ## 4. Admin UI
 
 - **Reports** (`/reports`): queue with priority badges, reason, "chat" marker, reported member (with count of open reports), status and age.
-- **Report detail** (`/reports/:id`): reporter's details, profile snapshot, message snapshot (reported message highlighted, contact-detail flags), audited **Open conversation (logged)**, other reports, resolution form.
+- **Report detail** (`/reports/:id`): **Assign to me**, reporter's details (or the automated flag's signals), profile snapshot, message snapshot (reported message highlighted, contact-detail flags), audited **Open conversation (logged)**, sanction history, other reports, resolution form with durations.
 - From a member's page (`/users/:id`), moderators can still close individual matches and restrict interactions ([matches §5](../matching/matches.md#5-admin-moderation)).
 
 ## 5. What moderators never see

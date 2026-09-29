@@ -49,6 +49,7 @@ Defined once in `packages/shared/src/constants/admin.ts` (`ROLE_PERMISSIONS`). *
 | `users:view` | ✅ | ✅ | ❌ |
 | `users:sanction` | ✅ | ✅ | ❌ |
 | `users:reveal_phone` | ✅ | ❌ | ❌ |
+| `users:unban` | ✅ | ❌ | ❌ |
 | `reports:manage` | ✅ | ✅ | ❌ |
 | `verifications:review` | ✅ | ✅ | ❌ |
 | `photos:review` | ✅ | ✅ | ❌ |
@@ -56,6 +57,7 @@ Defined once in `packages/shared/src/constants/admin.ts` (`ROLE_PERMISSIONS`). *
 | `events:manage` | ✅ | ❌ | ✅ |
 | `locations:manage` | ✅ | ❌ | ✅ |
 | `audit:view` | ✅ | ❌ | ❌ |
+| `safety_logs:view` | ✅ | ✅ | ❌ |
 | `admins:manage` | ✅ | ❌ | ❌ |
 
 `GET /api/v1/admin/auth/me` returns the admin's `permissions`. The admin panel shows only permitted navigation items, and `RequireAdmin permission="…"` redirects on the client. This is UX only.

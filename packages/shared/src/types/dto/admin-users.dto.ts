@@ -5,6 +5,7 @@ import type {
   VerificationType,
 } from '../../constants/enums.js';
 import type { AdminConnectionSummaryDto } from './interest.dto.js';
+import type { AdminSanctionDto } from './safety.dto.js';
 import type { OwnProfileDto, PreferencesDto, ProfileCompletionDto } from './profile.dto.js';
 
 /** Row of `GET /api/v1/admin/users`. Never contains the phone number. */
@@ -34,7 +35,11 @@ export interface AdminUserDetailDto {
   hiddenFromDiscovery: boolean;
   /** Admin safety restriction: cannot send or accept interests (docs/matching/matches.md). */
   interactionsRestricted: boolean;
+  /** Moderator restriction: cannot send chat messages (docs/safety/admin-actions.md). */
+  chatRestricted: boolean;
   connections: AdminConnectionSummaryDto;
+  /** Newest first (at most `LIMITS.ADMIN_SANCTIONS_SHOWN`). Includes internal notes. */
+  sanctions: AdminSanctionDto[];
   termsVersion: string | null;
   createdAt: string;
   lastActiveAt: string | null;

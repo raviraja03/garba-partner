@@ -24,6 +24,42 @@ export function looksLikeContactDetails(text: string): boolean {
 }
 
 /**
+ * Requests for money, payments or financial secrets, in English and common Hinglish/Gujarati
+ * phrasing. Mentions of prices ("the pass is ₹500") are NOT matched: only asking someone to pay,
+ * send, lend or share payment details.
+ */
+const MONEY_REQUEST_PATTERNS: readonly RegExp[] = [
+  // "send me 500", "transfer us ₹2000", "pay me"
+  /\b(?:send|transfer|lend|give)\s+(?:me|us)\s+(?:₹\s?|rs\.?\s?)?\d/i,
+  /\bpay\s+(?:me|us)\b/i,
+  // "can you send money", "lend some cash", "transfer 2000 rupees"
+  /\b(?:send|transfer|lend|borrow)\b[^.?!\n]{0,40}(?:\b(?:money|cash|rupees?|rs|inr|funds?|loan)\b|₹)/i,
+  // "I need money urgently"
+  /\bneed\b[^.?!\n]{0,30}\b(?:money|cash|loan|funds)\b/i,
+  // Payment apps and UPI requests
+  /\b(?:g\s?pay|google\s?pay|phone\s?pe|paytm|upi|bhim)\b/i,
+  // Financial secrets and classic scam hooks
+  /\b(?:otp|cvv|ifsc|atm\s?pin|card\s?number|account\s?number|bank\s?details)\b/i,
+  /\b(?:gift\s?cards?|crypto|bitcoin|investment\s?(?:plan|scheme|opportunity))\b/i,
+  // Hinglish / Gujarati: "paise bhejo", "paisa chahiye", "udhaar", "rupiya moklo"
+  /\b(?:paise|paisa|paisay|rupiya|rupaye|rupiye)\b[^.?!\n]{0,20}\b(?:bhej|chahiye|de\s?do|dedo|do|moklo|mokal|aapo|apo)/i,
+  /\b(?:udhaar|udhar|udhari)\b/i,
+];
+
+/**
+ * A chat message that looks like a request for money or payment details (a common scam). Chat
+ * does not block it: the recipient sees a scam warning and repeated requests are flagged to
+ * moderators (docs/safety/abuse-prevention.md#5-scam-and-money-warnings).
+ */
+export function looksLikeMoneyRequest(text: string): boolean {
+  return (
+    MONEY_REQUEST_PATTERNS.some((pattern) => pattern.test(text)) ||
+    // A bare UPI ID ("name@okaxis") is a payment request in a dating/partner chat.
+    (UPI_LIKE.test(text) && !EMAIL_LIKE.test(text))
+  );
+}
+
+/**
  * Phone numbers or email addresses (links allowed). Guards public event and organizer text so
  * private organizer contact details are not published by accident (docs/events/organizer-management.md).
  */

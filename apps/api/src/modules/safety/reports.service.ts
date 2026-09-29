@@ -38,7 +38,7 @@ export interface ReportsService {
 type EvidenceMessage = NonNullable<ReportEvidence['messages']>[number];
 
 /**
- * Member reports (docs/safety/reporting.md, docs/chat/moderation.md). The reported member is
+ * Member reports (docs/safety/moderation-system.md, docs/chat/moderation.md). The reported member is
  * never told who reported them. Automatic protection: a P0 report (underage, safety threat) or
  * reports from several different members hide the reported member from discovery until a
  * moderator reviews. A report about a chat message copies that message and the preceding

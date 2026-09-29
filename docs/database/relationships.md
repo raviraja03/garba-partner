@@ -47,6 +47,9 @@ flowchart LR
 | `matches` | `messages` | 1 : 0..n | `messages.match_id` | FK | `CASCADE` | none (queried by match) |
 | `users` | `messages` | 1 : 0..n (sender) | `messages.sender_id` | FK + `UNIQUE (sender_id, client_message_id)` | `CASCADE` | none |
 | `messages` / `matches` | `reports` | 0..1 : 0..n | `reports.message_id`, `reports.match_id` | FK | `SET NULL` (evidence snapshot survives) | none |
+| `users` | `user_sanctions` | 1 : 0..n | `user_sanctions.user_id` | FK | `RESTRICT` | `(user_id, created_at DESC)`; partial unique one active non-warning sanction per type |
+| `reports` | `user_sanctions` | 0..1 : 0..n | `user_sanctions.report_id` | FK | `SET NULL` | partial `(report_id)` |
+| `admin_users` | `user_sanctions` | 1 : 0..n (creator, revoker) | `created_by_admin_id`, `revoked_by_admin_id` | FK | `RESTRICT` | none |
 | `admin_users` | `user_verifications` | 0..1 : 0..n (reviewer) | `user_verifications.reviewed_by_admin_id` | FK (nullable) | `RESTRICT` | none yet (added with the verification review feature) |
 
 "0..1" rather than "1": a user exists as soon as their phone is verified, and the profile and preferences are created during onboarding. The service layer creates **both in one transaction** when onboarding completes.

@@ -19,7 +19,7 @@ export interface SafetyLogger {
   record(event: SafetyEvent): Promise<void>;
 }
 
-/** Suspicious-activity logging (docs/safety/privacy.md#suspicious-activity-logging). */
+/** Suspicious-activity logging (docs/safety/abuse-prevention.md#6-safety-logs). */
 export function createSafetyLogger(deps: { ipHashSecret: string; logger: Logger }): SafetyLogger {
   return {
     async record(event) {

@@ -1,5 +1,6 @@
 import { Router, type Request, type RequestHandler } from 'express';
 import {
+  adminSanctionSchema,
   adminUserActionSchema,
   adminUserListQuerySchema,
   uuidParamSchema,
@@ -23,6 +24,7 @@ export function createAdminUsersRouter(deps: {
   const router = Router();
   const canView = [authenticateAdmin, requirePermission('users:view')];
   const canSanction = [authenticateAdmin, requirePermission('users:sanction')];
+  const canUnban = [authenticateAdmin, requirePermission('users:unban')];
 
   router.get('/', ...canView, async (req, res) => {
     const query = parseInput(adminUserListQuerySchema, req.query);
@@ -37,16 +39,52 @@ export function createAdminUsersRouter(deps: {
     ok(res, await service.get(userId));
   });
 
-  router.post('/:userId/suspend', ...canSanction, async (req, res) => {
+  // Moderator sanctions (docs/safety/admin-actions.md). Every action is audited.
+  router.post('/:userId/warn', ...canSanction, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const input = parseInput(adminSanctionSchema, req.body);
+    ok(res, await service.warn(actor(req), userId, input), 'Warning sent');
+  });
+
+  router.post('/:userId/restrict-chat', ...canSanction, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const input = parseInput(adminSanctionSchema, req.body);
+    ok(res, await service.restrictChat(actor(req), userId, input), 'Chat restricted');
+  });
+
+  router.post('/:userId/lift-chat-restriction', ...canSanction, async (req, res) => {
     const userId = parseInput(uuidParamSchema, req.params.userId);
     const { reason } = parseInput(adminUserActionSchema, req.body);
-    ok(res, await service.suspend(actor(req), userId, reason), 'User suspended');
+    ok(
+      res,
+      await service.liftChatRestriction(actor(req), userId, reason),
+      'Chat restriction lifted',
+    );
+  });
+
+  router.post('/:userId/suspend', ...canSanction, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const input = parseInput(adminSanctionSchema, req.body);
+    ok(res, await service.suspend(actor(req), userId, input), 'User suspended');
   });
 
   router.post('/:userId/reactivate', ...canSanction, async (req, res) => {
     const userId = parseInput(uuidParamSchema, req.params.userId);
     const { reason } = parseInput(adminUserActionSchema, req.body);
     ok(res, await service.reactivate(actor(req), userId, reason), 'User reactivated');
+  });
+
+  // Bans are permanent and manual; lifting one is reserved to super admins (`users:unban`).
+  router.post('/:userId/ban', ...canSanction, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const input = parseInput(adminSanctionSchema, req.body);
+    ok(res, await service.ban(actor(req), userId, input), 'User banned');
+  });
+
+  router.post('/:userId/unban', ...canUnban, async (req, res) => {
+    const userId = parseInput(uuidParamSchema, req.params.userId);
+    const { reason } = parseInput(adminUserActionSchema, req.body);
+    ok(res, await service.unban(actor(req), userId, reason), 'Ban lifted');
   });
 
   router.post('/:userId/restrict-interactions', ...canSanction, async (req, res) => {

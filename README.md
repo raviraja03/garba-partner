@@ -2,7 +2,7 @@
 
 **A safe, event-first platform for adults (18+) to discover Garba events, find a dance partner going to the same event, connect by mutual consent and chat in the app. Buying event passes will come later.**
 
-> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). **Partner discovery** and **interests & matches** are live: ranked suggestions filtered by mutual preferences, city, date, level, event and verification; request → accept interests with exactly one match per pair; block, report and admin match moderation. **Real-time chat** (Socket.IO) connects matched members, with read receipts, unread counts, message reports and an admin reports queue with audited conversation review. Payments come in a later phase; identity verification and the admin reports queue are still pending. See the [roadmap](#development-roadmap).
+> **Status:** Foundation, database, authentication, the **user profile system** and **event management** are complete: OTP login, onboarding with an 18+ gate, profiles and preferences, Cloudinary photo upload (EXIF stripped), admin user management, and events with organizers (public event browsing with city/date filters, verified-organizer badges, admin create/edit/publish/verify/archive). **Partner discovery** and **interests & matches** are live: ranked suggestions filtered by mutual preferences, city, date, level, event and verification; request → accept interests with exactly one match per pair; block, report and admin match moderation. **Real-time chat** (Socket.IO) connects matched members, with read receipts, unread counts, message reports and an admin reports queue with audited conversation review. The **safety and moderation system** is complete: reports with product reasons, block/unblock, warnings, chat restrictions, timed suspensions and bans (always decided by a moderator), automated suspicious-activity flags, scam/money warnings, a safety centre and community guidelines, and audited admin actions with safety and audit log viewers. Payments come in a later phase. See the [roadmap](#development-roadmap).
 
 ---
 
@@ -217,6 +217,16 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Chat moderation](docs/chat/moderation.md) | Message reports and evidence, **admin reports queue**, audited conversation access, resolutions |
 | [Chat safety](docs/chat/safety.md) | Who can chat and how it is enforced, contact-sharing nudge, rate limits, retention, privacy |
 
+### Safety & moderation
+
+| Document | Contents |
+|---|---|
+| [Moderation system](docs/safety/moderation-system.md) | Architecture, report reasons and priorities, automatic protection (and the no-auto-ban rule), **moderation queue API**, member notices API, database changes, tests |
+| [Admin actions](docs/safety/admin-actions.md) | Review, warn, restrict chat, suspend, ban, dismiss, lift: effects, permissions, **API reference**, expiry job, audit trail |
+| [Abuse prevention](docs/safety/abuse-prevention.md) | Blocking, every rate limit, suspicious-activity detection, scam/money warnings, safety logs, false reports, ban evasion |
+| [Incident response](docs/safety/incident-response.md) | Severity levels, investigation tools, playbooks (threats, under-18, scams, compromised accounts, admin misuse), communication |
+| [Community guidelines](docs/safety/community-guidelines.md) | The guidelines, where they are shown, how they map to report reasons |
+
 ### Database
 
 | Document | Contents |
@@ -268,7 +278,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **2** | Admin foundation & events | ✅ **Events:** organizers (public profile + private contact, verify, archive), events CRUD, publish/unpublish, verify, archive/restore, image upload, public list/detail with filters, sorting and pagination, web events pages. ⏳ **Remaining:** admin TOTP 2FA + forced password change, admin management, cities/areas CRUD, attendance ("going"/"looking for a partner"), event cancellation with notice, in-app notifications | 🟡 In progress |
 | **3** | Discovery, interests, matches & safety core | ✅ **Discovery** (`/partners`, mutual preferences, filters, deterministic ranking without exposing scores). ✅ **Interests & matches:** send/accept/reject/withdraw, mutual interest → exactly one match (DB-enforced), unmatch, block/report end matches, admin match history + close match + interaction restriction. ✅ Event attendance, **block**, **report user**, auto-hide. ⏳ **Remaining:** admin report queue, sanctions from reports | 🟡 Nearly done |
 | **4** | Chat | ✅ Socket.IO chat (handshake auth, per-event session checks), history, read receipts, unread counts, REST fallback, message reports with evidence snapshots, contact-sharing nudge, live enforcement of blocks/unmatch/sanctions, admin reports queue with audited conversation review. ⏳ Retention purge job (hardening phase) | ✅ Done |
-| **5** | Verification & moderation | Photo verification, verification & photo review queues, selfie retention job, safety centre | Planned |
+| **5** | Safety & moderation | ✅ Product report reasons, block/unblock UI, warnings with acknowledgement, chat restriction, timed suspensions, bans (manual, reviewed), sanction history, expiry job, suspicious-activity flags, scam/money warnings, safety centre, community guidelines, safety and audit log viewers. ⏳ Photo verification and photo/verification review queues, reporter notifications, `banned_phone_hashes` (with account deletion) | ✅ Done (moderation) |
 | **6** | Hardening & launch | Security review, load test, Nginx/PM2/VPS, TLS, backups & restore drill, legal pages, SMS DLT, runbooks | Planned |
 
 ### Post-MVP (indicative)

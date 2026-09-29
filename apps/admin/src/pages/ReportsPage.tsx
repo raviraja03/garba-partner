@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router';
-import { REPORT_STATUSES } from '@garba-partner/shared';
+import { REPORT_REASONS, REPORT_STATUSES } from '@garba-partner/shared';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { FILTER_CLASS } from '../components/ui/styles';
+import { TRIGGER_LABELS } from '../features/moderation/labels';
 import { useReportList } from '../features/reports/hooks';
 import { PRIORITY_LABELS, REASON_LABELS, STATUS_LABELS } from '../features/reports/labels';
 import type { ReportFilters } from '../features/reports/reports-api';
@@ -15,9 +16,17 @@ const PRIORITY_CLASS = [
   'bg-black/5 text-muted',
 ] as const;
 
-/** Moderation queue: open and in-review reports, most urgent first, then oldest. */
+/**
+ * Moderation queue: open and in-review reports (member reports and automated flags), most urgent
+ * first, then oldest.
+ */
 export function ReportsPage() {
-  const [filters, setFilters] = useState<ReportFilters>({ status: '', priority: '' });
+  const [filters, setFilters] = useState<ReportFilters>({
+    status: '',
+    priority: '',
+    reason: '',
+    source: '',
+  });
   const list = useReportList(filters);
   const reports = list.data?.pages.flatMap((page) => page.items) ?? [];
 
@@ -61,6 +70,39 @@ export function ReportsPage() {
             </option>
           ))}
         </select>
+        <label className="sr-only" htmlFor="report-reason">
+          Reason
+        </label>
+        <select
+          id="report-reason"
+          value={filters.reason}
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, reason: e.target.value as ReportFilters['reason'] }));
+          }}
+          className={FILTER_CLASS}
+        >
+          <option value="">All reasons</option>
+          {REPORT_REASONS.map((r) => (
+            <option key={r} value={r}>
+              {REASON_LABELS[r]}
+            </option>
+          ))}
+        </select>
+        <label className="sr-only" htmlFor="report-source">
+          Source
+        </label>
+        <select
+          id="report-source"
+          value={filters.source}
+          onChange={(e) => {
+            setFilters((f) => ({ ...f, source: e.target.value as ReportFilters['source'] }));
+          }}
+          className={FILTER_CLASS}
+        >
+          <option value="">Members &amp; automated flags</option>
+          <option value="member">Member reports</option>
+          <option value="system">Automated flags</option>
+        </select>
       </div>
 
       {list.isError && <Alert tone="error">{list.error.message}</Alert>}
@@ -103,6 +145,11 @@ export function ReportsPage() {
                     {REASON_LABELS[report.reason]}
                   </Link>
                   {report.involvesChat && <span className="ml-2 text-xs text-muted">chat</span>}
+                  {report.trigger && (
+                    <span className="mt-0.5 block text-xs font-semibold text-amber-800">
+                      {TRIGGER_LABELS[report.trigger]}
+                    </span>
+                  )}
                 </td>
                 <td className="px-4 py-3">
                   {report.reportedUser.name ?? 'No profile'}

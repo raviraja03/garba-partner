@@ -25,6 +25,14 @@ Tests cover each rule over **both** REST and Socket.IO ([architecture §9](archi
 
 Before a message that looks like a **phone number, email, link or UPI ID** is sent, the sender sees a non-blocking prompt: "Sharing contact or payment details? Only share with people you trust…" with **Send anyway**. The server doesn't block such messages (adults may choose to share) but records `contains_contact_info = true` on the message as **moderation context only**; it is never shown to members and appears to moderators only in report evidence.
 
+### Money-request warnings
+
+Messages that look like requests for money or payment details (`looksLikeMoneyRequest`) get a scam warning under them for the **recipient**, with a one-click report pre-set to *Asking for money*. The **sender** sees a nudge that asking for money breaks the guidelines (**Send anyway** still works). The server records `contains_money_request` (moderation context only), and repeated requests open an automated flag for moderators ([abuse prevention §5](../safety/abuse-prevention.md#5-scam-and-money-warnings)).
+
+### Chat restriction
+
+A moderator can **restrict chat** for a member (optionally 1/3/7/30 days). Every send, REST or socket, re-checks it inside the send transaction and fails with `403 CHAT_RESTRICTED`; the socket stays connected and reading still works. The web app replaces the composer with a notice ([admin actions](../safety/admin-actions.md)).
+
 ## 4. Abuse controls
 
 | Control | Limit |

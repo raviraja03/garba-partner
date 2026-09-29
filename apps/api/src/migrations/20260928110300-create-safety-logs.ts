@@ -3,7 +3,7 @@ import type { MigrationContext } from '../config/umzug.js';
 import { runInTransaction } from '../lib/migration-helpers.js';
 
 /**
- * Suspicious-activity log (docs/safety/privacy.md#suspicious-activity-logging). Append-only.
+ * Suspicious-activity log (docs/safety/abuse-prevention.md#6-safety-logs). Append-only.
  * `user_id` / `admin_id` are plain references WITHOUT foreign keys: log rows must survive
  * account erasure and must never be modified (an FK with SET NULL would be an UPDATE).
  * `metadata` never contains phone numbers, OTPs, message text, tokens or raw IP addresses.

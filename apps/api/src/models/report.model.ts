@@ -30,8 +30,10 @@ import { User } from './user.model.js';
 /** Snapshot of the reported member's public profile at report time. */
 export interface ReportEvidence {
   profile?: { name: string; bio: string | null; imagePublicId: string | null } | null;
-  /** System reports: what triggered them (e.g. `identity_verification`). */
+  /** System reports: the automated detection that raised them (`SUSPICIOUS_ACTIVITY_TRIGGERS`). */
   trigger?: string;
+  /** System reports: counts behind the detection (never message text or contact details). */
+  signals?: Record<string, unknown>;
   /**
    * Chat reports: the reported message(s) plus up to `LIMITS.REPORT_MESSAGE_CONTEXT` earlier
    * messages, copied at report time so they survive unmatch or deletion.
@@ -46,7 +48,7 @@ export interface ReportEvidence {
   }[];
 }
 
-/** A report about a member (docs/safety/reporting.md). */
+/** A report about a member (docs/safety/moderation-system.md). */
 @Table({ tableName: 'reports' })
 export class Report extends Model<InferAttributes<Report>, InferCreationAttributes<Report>> {
   @Column({ type: DataType.UUID, primaryKey: true, defaultValue: DataType.UUIDV4 })

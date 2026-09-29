@@ -71,7 +71,7 @@ describe.skipIf(!hasTestDatabase)('admin reports and conversation review (integr
 
   it('orders the queue by priority, then age', async () => {
     const low = await chatReport('other');
-    const urgent = await chatReport('safety_threat');
+    const urgent = await chatReport('threatening_behavior');
     const moderator = await loginAdmin(app, ip, 'moderator');
     const res = await request(app).get('/api/v1/admin/reports').set(bearer(moderator.accessToken));
     expect((res.body.data as AdminReportListItemDto[]).map((r) => r.id)).toEqual([
@@ -188,6 +188,17 @@ describe.skipIf(!hasTestDatabase)('admin reports and conversation review (integr
       .expect(201);
 
     const moderator = await loginAdmin(app, ip, 'moderator');
+    // Never on an unreviewed report: the moderator must take it into review first.
+    await request(app)
+      .post(`/api/v1/admin/reports/${reportId}/resolve`)
+      .set(bearer(moderator.accessToken))
+      .send({ action: 'ban', note: 'Repeated harassment' })
+      .expect(409);
+    expect((await User.findByPk(b.userId))?.status).toBe('active');
+    await request(app)
+      .post(`/api/v1/admin/reports/${reportId}/assign`)
+      .set(bearer(moderator.accessToken))
+      .expect(200);
     await request(app)
       .post(`/api/v1/admin/reports/${reportId}/resolve`)
       .set(bearer(moderator.accessToken))
@@ -198,7 +209,7 @@ describe.skipIf(!hasTestDatabase)('admin reports and conversation review (integr
   });
 
   it('dismisses and can clear the automatic hide', async () => {
-    const { b, reportId } = await chatReport('safety_threat'); // P0 → auto-hidden
+    const { b, reportId } = await chatReport('threatening_behavior'); // P0 → auto-hidden
     expect((await User.findByPk(b.userId))?.hiddenFromDiscovery).toBe(true);
     const moderator = await loginAdmin(app, ip, 'moderator');
     const res = await request(app)

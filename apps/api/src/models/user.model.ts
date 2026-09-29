@@ -91,6 +91,13 @@ export class User extends Model<InferAttributes<User>, InferCreationAttributes<U
   @Column({ type: DataType.DATE, allowNull: true })
   interactionsRestrictedAt!: CreationOptional<Date | null>;
 
+  /**
+   * Moderator restriction: cannot send chat messages. Cached projection of an active
+   * `chat_restriction` sanction (docs/safety/admin-actions.md).
+   */
+  @Column({ type: DataType.DATE, allowNull: true })
+  chatRestrictedAt!: CreationOptional<Date | null>;
+
   @Column({ type: DataType.STRING(20), allowNull: true })
   termsVersion!: CreationOptional<string | null>;
 

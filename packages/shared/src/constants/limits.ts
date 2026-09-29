@@ -43,12 +43,24 @@ export const LIMITS = {
   IDENTITY_SESSION_TTL_MINUTES: 30,
   VERIFICATION_WEBHOOK_TOLERANCE_SECONDS: 300,
 
-  // Safety (docs/safety/reporting.md, docs/safety/blocking.md)
+  // Safety (docs/safety/moderation-system.md, docs/safety/abuse-prevention.md)
   REPORTS_PER_DAY: 10,
   REPORT_DETAILS_MAX_LENGTH: 1000,
   BLOCKS_PER_HOUR: 30,
   AUTO_HIDE_REPORT_THRESHOLD: 3,
   AUTO_HIDE_WINDOW_DAYS: 7,
+  /** Unblocks per member per hour (block/unblock churn is used to harass). */
+  UNBLOCKS_PER_HOUR: 30,
+  /** Suspicious activity (docs/safety/abuse-prevention.md#4-suspicious-activity-detection). */
+  SUSPICIOUS_MONEY_MESSAGES: 3,
+  SUSPICIOUS_MONEY_WINDOW_HOURS: 24,
+  SUSPICIOUS_REPEATED_MESSAGE_CHATS: 4,
+  SUSPICIOUS_REPEATED_WINDOW_HOURS: 1,
+  SUSPICIOUS_REPEATED_MIN_LENGTH: 20,
+  SUSPICIOUS_BLOCKED_BY_MEMBERS: 5,
+  SUSPICIOUS_BLOCKED_WINDOW_DAYS: 7,
+  /** Sanctions shown on an admin user or report page. */
+  ADMIN_SANCTIONS_SHOWN: 50,
   ADMIN_RESOLUTION_NOTE_MIN: 5,
   ADMIN_RESOLUTION_NOTE_MAX: 2000,
 

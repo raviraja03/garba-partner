@@ -38,13 +38,6 @@ export async function fetchUsers(
 export const fetchUser = (userId: string) =>
   api<AdminUserDetailDto>(`/admin/users/${userId}`, { authenticated: true });
 
-export const suspendUser = (userId: string, reason: string) =>
-  api<AdminUserDetailDto>(`/admin/users/${userId}/suspend`, {
-    method: 'POST',
-    body: { reason },
-    authenticated: true,
-  });
-
 export const fetchUserMatches = (userId: string) =>
   api<AdminMatchDto[]>(`/admin/users/${userId}/matches`, { authenticated: true });
 
@@ -60,10 +53,3 @@ export const setInteractionRestriction = (userId: string, restrict: boolean, rea
     `/admin/users/${userId}/${restrict ? 'restrict-interactions' : 'lift-interaction-restriction'}`,
     { method: 'POST', body: { reason }, authenticated: true },
   );
-
-export const reactivateUser = (userId: string, reason: string) =>
-  api<AdminUserDetailDto>(`/admin/users/${userId}/reactivate`, {
-    method: 'POST',
-    body: { reason },
-    authenticated: true,
-  });

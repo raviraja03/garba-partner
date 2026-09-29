@@ -1,6 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AdminResolveReportInput } from '@garba-partner/shared';
 import {
+  assignReport,
   fetchConversation,
   fetchReport,
   fetchReports,
@@ -37,6 +38,17 @@ export function useOpenConversation(reportId: string) {
   return useMutation({
     mutationFn: () => fetchConversation(reportId),
     onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: reportKeys.all });
+    },
+  });
+}
+
+export function useAssignReport(reportId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => assignReport(reportId),
+    onSuccess: async (report) => {
+      queryClient.setQueryData(reportKeys.detail(reportId), report);
       await queryClient.invalidateQueries({ queryKey: reportKeys.all });
     },
   });

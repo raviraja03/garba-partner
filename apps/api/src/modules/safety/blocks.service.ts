@@ -6,16 +6,18 @@ import type { MediaStorage } from '../../providers/media/index.js';
 import type { RealtimeHub } from '../../realtime/hub.js';
 import { emitMatchEnded, endConnections, lockPair } from '../interests/connections.js';
 import type { SafetyLogger } from './safety-log.service.js';
+import type { SuspiciousActivityDetector } from './suspicious-activity.service.js';
 
 export interface BlocksService {
   /** Idempotent. Returns true when a new block was created. */
   block(blockerId: string, targetUserId: string, ip: string): Promise<boolean>;
-  unblock(blockerId: string, targetUserId: string): Promise<void>;
+  /** Idempotent. Returns true when a block was removed. */
+  unblock(blockerId: string, targetUserId: string, ip: string): Promise<boolean>;
   list(blockerId: string): Promise<BlockedMemberDto[]>;
 }
 
 /**
- * Blocking (docs/safety/blocking.md): instant, silent (the other member is never told) and
+ * Blocking (docs/safety/abuse-prevention.md#2-blocking): instant, silent (the other member is never told) and
  * symmetric in effect — neither member can see or interact with the other.
  */
 export function createBlocksService(deps: {
@@ -23,8 +25,9 @@ export function createBlocksService(deps: {
   media: MediaStorage;
   safetyLog: SafetyLogger;
   hub: RealtimeHub;
+  suspicious: SuspiciousActivityDetector;
 }): BlocksService {
-  const { sequelize, media, safetyLog, hub } = deps;
+  const { sequelize, media, safetyLog, hub, suspicious } = deps;
 
   return {
     async block(blockerId, targetUserId, ip) {
@@ -62,13 +65,26 @@ export function createBlocksService(deps: {
           ip,
           metadata: { blockedUserId: targetUserId },
         });
+        // Many members blocking the same person is a signal for moderators (never a sanction).
+        await suspicious.afterBlock(targetUserId);
       }
       return created;
     },
 
-    async unblock(blockerId, targetUserId) {
-      // Lifting a block never restores anything else (future matches/chats stay ended).
-      await Block.destroy({ where: { blockerId, blockedId: targetUserId } });
+    async unblock(blockerId, targetUserId, ip) {
+      // Lifting a block never restores anything else (past matches and chats stay ended).
+      const removed = await Block.destroy({ where: { blockerId, blockedId: targetUserId } });
+      if (removed > 0) {
+        // Block/unblock churn can be used to harass: it is logged and rate-limited.
+        await safetyLog.record({
+          eventType: 'safety.block_removed',
+          severity: 'info',
+          userId: blockerId,
+          ip,
+          metadata: { unblockedUserId: targetUserId },
+        });
+      }
+      return removed > 0;
     },
 
     async list(blockerId) {

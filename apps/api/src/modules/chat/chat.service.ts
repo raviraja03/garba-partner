@@ -3,6 +3,7 @@ import type { Sequelize } from 'sequelize-typescript';
 import {
   LIMITS,
   looksLikeContactDetails,
+  looksLikeMoneyRequest,
   todayInIndia,
   type ChatSummaryDto,
   type MessageDto,
@@ -18,6 +19,7 @@ import type { RealtimeHub } from '../../realtime/hub.js';
 import { loadEvents } from '../interests/matches.service.js';
 import { lockPair } from '../interests/connections.js';
 import { loadPublicProfiles } from '../profiles/public-profiles.js';
+import type { SuspiciousActivityDetector } from '../safety/suspicious-activity.service.js';
 
 const PREVIEW_LENGTH = 120;
 
@@ -70,14 +72,25 @@ interface ChatRow {
  * Chat (docs/chat/architecture.md). The rules are checked on EVERY call, whatever the transport:
  * the match must be active, the caller must be one of its two members, the other member's
  * account must be active and there must be no block between them. Anything else is
- * `404` (not a member) or `409 MATCH_NOT_ACTIVE` (ended / unavailable).
+ * `404` (not a member) or `409 MATCH_NOT_ACTIVE` (ended / unavailable). A member under a
+ * moderator chat restriction can read but not send (`403 CHAT_RESTRICTED`).
  */
 export function createChatService(deps: {
   sequelize: Sequelize;
   media: MediaStorage;
   hub: RealtimeHub;
+  suspicious: SuspiciousActivityDetector;
 }): ChatService {
-  const { sequelize, media, hub } = deps;
+  const { sequelize, media, hub, suspicious } = deps;
+
+  /** A moderator chat restriction stops sending (reading and read receipts still work). */
+  async function assertCanSend(userId: string, transaction?: Transaction): Promise<void> {
+    const sender = await User.findByPk(userId, {
+      attributes: ['id', 'chatRestrictedAt'],
+      ...(transaction ? { transaction } : {}),
+    });
+    if (sender?.chatRestrictedAt) throw new AppError('CHAT_RESTRICTED');
+  }
 
   /** Loads the match for a member and enforces every chat rule. */
   async function authorize(userId: string, matchId: string, transaction?: Transaction) {
@@ -293,6 +306,7 @@ export function createChatService(deps: {
         return { message: toMessageDto(retried), created: false };
       }
 
+      await assertCanSend(userId);
       if (!hub.messageLimiter.take(userId)) {
         throw new AppError('RATE_LIMITED', {
           message: "You're sending messages too quickly. Please slow down.",
@@ -305,6 +319,7 @@ export function createChatService(deps: {
         // Same lock as block/unmatch/moderation: a block that commits first always wins.
         await lockPair(sequelize, userId, first.partnerId, transaction);
         const { match, partnerId: partner } = await authorize(userId, matchId, transaction);
+        await assertCanSend(userId, transaction);
         const [row, isNew] = await Message.findOrCreate({
           where: { senderId: userId, clientMessageId: input.clientMessageId },
           defaults: {
@@ -313,6 +328,7 @@ export function createChatService(deps: {
             clientMessageId: input.clientMessageId,
             body: input.body,
             containsContactInfo: looksLikeContactDetails(input.body),
+            containsMoneyRequest: looksLikeMoneyRequest(input.body),
           },
           transaction,
         });
@@ -328,6 +344,8 @@ export function createChatService(deps: {
         // After commit only: both members' rooms (the sender's other tabs included).
         hub.toUser(partnerId, 'message:new', dto);
         hub.toUser(userId, 'message:new', dto);
+        // Scam and spam patterns go to the moderation queue (never blocks the send).
+        await suspicious.afterMessage(message);
       }
       return { message: dto, created };
     },

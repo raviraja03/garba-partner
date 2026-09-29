@@ -14,6 +14,8 @@ import { createAdminAuthController } from './modules/admin/auth/admin-auth.contr
 import { createAdminAuthRouter } from './modules/admin/auth/admin-auth.routes.js';
 import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.js';
 import { createAdminEventsRouter } from './modules/admin/events/admin-events.routes.js';
+import { createAdminLogsRouter } from './modules/admin/log-viewer/admin-logs.routes.js';
+import { createAdminLogsService } from './modules/admin/log-viewer/admin-logs.service.js';
 import { createAdminMatchesRouter } from './modules/admin/matches/admin-matches.routes.js';
 import { createAdminMatchesService } from './modules/admin/matches/admin-matches.service.js';
 import { createAdminReportsRouter } from './modules/admin/reports/admin-reports.routes.js';
@@ -54,9 +56,11 @@ import {
 } from './modules/profiles/profile.routes.js';
 import { createProfileService } from './modules/profiles/profile.service.js';
 import { createBlocksService } from './modules/safety/blocks.service.js';
+import { createMemberSafetyService } from './modules/safety/member-safety.service.js';
 import { createReportsService } from './modules/safety/reports.service.js';
 import { createSafetyLogger } from './modules/safety/safety-log.service.js';
-import { createSafetyRouters } from './modules/safety/safety.routes.js';
+import { createMySafetyRouter, createSafetyRouters } from './modules/safety/safety.routes.js';
+import { createSuspiciousActivityDetector } from './modules/safety/suspicious-activity.service.js';
 import type { MediaStorage } from './providers/media/index.js';
 import type { RealtimeHub } from './realtime/hub.js';
 import type { SmsProvider } from './providers/sms/index.js';
@@ -163,6 +167,8 @@ export function createApiRouter(options: {
 
   // Blocking and reporting (docs/safety): required before any member-to-member feature.
   const safetyLog = createSafetyLogger({ ipHashSecret: env.OTP_HMAC_SECRET, logger });
+  // Automated flags for moderators; never sanctions anyone (docs/safety/abuse-prevention.md).
+  const suspicious = createSuspiciousActivityDetector({ sequelize, safetyLog, logger });
 
   // Interests and matches (docs/matching/interests.md, docs/matching/matches.md).
   const matches = createMatchesService({ sequelize, media, hub });
@@ -183,10 +189,15 @@ export function createApiRouter(options: {
     createMatchesRouter({ service: matches, authenticateMember, limiter: interestLimiter }),
   );
   const safety = createSafetyRouters({
-    blocks: createBlocksService({ sequelize, media, safetyLog, hub }),
+    blocks: createBlocksService({ sequelize, media, safetyLog, hub, suspicious }),
     reports: createReportsService({ sequelize, safetyLog, hub }),
     authenticateMember,
     blockLimiter: createMemberRateLimiter({ windowMs: HOUR_MS, limit: LIMITS.BLOCKS_PER_HOUR }),
+    unblockLimiter: createMemberRateLimiter({
+      windowMs: HOUR_MS,
+      limit: LIMITS.UNBLOCKS_PER_HOUR,
+    }),
+    // Burst guard; the service also enforces REPORTS_PER_DAY over 24 hours.
     reportLimiter: createMemberRateLimiter({
       windowMs: HOUR_MS,
       limit: LIMITS.REPORTS_PER_DAY,
@@ -194,12 +205,20 @@ export function createApiRouter(options: {
   });
   router.use('/blocks', safety.blocks);
   router.use('/reports', safety.reports);
+  router.use(
+    '/me',
+    createMySafetyRouter({
+      service: createMemberSafetyService(),
+      authenticateMember,
+      limiter: createMemberRateLimiter({ windowMs: 60 * 1000, limit: 30 }),
+    }),
+  );
 
   // Chat (docs/chat/architecture.md). Sending is rate-limited in the service (shared with sockets).
   router.use(
     '/chats',
     createChatRouter({
-      service: createChatService({ sequelize, media, hub }),
+      service: createChatService({ sequelize, media, hub, suspicious }),
       authenticateMember,
       limiter: createMemberRateLimiter({
         windowMs: 60 * 1000,
@@ -231,6 +250,10 @@ export function createApiRouter(options: {
       service: createAdminMatchesService({ sequelize, env, hub }),
       authenticateAdmin,
     }),
+  );
+  router.use(
+    '/admin',
+    createAdminLogsRouter({ service: createAdminLogsService(), authenticateAdmin }),
   );
   router.use(
     '/admin/events',

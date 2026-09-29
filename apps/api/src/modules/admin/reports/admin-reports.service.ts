@@ -9,29 +9,47 @@ import {
   type AdminReportListItemDto,
   type AdminReportListQueryData,
   type AdminReportUserDto,
+  SUSPICIOUS_ACTIVITY_TRIGGERS,
   type PaginationMeta,
   type ReportResolutionAction,
+  type SanctionDurationDays,
+  type SanctionType,
+  type SuspiciousActivityTrigger,
 } from '@garba-partner/shared';
 import { AppError } from '../../../lib/app-error.js';
 import { Match, Message, Report, User, UserProfile } from '../../../models/index.js';
 import type { MediaStorage } from '../../../providers/media/index.js';
 import type { RealtimeHub } from '../../../realtime/hub.js';
 import {
-  cancelPendingInterestsOf,
-  emitMatchEnded,
-  endAllMatchesOf,
-} from '../../interests/connections.js';
-import { setAccountStatus } from '../../safety/sanctions.js';
+  applySanction,
+  applySanctionEffects,
+  loadSanctionHistory,
+} from '../../safety/sanctions.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 import type { AdminActor } from '../users/admin-users.service.js';
 
 const OPEN_STATUSES = ['open', 'in_review'] as const;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Resolution action → the sanction it applies (`dismiss` applies none). */
+const SANCTION_BY_ACTION: Record<ReportResolutionAction, SanctionType | null> = {
+  dismiss: null,
+  warn: 'warning',
+  restrict_chat: 'chat_restriction',
+  suspend: 'suspension',
+  ban: 'ban',
+};
+
+function triggerOf(report: Report): SuspiciousActivityTrigger | null {
+  const trigger = report.evidence.trigger;
+  return SUSPICIOUS_ACTIVITY_TRIGGERS.find((known) => known === trigger) ?? null;
+}
+
 export interface ResolveReportData {
   action: ReportResolutionAction;
   note: string;
   clearAutoHide?: boolean | undefined;
+  durationDays?: SanctionDurationDays | undefined;
 }
 
 export interface AdminReportsService {
@@ -45,6 +63,8 @@ export interface AdminReportsService {
    * or in review (an active safety process), and every access is written to the audit log.
    */
   conversation(actor: AdminActor, reportId: string): Promise<AdminConversationDto>;
+  /** Review: takes the report into review, assigned to the acting moderator. Audited. */
+  assign(actor: AdminActor, reportId: string): Promise<AdminReportDetailDto>;
   resolve(
     actor: AdminActor,
     reportId: string,
@@ -133,6 +153,7 @@ export function createAdminReportsService(deps: {
           assignedAdminId: report.assignedAdminId,
           openReportsAgainstUser: openById.get(report.reportedUserId) ?? 0,
           involvesChat: report.matchId !== null || (report.evidence.messages?.length ?? 0) > 0,
+          trigger: triggerOf(report),
           createdAt: report.createdAt.toISOString(),
         },
       ];
@@ -142,10 +163,10 @@ export function createAdminReportsService(deps: {
   async function getDetail(reportId: string): Promise<AdminReportDetailDto> {
     const report = await Report.findByPk(reportId);
     if (!report) throw new AppError('NOT_FOUND', { message: 'Report not found.' });
-    const [[item], reportedUser, otherReports] = await Promise.all([
+    const [[item], reportedUser, otherReports, sanctions] = await Promise.all([
       toListItems([report]),
       User.findByPk(report.reportedUserId, {
-        attributes: ['hiddenFromDiscovery'],
+        attributes: ['hiddenFromDiscovery', 'chatRestrictedAt'],
         paranoid: false,
       }),
       Report.findAll({
@@ -154,6 +175,7 @@ export function createAdminReportsService(deps: {
         order: [['createdAt', 'DESC']],
         limit: 10,
       }),
+      loadSanctionHistory(report.reportedUserId),
     ]);
     if (!item) throw new AppError('NOT_FOUND', { message: 'Report not found.' });
     const profile = report.evidence.profile ?? null;
@@ -171,10 +193,13 @@ export function createAdminReportsService(deps: {
             }
           : null,
         messages: report.evidence.messages ?? [],
+        signals: report.evidence.signals ?? null,
       },
       conversationAvailable:
         report.matchId !== null && (OPEN_STATUSES as readonly string[]).includes(report.status),
       reportedUserHiddenFromDiscovery: reportedUser?.hiddenFromDiscovery ?? false,
+      reportedUserChatRestricted: (reportedUser?.chatRestrictedAt ?? null) !== null,
+      sanctions,
       resolution:
         report.resolutionAction && report.resolvedAt && report.resolvedByAdminId
           ? {
@@ -201,6 +226,8 @@ export function createAdminReportsService(deps: {
       );
       const conditions: WhereOptions[] = [{ status: query.status ?? [...OPEN_STATUSES] }];
       if (query.priority !== undefined) conditions.push({ priority: Number(query.priority) });
+      if (query.reason) conditions.push({ reason: query.reason });
+      if (query.source) conditions.push({ source: query.source });
       if (query.cursor) {
         const c = decodeQueueCursor(query.cursor);
         conditions.push({
@@ -315,8 +342,8 @@ export function createAdminReportsService(deps: {
       });
     },
 
-    async resolve(actor, reportId, input) {
-      const outcome = await sequelize.transaction(async (transaction) => {
+    async assign(actor, reportId) {
+      await sequelize.transaction(async (transaction) => {
         const report = await Report.findByPk(reportId, {
           lock: transaction.LOCK.UPDATE,
           transaction,
@@ -325,30 +352,77 @@ export function createAdminReportsService(deps: {
         if (!(OPEN_STATUSES as readonly string[]).includes(report.status)) {
           throw new AppError('CONFLICT', { message: 'This report has already been resolved.' });
         }
-        const userId = report.reportedUserId;
-        let endedMatches: [string, string][] = [];
+        const previousAdminId = report.assignedAdminId;
+        await report.update(
+          { status: 'in_review', assignedAdminId: actor.adminId },
+          { transaction },
+        );
+        await recordAdminAction(
+          {
+            adminId: actor.adminId,
+            action: 'report.assign',
+            targetType: 'report',
+            targetId: report.id,
+            metadata: { previousAdminId, reportedUserId: report.reportedUserId },
+            ip: actor.ip,
+          },
+          env.OTP_HMAC_SECRET,
+          transaction,
+        );
+      });
+      return getDetail(reportId);
+    },
 
-        if (input.action === 'suspend' || input.action === 'ban') {
-          const user = await User.findByPk(userId, { attributes: ['id', 'status'], transaction });
-          if (!user) throw new AppError('NOT_FOUND', { message: 'Member not found.' });
-          if (user.status === 'banned' || user.status === 'pending_deletion') {
-            throw new AppError('CONFLICT', { message: `This account is ${user.status}.` });
-          }
-          // Revokes every session in the same transaction.
-          await setAccountStatus(
-            userId,
-            input.action === 'ban' ? 'banned' : 'suspended',
-            transaction,
-          );
-          if (input.action === 'ban') {
-            endedMatches = await endAllMatchesOf(
-              userId,
-              { endedByAdminId: actor.adminId },
-              transaction,
-            );
-            await cancelPendingInterestsOf(userId, transaction);
-          }
+    async resolve(actor, reportId, input) {
+      const sanctionType = SANCTION_BY_ACTION[input.action];
+      if (
+        input.durationDays !== undefined &&
+        sanctionType !== 'suspension' &&
+        sanctionType !== 'chat_restriction'
+      ) {
+        throw new AppError('VALIDATION_ERROR', {
+          details: [
+            {
+              path: 'durationDays',
+              message: 'Only suspensions and chat restrictions can have a duration.',
+            },
+          ],
+        });
+      }
+      const effects = await sequelize.transaction(async (transaction) => {
+        const report = await Report.findByPk(reportId, {
+          lock: transaction.LOCK.UPDATE,
+          transaction,
+        });
+        if (!report) throw new AppError('NOT_FOUND', { message: 'Report not found.' });
+        if (!(OPEN_STATUSES as readonly string[]).includes(report.status)) {
+          throw new AppError('CONFLICT', { message: 'This report has already been resolved.' });
         }
+        // A ban is never decided on an unreviewed report: a moderator must take the report into
+        // review (assign it) and look at the evidence first.
+        if (input.action === 'ban' && report.status !== 'in_review') {
+          throw new AppError('CONFLICT', {
+            message: 'Assign the report to yourself and review the evidence before banning.',
+          });
+        }
+        const userId = report.reportedUserId;
+
+        const applied = sanctionType
+          ? await applySanction(
+              actor,
+              {
+                userId,
+                type: sanctionType,
+                reasonCode: report.reason,
+                note: input.note,
+                reportId: report.id,
+                durationDays: input.durationDays,
+                reuseActive: true,
+              },
+              env.OTP_HMAC_SECRET,
+              transaction,
+            )
+          : null;
         if (input.clearAutoHide && (input.action === 'dismiss' || input.action === 'warn')) {
           await User.update(
             { hiddenFromDiscovery: false, hiddenReason: null },
@@ -378,23 +452,21 @@ export function createAdminReportsService(deps: {
               note: input.note,
               reportedUserId: userId,
               clearAutoHide: input.clearAutoHide ?? false,
-              matchesEnded: endedMatches.length,
+              durationDays: input.durationDays ?? null,
+              sanctionId: applied?.sanction?.id ?? null,
+              sanctionAlreadyActive: applied ? !applied.created : false,
+              matchesEnded: applied?.effects.endedMatches.length ?? 0,
             },
             ip: actor.ip,
           },
           env.OTP_HMAC_SECRET,
           transaction,
         );
-        return { userId, endedMatches };
+        return applied?.effects ?? null;
       });
 
       // After commit: sanctions take effect on open sockets immediately.
-      for (const [matchId, partnerId] of outcome.endedMatches) {
-        emitMatchEnded(hub, matchId, outcome.userId, partnerId);
-      }
-      if (input.action === 'suspend' || input.action === 'ban') {
-        hub.disconnectUser(outcome.userId, 'account_restricted');
-      }
+      if (effects) applySanctionEffects(hub, effects);
       return getDetail(reportId);
     },
   };

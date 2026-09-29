@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router';
-import { LIMITS, looksLikeContactDetails, type MessageDto } from '@garba-partner/shared';
+import {
+  LIMITS,
+  looksLikeContactDetails,
+  looksLikeMoneyRequest,
+  type MessageDto,
+  type ReportReason,
+} from '@garba-partner/shared';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { FullPageSpinner } from '../components/FullPageSpinner';
@@ -14,6 +20,8 @@ import {
 } from '../features/chat/hooks';
 import { ReportForm } from '../features/partners/components/ReportForm';
 import { SafetyActions } from '../features/partners/components/SafetyActions';
+import { MoneyWarning } from '../features/safety/components/MoneyWarning';
+import { useMySafety } from '../features/safety/hooks';
 import { ApiClientError } from '../lib/api-client';
 
 const time = (iso: string) =>
@@ -50,9 +58,14 @@ export function ChatPage() {
   const markRead = useMarkRead(matchId);
   const connected = useChatConnected();
   const [draft, setDraft] = useState('');
-  const [nudge, setNudge] = useState(false);
+  const [nudge, setNudge] = useState<'contact' | 'money' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [reporting, setReporting] = useState<MessageDto | null>(null);
+  const [reporting, setReporting] = useState<{
+    message: MessageDto;
+    reason?: ReportReason;
+  } | null>(null);
+  const safety = useMySafety(true);
+  const chatRestricted = safety.data?.chatRestricted ?? false;
   const [done, setDone] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const lastMarked = useRef<string | null>(null);
@@ -98,20 +111,29 @@ export function ChatPage() {
     event?.preventDefault();
     const body = draft.trim();
     if (!body) return;
-    // Contact-sharing nudge: not a block, just a moment to think.
-    if (looksLikeContactDetails(body) && !nudge) {
-      setNudge(true);
-      return;
+    // Nudges: not a block, just a moment to think before sending.
+    if (!nudge) {
+      if (looksLikeMoneyRequest(body)) {
+        setNudge('money');
+        return;
+      }
+      if (looksLikeContactDetails(body)) {
+        setNudge('contact');
+        return;
+      }
     }
     setError(null);
     try {
       await send.mutateAsync(body);
       setDraft('');
-      setNudge(false);
+      setNudge(null);
     } catch (err) {
       if (err instanceof ApiClientError && err.code === 'MATCH_NOT_ACTIVE') {
         setDone('This chat is no longer available.');
         return;
+      }
+      if (err instanceof ApiClientError && err.code === 'CHAT_RESTRICTED') {
+        void safety.refetch();
       }
       setError(err instanceof Error ? err.message : 'Message not sent. Please try again.');
     }
@@ -176,6 +198,13 @@ export function ChatPage() {
               >
                 {message.body}
               </div>
+              {!mine && looksLikeMoneyRequest(message.body) && (
+                <MoneyWarning
+                  onReport={() => {
+                    setReporting({ message, reason: 'asking_for_money' });
+                  }}
+                />
+              )}
               <span className="mt-0.5 flex gap-2 text-[11px] text-muted">
                 <time dateTime={message.createdAt}>{time(message.createdAt)}</time>
                 {!mine && (
@@ -183,7 +212,7 @@ export function ChatPage() {
                     type="button"
                     className="font-semibold text-danger hover:underline"
                     onClick={() => {
-                      setReporting(message);
+                      setReporting({ message });
                     }}
                   >
                     Report
@@ -201,8 +230,9 @@ export function ChatPage() {
         <ReportForm
           userId={partner.id}
           name={partner.name}
-          messageId={reporting.id}
-          messagePreview={reporting.body}
+          messageId={reporting.message.id}
+          messagePreview={reporting.message.body}
+          {...(reporting.reason ? { initialReason: reporting.reason } : {})}
           onDone={setDone}
           onCancel={() => {
             setReporting(null);
@@ -210,45 +240,61 @@ export function ChatPage() {
         />
       )}
 
-      {nudge && (
+      {nudge === 'contact' && (
         <Alert tone="info">
           Sharing contact or payment details? Only share with people you trust. You can keep
           chatting here, and never send money to someone you haven&apos;t met.
         </Alert>
       )}
+      {nudge === 'money' && (
+        <Alert tone="info">
+          Asking members for money, payments or bank details is against our{' '}
+          <Link to="/guidelines#never_ask_for_money" className="font-semibold underline">
+            community guidelines
+          </Link>{' '}
+          and can get your account restricted.
+        </Alert>
+      )}
       {error && <Alert tone="error">{error}</Alert>}
 
-      <form onSubmit={(event) => void submit(event)} className="flex items-end gap-2">
-        <label htmlFor="chat-draft" className="sr-only">
-          Message
-        </label>
-        <textarea
-          id="chat-draft"
-          rows={2}
-          maxLength={LIMITS.MESSAGE_MAX_LENGTH}
-          value={draft}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setNudge(false);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault();
-              void submit();
-            }
-          }}
-          placeholder={`Message ${partner.name}`}
-          className="min-h-11 flex-1 resize-none rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-black/10 outline-none focus:ring-2 focus:ring-brand-600"
-        />
-        <Button
-          type="submit"
-          className="w-auto! px-5"
-          loading={send.isPending}
-          disabled={!draft.trim()}
-        >
-          {nudge ? 'Send anyway' : 'Send'}
-        </Button>
-      </form>
+      {chatRestricted ? (
+        <Alert tone="info">
+          You can&apos;t send messages right now because of a restriction on your account. You can
+          still read this chat.
+        </Alert>
+      ) : (
+        <form onSubmit={(event) => void submit(event)} className="flex items-end gap-2">
+          <label htmlFor="chat-draft" className="sr-only">
+            Message
+          </label>
+          <textarea
+            id="chat-draft"
+            rows={2}
+            maxLength={LIMITS.MESSAGE_MAX_LENGTH}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setNudge(null);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder={`Message ${partner.name}`}
+            className="min-h-11 flex-1 resize-none rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-black/10 outline-none focus:ring-2 focus:ring-brand-600"
+          />
+          <Button
+            type="submit"
+            className="w-auto! px-5"
+            loading={send.isPending}
+            disabled={!draft.trim()}
+          >
+            {nudge ? 'Send anyway' : 'Send'}
+          </Button>
+        </form>
+      )}
 
       <SafetyActions userId={partner.id} name={partner.name} onDone={setDone} />
     </div>

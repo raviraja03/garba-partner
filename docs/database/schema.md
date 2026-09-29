@@ -634,6 +634,7 @@ Migration `20260929130000-create-messages`. See [chat architecture](../chat/arch
 | `client_message_id` | uuid | no | | Client idempotency key. **`UNIQUE (sender_id, client_message_id)`** |
 | `body` | varchar(1000) | no | | Plain text. Check: not blank |
 | `contains_contact_info` | boolean | no | `false` | Moderation context only; never returned to members |
+| `contains_money_request` | boolean | no | `false` | Added by `20260930100100`. Looks like a money/payment request (scam detection). Moderation context only |
 | `created_at` | timestamptz | no | `now()` | No `updated_at`: messages are **immutable** (trigger `messages_immutable` rejects UPDATE) |
 
 Index: `(match_id, created_at DESC, id DESC)` (history, unread counts).
@@ -649,6 +650,8 @@ Created by the safety-phase migrations `20260928110100-create-blocks`, `…11020
 | `blocks` | `blocker_id`, `blocked_id` (both FK → users `CASCADE`), `created_at` | `blocks_pair_unique (blocker_id, blocked_id)`, not-self check, `(blocked_id)` |
 | `reports` | `source` (`member`\|`system`), `reporter_id` (FK `SET NULL`), `reported_user_id` (FK `RESTRICT`), `reason`, `priority` 0–2, `details`, `evidence` jsonb (profile snapshot), `status` (`open`\|`in_review`\|`resolved`\|`dismissed`), assignment/resolution columns (FK → admin_users `RESTRICT`) | Reason/priority/status/resolution checks, partial unique **one open report per pair**, queue index `(status, priority, created_at, id)`, `(reported_user_id, created_at DESC)`, `(reporter_id, created_at DESC)`, `reports_reporter_reported_idx` (discovery) |
 | `safety_logs` | `event_type`, `severity`, `user_id`, `admin_id` (no FKs: kept after deletion), `ip_hash` (HMAC), `metadata` | **Append-only** trigger; indexes on `created_at`, `(user_id, created_at)`, `(event_type, created_at)`, critical events |
+
+Reasons and resolution actions were changed by `20260930100000-update-report-reasons` (see §4.20).
 
 ### 4.18 Discovery indexes
 
@@ -667,6 +670,43 @@ Migration `20260929110100-add-discovery-indexes` ([matching logic §6](../matchi
 |---|---|---|
 | `schema_migrations` | Umzug `SequelizeStorage` | Names of applied migrations |
 | `schema_seeders` | Umzug `SequelizeStorage` | Names of applied seeders (development) |
+
+### 4.20 `user_sanctions` and moderation columns
+
+Migrations `20260930100000-update-report-reasons` and `20260930100100-create-user-sanctions`. See [moderation system](../safety/moderation-system.md) and [admin actions](../safety/admin-actions.md).
+
+**`user_sanctions`**: one row per warning, chat restriction, suspension or ban. Never deleted.
+
+| Column | Type | Null | Default | Notes |
+|---|---|---|---|---|
+| `id` | uuid | no | `gen_random_uuid()` | PK |
+| `user_id` | uuid | no | | FK → `users.id` `ON DELETE RESTRICT` |
+| `type` | varchar(20) | no | | `warning` \| `chat_restriction` \| `suspension` \| `ban` |
+| `reason_code` | varchar(30) | no | | A report reason (guideline category) |
+| `note` | text | no | | Internal moderator note, not blank. Never shown to the member |
+| `report_id` | uuid | yes | | FK → `reports.id` `ON DELETE SET NULL` |
+| `starts_at` | timestamptz | no | `now()` | |
+| `ends_at` | timestamptz | yes | | Timed suspensions and chat restrictions only; `> starts_at` |
+| `created_by_admin_id` | uuid | no | | FK → `admin_users.id` `RESTRICT` |
+| `acknowledged_at` | timestamptz | yes | | Warnings only |
+| `revoked_at`, `revoked_by_admin_id`, `revoke_reason` | | yes | | Lifted by a moderator; all three set together |
+| `expired_at` | timestamptz | yes | | Set by the expiry job; requires `ends_at` |
+| `created_at`, `updated_at` | timestamptz | no | `now()` | `updated_at` trigger |
+
+Indexes: `(user_id, created_at DESC)`, partial `(report_id)`, expiry `(ends_at) WHERE ends_at IS NOT NULL AND revoked_at IS NULL AND expired_at IS NULL`, open warnings `(user_id, created_at DESC) WHERE type = 'warning' AND acknowledged_at IS NULL AND …`, and **`user_sanctions_one_active_unique (user_id, type) WHERE type <> 'warning' AND revoked_at IS NULL AND expired_at IS NULL`**.
+
+Other changes:
+
+| Object | Change |
+|---|---|
+| `users.chat_restricted_at` | timestamptz null. Cached projection of an active chat restriction (like `users.status` for suspensions and bans) |
+| `users_hidden_reason_check` | Adds `suspicious_activity` |
+| `reports_reason_check` | `fake_profile`, `harassment`, `spam`, `asking_for_money`, `inappropriate_behavior`, `threatening_behavior`, `impersonation`, `underage`, `other`. Existing rows remapped: `safety_threat → threatening_behavior`, `sexual_content → inappropriate_behavior`, `hate_speech → harassment`, `scam_spam → spam` |
+| `reports_resolution_action_check` | Adds `restrict_chat` |
+| `reports_one_open_system_flag_unique` | `UNIQUE (reported_user_id, (evidence->>'trigger')) WHERE source = 'system' AND status IN ('open','in_review')` |
+| `reports_source_status_idx` | `(source, status, priority, created_at)` (queue filter) |
+| `messages.contains_money_request` | See §4.16 |
+| `messages_sender_id_created_at_idx` | `(sender_id, created_at DESC)`, for per-sender detection queries |
 
 ## 5. Database functions and triggers
 

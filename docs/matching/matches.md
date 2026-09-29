@@ -78,7 +78,8 @@ Moderators and super admins have `users:view` and `users:sanction`; event manage
 |---|---|
 | One match is a problem (e.g. off-platform harassment reported) | Close match |
 | Member spams interests or pressures people, but may keep browsing | Restrict interactions |
-| Member must be cut off entirely | Suspend (existing) |
+| Member must stop messaging but may keep browsing | Restrict chat ([admin actions](../safety/admin-actions.md)) |
+| Member must be cut off entirely | Suspend or ban ([admin actions](../safety/admin-actions.md)) |
 
 ## 6. Database guarantees
 
@@ -108,5 +109,5 @@ See [interests §8](interests.md#8-testing), plus `apps/api/src/modules/admin/ma
 ## 9. Known limitations
 
 - Chat and read receipts are live ([chat](../chat/architecture.md)); match notifications come with notifications.
-- Suspending a member hides their matches but doesn't end them; ban flows (and ending matches on ban) come with the moderation phase.
+- Suspending a member hides their matches but doesn't end them; a ban ends them all ([admin actions](../safety/admin-actions.md)).
 - The admin match list shows the latest 50 matches per member.

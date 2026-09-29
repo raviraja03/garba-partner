@@ -7,6 +7,9 @@ import { readEnv } from './config/env.js';
 import { createLogger } from './lib/logger.js';
 import { createTokenService } from './modules/auth/token.service.js';
 import { createChatService } from './modules/chat/chat.service.js';
+import { startSanctionExpiryJob } from './modules/safety/sanction-expiry.job.js';
+import { createSafetyLogger } from './modules/safety/safety-log.service.js';
+import { createSuspiciousActivityDetector } from './modules/safety/suspicious-activity.service.js';
 import { createMediaStorage } from './providers/media/index.js';
 import { createSmsProvider } from './providers/sms/index.js';
 import { createRealtimeHub } from './realtime/hub.js';
@@ -52,14 +55,23 @@ function start(): void {
       },
     }),
   );
+  const safetyLog = createSafetyLogger({ ipHashSecret: env.OTP_HMAC_SECRET, logger });
   // Socket.IO shares the HTTP server (path /socket.io) and the same services as REST.
   const io = attachSocketServer(server, {
     env,
     logger,
     tokens: createTokenService(env),
-    chat: createChatService({ sequelize, media, hub: realtime }),
+    chat: createChatService({
+      sequelize,
+      media,
+      hub: realtime,
+      suspicious: createSuspiciousActivityDetector({ sequelize, safetyLog, logger }),
+    }),
     hub: realtime,
   });
+
+  // Timed suspensions and chat restrictions end on their own (docs/safety/admin-actions.md).
+  const stopSanctionExpiry = startSanctionExpiryJob({ sequelize, safetyLog, logger });
 
   server.on('error', (err: NodeJS.ErrnoException) => {
     const message =
@@ -89,6 +101,7 @@ function start(): void {
     }, SHUTDOWN_TIMEOUT_MS);
     forceExit.unref();
 
+    stopSanctionExpiry();
     // Closes every socket, then the HTTP server.
     void io.close();
     server.close((err) => {

@@ -241,7 +241,7 @@ describe.skipIf(!hasTestDatabase)('chat REST API (integration)', () => {
       const res = await request(app)
         .post('/api/v1/reports')
         .set(bearer(a.accessToken))
-        .send({ reportedUserId: b.userId, reason: 'scam_spam', messageId: bad.id });
+        .send({ reportedUserId: b.userId, reason: 'spam', messageId: bad.id });
       expect(res.status).toBe(201);
 
       const report = await Report.findByPk(res.body.data.reportId as string);

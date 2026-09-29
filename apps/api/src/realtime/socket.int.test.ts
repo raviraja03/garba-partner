@@ -264,6 +264,27 @@ describe.skipIf(!hasTestDatabase)('Socket.IO chat (integration)', () => {
       expect(await Message.count({ where: { matchId } })).toBe(0);
     });
 
+    it('a chat restriction refuses socket sends but keeps the member connected', async () => {
+      const { a, b, matchId } = await createMatchedPair(server.app);
+      const aSocket = await connect(a.accessToken);
+      const bSocket = await connect(b.accessToken);
+      const moderator = await loginAdmin(server.app, uniqueIp(), 'moderator');
+      await request(server.app)
+        .post(`/api/v1/admin/users/${a.userId}/restrict-chat`)
+        .set(bearer(moderator.accessToken))
+        .send({ reason: 'Hostile messages reported' })
+        .expect(200);
+
+      const refused = (await sendVia(aSocket, matchId, 'Still here')) as SocketAck<unknown>;
+      expect(refused).toMatchObject({ ok: false, error: { code: 'CHAT_RESTRICTED' } });
+      expect(aSocket.connected).toBe(true);
+      const delivered = next(aSocket, 'message:new');
+      const ack = (await sendVia(bSocket, matchId, 'Hello from B')) as SocketAck<unknown>;
+      expect(ack.ok).toBe(true);
+      expect(await delivered).toMatchObject({ body: 'Hello from B' });
+      expect(await Message.count({ where: { matchId, senderId: a.userId } })).toBe(0);
+    });
+
     it('stops accepting events once the session is revoked (logout)', async () => {
       const { a, matchId } = await createMatchedPair(server.app);
       const aSocket = await connect(a.accessToken);

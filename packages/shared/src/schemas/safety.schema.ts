@@ -2,7 +2,9 @@ import * as z from 'zod/mini';
 import {
   REPORT_REASONS,
   REPORT_RESOLUTION_ACTIONS,
+  REPORT_SOURCES,
   REPORT_STATUSES,
+  SANCTION_DURATION_DAYS,
   SAFETY_EVENT_TYPES,
   SAFETY_SEVERITIES,
   VERIFICATION_STATUSES,
@@ -69,6 +71,9 @@ const limit = z.optional(
 export const adminReportListQuerySchema = z.strictObject({
   status: z.optional(z.enum(REPORT_STATUSES)),
   priority: z.optional(z.enum(['0', '1', '2'])),
+  reason: z.optional(z.enum(REPORT_REASONS)),
+  /** `system` = automated suspicious-activity flags. */
+  source: z.optional(z.enum(REPORT_SOURCES)),
   cursor,
   limit,
 });
@@ -89,8 +94,46 @@ export const adminResolveReportSchema = z.strictObject({
     ),
   /** Remove the automatic "hidden from discovery" flag set by reports. */
   clearAutoHide: z.optional(z.boolean()),
+  /** `suspend` / `restrict_chat` only: length in days (omit = until a moderator lifts it). */
+  durationDays: z.optional(z.literal(SANCTION_DURATION_DAYS)),
 });
 export type AdminResolveReportInput = z.input<typeof adminResolveReportSchema>;
+
+/** Internal moderator note (stored with the sanction and in the audit log, never shown to members). */
+const adminNote = z
+  .string()
+  .check(
+    z.trim(),
+    z.minLength(
+      LIMITS.ADMIN_ACTION_REASON_MIN,
+      `Reason must be at least ${String(LIMITS.ADMIN_ACTION_REASON_MIN)} characters.`,
+    ),
+    z.maxLength(LIMITS.ADMIN_ACTION_REASON_MAX),
+  );
+
+/**
+ * `POST /api/v1/admin/users/:userId/{warn,restrict-chat,suspend,ban}`. `reasonCode` is the
+ * guideline category (the member sees it on a warning); `reason` is the internal note.
+ */
+export const adminSanctionSchema = z.strictObject({
+  reason: adminNote,
+  reasonCode: z.optional(z.enum(REPORT_REASONS)),
+  /** `suspend` / `restrict-chat` only. Omit = until a moderator lifts it. */
+  durationDays: z.optional(z.literal(SANCTION_DURATION_DAYS)),
+});
+export type AdminSanctionInput = z.input<typeof adminSanctionSchema>;
+export type AdminSanctionData = z.output<typeof adminSanctionSchema>;
+
+/** `GET /api/v1/admin/audit-logs` */
+export const adminAuditLogQuerySchema = z.strictObject({
+  action: z.optional(z.string().check(z.regex(/^[a-z_]+(\.[a-z_]+)+$/, 'Invalid action.'))),
+  targetType: z.optional(z.string().check(z.regex(/^[a-z_]{2,30}$/, 'Invalid target type.'))),
+  targetId: z.optional(z.uuid()),
+  adminId: z.optional(z.uuid()),
+  cursor,
+  limit,
+});
+export type AdminAuditLogQueryData = z.output<typeof adminAuditLogQuerySchema>;
 
 /** `GET /api/v1/admin/verifications` */
 export const adminVerificationListQuerySchema = z.strictObject({

@@ -9,13 +9,14 @@ import { useAdminAuth } from '../features/auth/auth-context';
 const SECTIONS: readonly { label: string; permission: AdminPermission; path?: string }[] = [
   { label: 'Dashboard', permission: 'dashboard:view', path: '/' },
   { label: 'Reports', permission: 'reports:manage', path: '/reports' },
+  { label: 'Safety logs', permission: 'safety_logs:view', path: '/safety-logs' },
   { label: 'Verifications', permission: 'verifications:review' },
   { label: 'Photo review', permission: 'photos:review' },
   { label: 'Users', permission: 'users:view', path: '/users' },
   { label: 'Events', permission: 'events:view', path: '/events' },
   { label: 'Organizers', permission: 'events:view', path: '/organizers' },
   { label: 'Cities', permission: 'locations:manage' },
-  { label: 'Audit log', permission: 'audit:view' },
+  { label: 'Audit log', permission: 'audit:view', path: '/audit-logs' },
   { label: 'Admins', permission: 'admins:manage' },
 ];
 

@@ -1,4 +1,5 @@
 import { useId, useState, type FormEvent } from 'react';
+import { Link } from 'react-router';
 import { LIMITS, REPORT_REASONS, type ReportReason } from '@garba-partner/shared';
 import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
@@ -16,6 +17,7 @@ export function ReportForm({
   messagePreview,
   onDone,
   onCancel,
+  initialReason,
 }: {
   userId: string;
   name: string;
@@ -23,10 +25,12 @@ export function ReportForm({
   messagePreview?: string;
   onDone: (message: string) => void;
   onCancel: () => void;
+  /** Pre-selected reason (e.g. from a scam warning). */
+  initialReason?: ReportReason;
 }) {
   const id = useId();
   const report = useReportMember();
-  const [reason, setReason] = useState<ReportReason | ''>('');
+  const [reason, setReason] = useState<ReportReason | ''>(initialReason ?? '');
   const [details, setDetails] = useState('');
   const [alsoBlock, setAlsoBlock] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +68,12 @@ export function ReportForm({
         </blockquote>
       )}
       <fieldset className="space-y-1">
-        <legend className="text-sm font-semibold">What happened?</legend>
+        <legend className="text-sm font-semibold">
+          What happened?{' '}
+          <Link to="/guidelines" className="font-normal text-brand-700 underline">
+            Community guidelines
+          </Link>
+        </legend>
         {REPORT_REASONS.map((value) => (
           <label key={value} className="flex items-center gap-2 text-sm">
             <input

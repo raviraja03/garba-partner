@@ -4,9 +4,7 @@ import {
   fetchUser,
   fetchUserMatches,
   fetchUsers,
-  reactivateUser,
   setInteractionRestriction,
-  suspendUser,
   type UserListFilters,
 } from './users-api';
 
@@ -53,18 +51,6 @@ export function useInteractionRestriction(userId: string, restrict: boolean) {
     mutationFn: (reason: string) => setInteractionRestriction(userId, restrict, reason),
     onSuccess: (user) => {
       queryClient.setQueryData(userKeys.detail(userId), user);
-    },
-  });
-}
-
-export function useUserStatusAction(userId: string, action: 'suspend' | 'reactivate') {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (reason: string) =>
-      action === 'suspend' ? suspendUser(userId, reason) : reactivateUser(userId, reason),
-    onSuccess: async (user) => {
-      queryClient.setQueryData(userKeys.detail(userId), user);
-      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] });
     },
   });
 }

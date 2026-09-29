@@ -8,8 +8,10 @@ import {
   type AdminConnectionSummaryDto,
   type AdminUserDetailDto,
   type AdminUserListItemDto,
+  type AdminSanctionData,
   type AdminUserListQueryData,
   type PaginationMeta,
+  type SanctionType,
 } from '@garba-partner/shared';
 import { AppError } from '../../../lib/app-error.js';
 import { hashPhone } from '../../../lib/crypto.js';
@@ -35,6 +37,13 @@ import {
   toPreferencesDto,
 } from '../../profiles/profile.mapper.js';
 import { cancelPendingInterestsOf } from '../../interests/connections.js';
+import {
+  applySanction,
+  applySanctionEffects,
+  liftSanction,
+  loadSanctionHistory,
+  type LiftableSanction,
+} from '../../safety/sanctions.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -49,8 +58,22 @@ export interface AdminUsersService {
     query: AdminUserListQueryData,
   ): Promise<{ items: AdminUserListItemDto[]; meta: PaginationMeta }>;
   get(userId: string): Promise<AdminUserDetailDto>;
-  suspend(actor: AdminActor, userId: string, reason: string): Promise<AdminUserDetailDto>;
+  /** Moderator sanctions (docs/safety/admin-actions.md). Each is audited. */
+  warn(actor: AdminActor, userId: string, input: AdminSanctionData): Promise<AdminUserDetailDto>;
+  restrictChat(
+    actor: AdminActor,
+    userId: string,
+    input: AdminSanctionData,
+  ): Promise<AdminUserDetailDto>;
+  liftChatRestriction(
+    actor: AdminActor,
+    userId: string,
+    reason: string,
+  ): Promise<AdminUserDetailDto>;
+  suspend(actor: AdminActor, userId: string, input: AdminSanctionData): Promise<AdminUserDetailDto>;
   reactivate(actor: AdminActor, userId: string, reason: string): Promise<AdminUserDetailDto>;
+  ban(actor: AdminActor, userId: string, input: AdminSanctionData): Promise<AdminUserDetailDto>;
+  unban(actor: AdminActor, userId: string, reason: string): Promise<AdminUserDetailDto>;
   restrictInteractions(
     actor: AdminActor,
     userId: string,
@@ -148,28 +171,36 @@ export function createAdminUsersService(deps: {
     const user = await User.findByPk(userId);
     if (!user) throw new AppError('NOT_FOUND', { message: 'User not found.' });
 
-    const [profile, preferences, activeSessionCount, verifications, openReportCount, connections] =
-      await Promise.all([
-        UserProfile.findOne({
-          where: { userId },
-          include: [
-            { model: City, attributes: ['id', 'name', 'state'] },
-            { model: Area, attributes: ['id', 'cityId', 'name'] },
-          ],
-        }),
-        UserPreference.findOne({ where: { userId } }),
-        UserSession.count({
-          where: { userId, revokedAt: null, expiresAt: { [Op.gt]: new Date() } },
-        }),
-        UserVerification.findAll({
-          where: { userId },
-          attributes: ['type', 'status', 'createdAt', 'decidedAt'],
-          order: [['createdAt', 'DESC']],
-          limit: 10,
-        }),
-        Report.count({ where: { reportedUserId: userId, status: ['open', 'in_review'] } }),
-        connectionSummary(userId),
-      ]);
+    const [
+      profile,
+      preferences,
+      activeSessionCount,
+      verifications,
+      openReportCount,
+      connections,
+      sanctions,
+    ] = await Promise.all([
+      UserProfile.findOne({
+        where: { userId },
+        include: [
+          { model: City, attributes: ['id', 'name', 'state'] },
+          { model: Area, attributes: ['id', 'cityId', 'name'] },
+        ],
+      }),
+      UserPreference.findOne({ where: { userId } }),
+      UserSession.count({
+        where: { userId, revokedAt: null, expiresAt: { [Op.gt]: new Date() } },
+      }),
+      UserVerification.findAll({
+        where: { userId },
+        attributes: ['type', 'status', 'createdAt', 'decidedAt'],
+        order: [['createdAt', 'DESC']],
+        limit: 10,
+      }),
+      Report.count({ where: { reportedUserId: userId, status: ['open', 'in_review'] } }),
+      connectionSummary(userId),
+      loadSanctionHistory(userId),
+    ]);
 
     const today = todayInIndia();
     const completion = computeCompletion(profile, today);
@@ -183,7 +214,9 @@ export function createAdminUsersService(deps: {
       openReportCount,
       hiddenFromDiscovery: user.hiddenFromDiscovery,
       interactionsRestricted: user.interactionsRestrictedAt !== null,
+      chatRestricted: user.chatRestrictedAt !== null,
       connections,
+      sanctions,
       termsVersion: user.termsVersion,
       createdAt: user.createdAt.toISOString(),
       lastActiveAt: user.lastActiveAt?.toISOString() ?? null,
@@ -201,44 +234,40 @@ export function createAdminUsersService(deps: {
     };
   }
 
-  async function changeStatus(
+  /** Applies a sanction (audited in the same transaction), then updates live connections. */
+  async function sanction(
     actor: AdminActor,
     userId: string,
-    reason: string,
-    transition: { from: 'active' | 'suspended'; to: 'active' | 'suspended'; action: string },
+    type: SanctionType,
+    input: AdminSanctionData,
   ): Promise<AdminUserDetailDto> {
-    await sequelize.transaction(async (transaction) => {
-      const user = await User.findByPk(userId, { lock: transaction.LOCK.UPDATE, transaction });
-      if (!user) throw new AppError('NOT_FOUND', { message: 'User not found.' });
-      if (user.status !== transition.from) {
-        throw new AppError('CONFLICT', {
-          message: `Only ${transition.from} accounts can be ${transition.to === 'suspended' ? 'suspended' : 'reactivated'} (current status: ${user.status}).`,
-        });
-      }
-
-      await user.update({ status: transition.to }, { transaction });
-      if (transition.to === 'suspended') {
-        // Immediate effect: every session ends now (the middleware also checks status per request).
-        await UserSession.update(
-          { revokedAt: new Date(), revokedReason: 'sanction' },
-          { where: { userId, revokedAt: null }, transaction },
-        );
-      }
-      await recordAdminAction(
+    const { effects } = await sequelize.transaction((transaction) =>
+      applySanction(
+        actor,
         {
-          adminId: actor.adminId,
-          action: transition.action,
-          targetType: 'user',
-          targetId: userId,
-          metadata: { reason, from: transition.from, to: transition.to },
-          ip: actor.ip,
+          userId,
+          type,
+          reasonCode: input.reasonCode ?? 'other',
+          note: input.reason,
+          durationDays: input.durationDays,
         },
         env.OTP_HMAC_SECRET,
         transaction,
-      );
-    });
-    // Live connections end now too: the member can't keep chatting on an open socket.
-    if (transition.to === 'suspended') hub.disconnectUser(userId, 'account_restricted');
+      ),
+    );
+    applySanctionEffects(hub, effects);
+    return getDetail(userId);
+  }
+
+  async function lift(
+    actor: AdminActor,
+    userId: string,
+    type: LiftableSanction,
+    reason: string,
+  ): Promise<AdminUserDetailDto> {
+    await sequelize.transaction((transaction) =>
+      liftSanction(actor, { userId, type, reason }, env.OTP_HMAC_SECRET, transaction),
+    );
     return getDetail(userId);
   }
 
@@ -312,19 +341,13 @@ export function createAdminUsersService(deps: {
 
     get: getDetail,
 
-    suspend: (actor, userId, reason) =>
-      changeStatus(actor, userId, reason, {
-        from: 'active',
-        to: 'suspended',
-        action: 'user.suspend',
-      }),
-
-    reactivate: (actor, userId, reason) =>
-      changeStatus(actor, userId, reason, {
-        from: 'suspended',
-        to: 'active',
-        action: 'user.reactivate',
-      }),
+    warn: (actor, userId, input) => sanction(actor, userId, 'warning', input),
+    restrictChat: (actor, userId, input) => sanction(actor, userId, 'chat_restriction', input),
+    liftChatRestriction: (actor, userId, reason) => lift(actor, userId, 'chat_restriction', reason),
+    suspend: (actor, userId, input) => sanction(actor, userId, 'suspension', input),
+    reactivate: (actor, userId, reason) => lift(actor, userId, 'suspension', reason),
+    ban: (actor, userId, input) => sanction(actor, userId, 'ban', input),
+    unban: (actor, userId, reason) => lift(actor, userId, 'ban', reason),
 
     restrictInteractions: (actor, userId, reason) =>
       setInteractionRestriction(actor, userId, reason, true),

@@ -3,7 +3,7 @@ import type { MigrationContext } from '../config/umzug.js';
 import { runInTransaction, updatedAtTrigger } from '../lib/migration-helpers.js';
 
 /**
- * Reports about members (docs/safety/reporting.md). `source = 'system'` reports are raised by the
+ * Reports about members (docs/safety/moderation-system.md). `source = 'system'` reports are raised by the
  * platform itself (e.g. an identity check showing the member is under 18) and have no reporter.
  */
 export const up: MigrationFn<MigrationContext> = async ({ context: { sequelize } }) => {

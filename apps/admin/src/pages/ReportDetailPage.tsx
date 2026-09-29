@@ -3,13 +3,23 @@ import { Link, useParams } from 'react-router';
 import {
   LIMITS,
   REPORT_RESOLUTION_ACTIONS,
+  SANCTION_DURATION_DAYS,
   type AdminMessageDto,
+  type AdminReportDetailDto,
   type ReportResolutionAction,
+  type SanctionDurationDays,
 } from '@garba-partner/shared';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { FullPageSpinner } from '../components/FullPageSpinner';
-import { useOpenConversation, useReport, useResolveReport } from '../features/reports/hooks';
+import { DURATION_LABELS, TRIGGER_LABELS } from '../features/moderation/labels';
+import { SanctionHistory } from '../features/moderation/SanctionHistory';
+import {
+  useAssignReport,
+  useOpenConversation,
+  useReport,
+  useResolveReport,
+} from '../features/reports/hooks';
 import {
   ACTION_LABELS,
   PRIORITY_LABELS,
@@ -52,12 +62,18 @@ function MessageList({ messages }: { messages: AdminMessageDto[] }) {
   );
 }
 
-function ResolveForm({ reportId, hidden }: { reportId: string; hidden: boolean }) {
+function ResolveForm({ report }: { report: AdminReportDetailDto }) {
+  const reportId = report.id;
+  const hidden = report.reportedUserHiddenFromDiscovery;
   const resolve = useResolveReport(reportId);
+  const [duration, setDuration] = useState<SanctionDurationDays | ''>('');
   const [action, setAction] = useState<ReportResolutionAction>('warn');
   const [note, setNote] = useState('');
   const [clearAutoHide, setClearAutoHide] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const timed = action === 'suspend' || action === 'restrict_chat';
+  // Bans need a reviewed (assigned) report: the API refuses otherwise.
+  const banBlocked = action === 'ban' && report.status !== 'in_review';
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -77,6 +93,7 @@ function ResolveForm({ reportId, hidden }: { reportId: string; hidden: boolean }
         action,
         note: note.trim(),
         ...(clearAutoHide ? { clearAutoHide: true } : {}),
+        ...(timed && duration !== '' ? { durationDays: duration } : {}),
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not resolve.');
@@ -101,6 +118,33 @@ function ResolveForm({ reportId, hidden }: { reportId: string; hidden: boolean }
           </label>
         ))}
       </fieldset>
+      {timed && (
+        <label className="block">
+          <span className="block font-semibold">Duration</span>
+          <select
+            value={duration === '' ? '' : String(duration)}
+            onChange={(e) => {
+              setDuration(
+                e.target.value === '' ? '' : (Number(e.target.value) as SanctionDurationDays),
+              );
+            }}
+            className="mt-1 rounded-lg bg-white px-2 py-1 ring-1 ring-black/10"
+          >
+            <option value="">Until lifted</option>
+            {SANCTION_DURATION_DAYS.map((days) => (
+              <option key={days} value={String(days)}>
+                {DURATION_LABELS[days]}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      {banBlocked && (
+        <Alert tone="info">
+          Assign this report to yourself and review the evidence before banning. A report on its own
+          never bans anyone.
+        </Alert>
+      )}
       <label htmlFor="resolution-note" className="block font-semibold">
         Note (recorded in the audit log)
       </label>
@@ -127,7 +171,12 @@ function ResolveForm({ reportId, hidden }: { reportId: string; hidden: boolean }
         </label>
       )}
       {error && <Alert tone="error">{error}</Alert>}
-      <Button type="submit" className="w-auto! px-6" loading={resolve.isPending}>
+      <Button
+        type="submit"
+        className="w-auto! px-6"
+        loading={resolve.isPending}
+        disabled={banBlocked}
+      >
         Resolve report
       </Button>
     </form>
@@ -139,6 +188,7 @@ export function ReportDetailPage() {
   const { reportId = '' } = useParams();
   const report = useReport(reportId);
   const conversation = useOpenConversation(reportId);
+  const assign = useAssignReport(reportId);
 
   if (report.isPending) return <FullPageSpinner />;
   if (report.isError) return <Alert tone="error">{report.error.message}</Alert>;
@@ -160,15 +210,56 @@ export function ReportDetailPage() {
             {r.reportedUser.name ?? 'Reported member'}
           </Link>{' '}
           ({r.reportedUser.accountStatus}
-          {r.reportedUserHiddenFromDiscovery ? ', hidden from discovery' : ''})
+          {r.reportedUserHiddenFromDiscovery ? ', hidden from discovery' : ''}
+          {r.reportedUserChatRestricted ? ', chat restricted' : ''})
         </p>
+        {r.trigger && (
+          <p className="mt-1 text-sm font-semibold text-amber-800">
+            {TRIGGER_LABELS[r.trigger]}: a pattern match, not proof. Review before acting.
+          </p>
+        )}
+        {open && (
+          <div className="mt-2 flex flex-wrap items-center gap-3 text-sm">
+            <span className="text-muted">{r.assignedAdminId ? 'In review' : 'Not assigned'}</span>
+            <Button
+              variant="secondary"
+              className="w-auto! px-4 py-2!"
+              loading={assign.isPending}
+              onClick={() => {
+                assign.mutate();
+              }}
+            >
+              {r.status === 'in_review' ? 'Reassign to me' : 'Assign to me (start review)'}
+            </Button>
+            {assign.isError && <Alert tone="error">{assign.error.message}</Alert>}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-5 md:grid-cols-2">
-        <Section title="Reporter's details">
-          <p className="whitespace-pre-wrap">{r.details ?? '—'}</p>
-          <p className="text-xs text-muted">The reported member is never told who reported them.</p>
-        </Section>
+        {r.source === 'system' ? (
+          <Section title="Why it was flagged">
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+              {Object.entries(r.evidence.signals ?? {}).map(([key, value]) => (
+                <div key={key} className="contents">
+                  <dt className="text-muted">{key}</dt>
+                  <dd>{String(value)}</dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-xs text-muted">
+              Automated flags never sanction anyone. Messages shown are only the flagged
+              member&apos;s own.
+            </p>
+          </Section>
+        ) : (
+          <Section title="Reporter's details">
+            <p className="whitespace-pre-wrap">{r.details ?? '—'}</p>
+            <p className="text-xs text-muted">
+              The reported member is never told who reported them.
+            </p>
+          </Section>
+        )}
         <Section title="Profile at report time">
           {r.evidence.profile ? (
             <div className="flex gap-3">
@@ -223,6 +314,10 @@ export function ReportDetailPage() {
         </Section>
       )}
 
+      <Section title="Sanction history of this member">
+        <SanctionHistory sanctions={r.sanctions} />
+      </Section>
+
       {r.otherReports.length > 0 && (
         <Section title="Other reports about this member">
           <ul className="space-y-1">
@@ -245,7 +340,7 @@ export function ReportDetailPage() {
             {formatDateTime(r.resolution.resolvedAt)}: {r.resolution.note}
           </p>
         ) : open ? (
-          <ResolveForm reportId={r.id} hidden={r.reportedUserHiddenFromDiscovery} />
+          <ResolveForm report={r} />
         ) : null}
       </Section>
     </div>

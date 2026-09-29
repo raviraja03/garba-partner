@@ -9,7 +9,12 @@ export const USER_STATUSES = ['active', 'suspended', 'banned', 'pending_deletion
 export type UserStatus = (typeof USER_STATUSES)[number];
 
 /** Why a user is hidden from discovery pending moderator review. */
-export const HIDDEN_REASONS = ['p0_report', 'report_threshold', 'no_visible_photo'] as const;
+export const HIDDEN_REASONS = [
+  'p0_report',
+  'report_threshold',
+  'no_visible_photo',
+  'suspicious_activity',
+] as const;
 export type HiddenReason = (typeof HIDDEN_REASONS)[number];
 
 export const GENDERS = ['woman', 'man', 'non_binary'] as const;
@@ -92,28 +97,34 @@ export type VerificationFailureReason = (typeof VERIFICATION_FAILURE_REASONS)[nu
 
 // --- Safety ---------------------------------------------------------------------------------
 
-/** Report reasons, in the order shown to members. */
+/**
+ * Report reasons, in the order shown to members. `underage` is kept on top of the product list
+ * because the platform is 18+ and an under-18 member must always be reportable. Reasons are also
+ * the guideline categories cited by warnings and sanctions (`COMMUNITY_GUIDELINES`).
+ */
 export const REPORT_REASONS = [
-  'underage',
-  'safety_threat',
-  'harassment',
-  'sexual_content',
-  'hate_speech',
-  'scam_spam',
   'fake_profile',
+  'harassment',
+  'spam',
+  'asking_for_money',
+  'inappropriate_behavior',
+  'threatening_behavior',
+  'impersonation',
+  'underage',
   'other',
 ] as const;
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
-/** 0 = P0 (most urgent). See docs/safety/reporting.md. */
+/** 0 = P0 (most urgent). See docs/safety/moderation-system.md#3-priorities. */
 export const REPORT_PRIORITY_BY_REASON: Readonly<Record<ReportReason, 0 | 1 | 2>> = {
+  threatening_behavior: 0,
   underage: 0,
-  safety_threat: 0,
   harassment: 1,
-  sexual_content: 1,
-  hate_speech: 1,
-  scam_spam: 1,
+  asking_for_money: 1,
+  inappropriate_behavior: 1,
+  impersonation: 1,
   fake_profile: 2,
+  spam: 2,
   other: 2,
 };
 
@@ -123,7 +134,13 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 export const REPORT_SOURCES = ['member', 'system'] as const;
 export type ReportSource = (typeof REPORT_SOURCES)[number];
 
-export const REPORT_RESOLUTION_ACTIONS = ['dismiss', 'warn', 'suspend', 'ban'] as const;
+export const REPORT_RESOLUTION_ACTIONS = [
+  'dismiss',
+  'warn',
+  'restrict_chat',
+  'suspend',
+  'ban',
+] as const;
 export type ReportResolutionAction = (typeof REPORT_RESOLUTION_ACTIONS)[number];
 
 export const SAFETY_SEVERITIES = ['info', 'warning', 'critical'] as const;
@@ -137,6 +154,7 @@ export const SAFETY_EVENT_TYPES = [
   'admin.account_locked',
   'rate_limit.exceeded',
   'safety.block_created',
+  'safety.block_removed',
   'safety.report_created',
   'safety.report_limit_reached',
   'safety.auto_hidden',
@@ -144,8 +162,36 @@ export const SAFETY_EVENT_TYPES = [
   'verification.start_limit_reached',
   'verification.webhook_rejected',
   'verification.underage_detected',
+  'suspicious.money_requests',
+  'suspicious.repeated_messages',
+  'suspicious.frequently_blocked',
+  'sanction.expired',
 ] as const;
 export type SafetyEventType = (typeof SAFETY_EVENT_TYPES)[number];
+
+/**
+ * Patterns the platform flags automatically (docs/safety/abuse-prevention.md#4-suspicious-activity-detection).
+ * A flag opens a `source = 'system'` report in the moderation queue. It NEVER bans or suspends
+ * anyone: only a moderator applies sanctions.
+ */
+export const SUSPICIOUS_ACTIVITY_TRIGGERS = [
+  'money_requests',
+  'repeated_messages',
+  'frequently_blocked',
+] as const;
+export type SuspiciousActivityTrigger = (typeof SUSPICIOUS_ACTIVITY_TRIGGERS)[number];
+
+/**
+ * Sanctions applied by moderators (docs/safety/admin-actions.md). `warning` = in-app notice the
+ * member must acknowledge; `chat_restriction` = can't send messages; `suspension` = account
+ * paused (optionally timed); `ban` = permanent removal. Never applied automatically.
+ */
+export const SANCTION_TYPES = ['warning', 'chat_restriction', 'suspension', 'ban'] as const;
+export type SanctionType = (typeof SANCTION_TYPES)[number];
+
+/** Allowed lengths for timed suspensions and chat restrictions (omit for "until lifted"). */
+export const SANCTION_DURATION_DAYS = [1, 3, 7, 30] as const;
+export type SanctionDurationDays = (typeof SANCTION_DURATION_DAYS)[number];
 
 // --- Events (docs/events/event-management.md) ---------------------------------------------
 

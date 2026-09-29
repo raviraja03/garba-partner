@@ -5,7 +5,8 @@ import { User } from './user.model.js';
 
 /**
  * A chat message (docs/chat/architecture.md). Immutable: the database rejects UPDATE.
- * `containsContactInfo` is moderation context only and never returned to members.
+ * `containsContactInfo` / `containsMoneyRequest` are moderation context only and never returned
+ * to members.
  */
 @Table({ tableName: 'messages', updatedAt: false })
 export class Message extends Model<InferAttributes<Message>, InferCreationAttributes<Message>> {
@@ -28,6 +29,10 @@ export class Message extends Model<InferAttributes<Message>, InferCreationAttrib
 
   @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
   containsContactInfo!: CreationOptional<boolean>;
+
+  /** Looks like a request for money or payment details. Moderation context only. */
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  containsMoneyRequest!: CreationOptional<boolean>;
 
   @CreatedAt
   override createdAt!: CreationOptional<Date>;

@@ -50,13 +50,14 @@ export const MATCH_HIGHLIGHT_LABELS: Record<MatchHighlight, string> = {
 };
 
 export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
-  underage: 'Seems to be under 18',
-  safety_threat: 'Threat to my safety',
+  fake_profile: 'Fake profile',
   harassment: 'Harassment or bullying',
-  sexual_content: 'Sexual or explicit content',
-  hate_speech: 'Hate speech',
-  scam_spam: 'Scam, spam or asking for money',
-  fake_profile: 'Fake profile or impersonation',
+  spam: 'Spam or promotion',
+  asking_for_money: 'Asking for money or payment details',
+  inappropriate_behavior: 'Inappropriate or sexual behaviour',
+  threatening_behavior: 'Threatening behaviour',
+  impersonation: 'Pretending to be someone else',
+  underage: 'Seems to be under 18',
   other: 'Something else',
 };
 

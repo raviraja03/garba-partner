@@ -5,6 +5,8 @@ import type {
   ReportStatus,
   SafetyEventType,
   SafetySeverity,
+  SanctionType,
+  SuspiciousActivityTrigger,
   UserStatus,
   VerificationFailureReason,
   VerificationProvider,
@@ -59,7 +61,63 @@ export interface ReportCreatedDto {
   blocked: boolean;
 }
 
+/**
+ * A moderator warning as the member sees it: the guideline it cites and when. Never includes
+ * the internal note, the report or who reported.
+ */
+export interface MemberWarningDto {
+  id: string;
+  guideline: { id: string; title: string; summary: string } | null;
+  issuedAt: string;
+  acknowledgedAt: string | null;
+}
+
+/** `GET /api/v1/me/safety`: restrictions and unacknowledged warnings on the member's account. */
+export interface MySafetyStatusDto {
+  accountStatus: UserStatus;
+  /** Set for a timed suspension; null when suspended until reviewed (or not suspended). */
+  suspendedUntil: string | null;
+  chatRestricted: boolean;
+  /** Set for a timed chat restriction. */
+  chatRestrictedUntil: string | null;
+  /** Warnings not yet acknowledged, newest first. */
+  warnings: MemberWarningDto[];
+}
+
 // --- Admin ----------------------------------------------------------------------------------
+
+/** A sanction as moderators see it (docs/safety/admin-actions.md). */
+export interface AdminSanctionDto {
+  id: string;
+  userId: string;
+  type: SanctionType;
+  reasonCode: ReportReason;
+  /** Internal moderator note. Never shown to the member. */
+  note: string;
+  reportId: string | null;
+  startsAt: string;
+  endsAt: string | null;
+  createdByAdminId: string;
+  acknowledgedAt: string | null;
+  revokedAt: string | null;
+  revokedByAdminId: string | null;
+  revokeReason: string | null;
+  expiredAt: string | null;
+  /** Not revoked and not expired. */
+  active: boolean;
+  createdAt: string;
+}
+
+/** Row of `GET /api/v1/admin/audit-logs` (`audit:view`). The IP hash is never returned. */
+export interface AdminAuditLogDto {
+  id: string;
+  admin: { id: string; name: string | null };
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
 
 export interface AdminReportUserDto {
   id: string;
@@ -79,6 +137,8 @@ export interface AdminReportListItemDto {
   openReportsAgainstUser: number;
   /** The report is about chat messages (evidence includes a message snapshot). */
   involvesChat: boolean;
+  /** System reports: the automated detection that raised it. */
+  trigger: SuspiciousActivityTrigger | null;
   createdAt: string;
 }
 
@@ -93,6 +153,8 @@ export interface AdminReportDetailDto extends AdminReportListItemDto {
     } | null;
     /** Messages copied at report time (reported message + earlier context). */
     messages: AdminMessageDto[];
+    /** System reports: counts and IDs behind the automated flag. */
+    signals: Record<string, unknown> | null;
   };
   /**
    * Whether a moderator may open the live conversation around the reported message: only for
@@ -107,6 +169,10 @@ export interface AdminReportDetailDto extends AdminReportListItemDto {
     resolvedAt: string;
   } | null;
   otherReports: { id: string; reason: ReportReason; status: ReportStatus; createdAt: string }[];
+  /** The reported member's sanction history, newest first. */
+  sanctions: AdminSanctionDto[];
+  /** The reported member currently can't send messages. */
+  reportedUserChatRestricted: boolean;
 }
 
 export interface AdminVerificationListItemDto {

@@ -134,7 +134,7 @@ describe.skipIf(!hasTestDatabase)('blocking and reporting (integration)', () => 
       await request(app)
         .post('/api/v1/reports')
         .set(bearer(reporter.accessToken))
-        .send({ reportedUserId: reported.userId, reason: 'safety_threat' })
+        .send({ reportedUserId: reported.userId, reason: 'threatening_behavior' })
         .expect(201);
 
       const user = await User.findByPk(reported.userId);

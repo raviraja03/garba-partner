@@ -8,6 +8,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { EventDetailPage } from './pages/EventDetailPage';
 import { EditEventPage, NewEventPage } from './pages/EventFormPage';
 import { EventsPage } from './pages/EventsPage';
+import { AuditLogPage, SafetyLogsPage } from './pages/LogPages';
 import { LoginPage } from './pages/LoginPage';
 import { EditOrganizerPage, NewOrganizerPage, OrganizerDetailPage } from './pages/OrganizerPages';
 import { OrganizersPage } from './pages/OrganizersPage';
@@ -66,6 +67,14 @@ const router = createBrowserRouter([
               { path: '/reports', element: <ReportsPage /> },
               { path: '/reports/:reportId', element: <ReportDetailPage /> },
             ],
+          },
+          {
+            element: <RequireAdmin permission="safety_logs:view" />,
+            children: [{ path: '/safety-logs', element: <SafetyLogsPage /> }],
+          },
+          {
+            element: <RequireAdmin permission="audit:view" />,
+            children: [{ path: '/audit-logs', element: <AuditLogPage /> }],
           },
           {
             element: <RequireAdmin permission="events:view" />,

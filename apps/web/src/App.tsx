@@ -6,8 +6,10 @@ import { ChatRealtime } from './features/chat/ChatRealtime';
 import { PublicOnly, RequireAuth } from './features/auth/guards';
 import { RequireProfile } from './features/profile/RequireProfile';
 import { ApiClientError } from './lib/api-client';
+import { BlockedMembersPage } from './pages/BlockedMembersPage';
 import { ChatPage } from './pages/ChatPage';
 import { ChatsPage } from './pages/ChatsPage';
+import { CommunityGuidelinesPage } from './pages/CommunityGuidelinesPage';
 import { DiscoverPage } from './pages/DiscoverPage';
 import { EditProfilePage } from './pages/EditProfilePage';
 import { EventDetailPage } from './pages/EventDetailPage';
@@ -23,6 +25,7 @@ import { OnboardingPage } from './pages/OnboardingPage';
 import { PartnerProfilePage } from './pages/PartnerProfilePage';
 import { PreferencesPage } from './pages/PreferencesPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SafetyCenterPage } from './pages/SafetyCenterPage';
 import { VerifyOtpPage } from './pages/VerifyOtpPage';
 
 const queryClient = new QueryClient({
@@ -51,6 +54,9 @@ const router = createBrowserRouter([
       // Public: visitors can browse events before signing up.
       { path: '/events', element: <EventsPage /> },
       { path: '/events/:idOrSlug', element: <EventDetailPage /> },
+      // Public: safety information must be reachable by everyone, signed in or not.
+      { path: '/safety', element: <SafetyCenterPage /> },
+      { path: '/guidelines', element: <CommunityGuidelinesPage /> },
       {
         element: <RequireAuth />,
         children: [
@@ -62,6 +68,7 @@ const router = createBrowserRouter([
               { path: '/profile', element: <ProfilePage /> },
               { path: '/profile/edit', element: <EditProfilePage /> },
               { path: '/profile/preferences', element: <PreferencesPage /> },
+              { path: '/profile/blocked', element: <BlockedMembersPage /> },
               { path: '/events/:idOrSlug/find-partner', element: <FindPartnerPage /> },
               { path: '/discover', element: <DiscoverPage /> },
               { path: '/partners/:userId', element: <PartnerProfilePage /> },

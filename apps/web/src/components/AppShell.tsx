@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { APP_NAME } from '@garba-partner/shared';
 import { useAuth } from '../features/auth/auth-context';
 import { useUnreadCount } from '../features/chat/hooks';
+import { SafetyNotices } from '../features/safety/components/SafetyNotices';
 import { Button } from './ui/Button';
 
 const MEMBER_NAV = [
@@ -92,9 +93,19 @@ export function AppShell() {
           )}
         </nav>
       </header>
+      <SafetyNotices enabled={authenticated} />
       <main className="flex-1 py-6">
         <Outlet />
       </main>
+      <footer className="flex flex-wrap gap-x-4 gap-y-1 border-t border-black/5 pt-4 text-xs text-muted">
+        <Link to="/safety" className="hover:text-ink hover:underline">
+          Safety centre
+        </Link>
+        <Link to="/guidelines" className="hover:text-ink hover:underline">
+          Community guidelines
+        </Link>
+        <span>18+ only</span>
+      </footer>
     </div>
   );
 }

@@ -77,6 +77,12 @@ export const ERROR_CODES = {
   // Chat (docs/chat/architecture.md)
   /** The match ended (unmatch, block, report, moderation) or the other member is unavailable. */
   MATCH_NOT_ACTIVE: { httpStatus: 409, message: 'This chat is no longer available.' },
+  /** A moderator restricted this member from sending messages (docs/safety/admin-actions.md). */
+  CHAT_RESTRICTED: {
+    httpStatus: 403,
+    message:
+      "You can't send messages right now because of a restriction on your account. See the notice in the app for details.",
+  },
 } as const satisfies Record<string, { httpStatus: number; message: string }>;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

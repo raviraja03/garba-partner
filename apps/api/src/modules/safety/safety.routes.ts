@@ -5,6 +5,7 @@ import { parseInput } from '../../lib/validation.js';
 import { memberAuth } from '../../middlewares/authenticate.js';
 import { requireMemberStatus } from '../../middlewares/authorize.js';
 import type { BlocksService } from './blocks.service.js';
+import type { MemberSafetyService } from './member-safety.service.js';
 import type { ReportsService } from './reports.service.js';
 
 const clientIp = (req: Request) => req.ip ?? 'unknown';
@@ -18,6 +19,7 @@ export function createSafetyRouters(deps: {
   reports: ReportsService;
   authenticateMember: RequestHandler;
   blockLimiter: RequestHandler;
+  unblockLimiter: RequestHandler;
   reportLimiter: RequestHandler;
 }): { blocks: Router; reports: Router } {
   const guard = [deps.authenticateMember, requireMemberStatus('active', 'suspended')];
@@ -32,9 +34,9 @@ export function createSafetyRouters(deps: {
     const created = await deps.blocks.block(memberAuth(req).userId, userId, clientIp(req));
     ok(res, { userId, blocked: true }, 'Member blocked', created ? 201 : 200);
   });
-  blocks.delete('/:userId', ...guard, async (req, res) => {
+  blocks.delete('/:userId', ...guard, deps.unblockLimiter, async (req, res) => {
     const userId = parseInput(uuidParamSchema, req.params.userId);
-    await deps.blocks.unblock(memberAuth(req).userId, userId);
+    await deps.blocks.unblock(memberAuth(req).userId, userId, clientIp(req));
     ok(res, { userId, blocked: false }, 'Member unblocked');
   });
 
@@ -51,4 +53,30 @@ export function createSafetyRouters(deps: {
   });
 
   return { blocks, reports };
+}
+
+/**
+ * The member's own moderation status, mounted at `/api/v1/me`: `GET /safety` and
+ * `POST /warnings/:warningId/acknowledge`. Suspended members can read it (it tells them why).
+ */
+export function createMySafetyRouter(deps: {
+  service: MemberSafetyService;
+  authenticateMember: RequestHandler;
+  limiter: RequestHandler;
+}): Router {
+  const guard = [deps.authenticateMember, requireMemberStatus('active', 'suspended')];
+  const router = Router();
+  router.get('/safety', ...guard, async (req, res) => {
+    res.setHeader('Cache-Control', 'private, no-store');
+    ok(res, await deps.service.status(memberAuth(req).userId));
+  });
+  router.post('/warnings/:warningId/acknowledge', ...guard, deps.limiter, async (req, res) => {
+    const warningId = parseInput(uuidParamSchema, req.params.warningId);
+    ok(
+      res,
+      await deps.service.acknowledgeWarning(memberAuth(req).userId, warningId),
+      'Warning acknowledged',
+    );
+  });
+  return router;
 }

@@ -483,6 +483,8 @@ The admin panel is a separate app (`apps/admin`) on its own subdomain. Every act
 
 ### 12.2 Report handling
 
+> **Implemented** ([moderation system](../safety/moderation-system.md), [admin actions](../safety/admin-actions.md)) with these refinements: reasons are fake profile, harassment, spam, asking for money, inappropriate behaviour, threatening behaviour, impersonation, underage, other; `restrict_chat` is an additional action; `remove_content` and reporter notifications are not built yet; bans need an assigned (in-review) report.
+
 1. **Reports queue**: filter by status (`open`, `in_review`, `resolved`, `dismissed`), priority and reason. Default sort: priority, then oldest first.
 2. Open a report → **Assign to me** (`in_review`).
 3. The detail view shows: reporter reason and details, the message snapshot with context, the reported user's profile (photos, bio), their previous reports (count + outcomes), their sanction history, and other open reports against the same user (grouped).
@@ -496,6 +498,8 @@ The admin panel is a separate app (`apps/admin`) on its own subdomain. Every act
 5. The reporter gets a generic in-app update: "We've reviewed your report and taken appropriate action." We don't disclose the specific action.
 
 ### 12.3 User sanction
+
+> **Implemented** (`user_sanctions`, [admin actions](../safety/admin-actions.md)): warning, chat restriction, suspension (1/3/7/30 days or until lifted) and ban; the expiry job runs every minute; lifting a ban is super-admin only. `banned_phone_hashes` waits for account deletion.
 
 Triggered from a report resolution or directly from the user detail page (with a note).
 

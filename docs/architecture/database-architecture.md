@@ -324,6 +324,8 @@ Indexes: `(status, priority, created_at)`, `(reported_user_id, created_at DESC)`
 
 #### `user_sanctions`
 
+> **Implemented** with changes: `type` also allows `chat_restriction`; `reason_code` uses the report reasons; plus `acknowledged_at` (warnings) and `expired_at` (timed sanctions). See [schema §4.20](../database/schema.md#420-user_sanctions-and-moderation-columns).
+
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |
