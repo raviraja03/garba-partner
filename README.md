@@ -217,6 +217,15 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Chat moderation](docs/chat/moderation.md) | Message reports and evidence, **admin reports queue**, audited conversation access, resolutions |
 | [Chat safety](docs/chat/safety.md) | Who can chat and how it is enforced, contact-sharing nudge, rate limits, retention, privacy |
 
+### Testing & quality
+
+| Document | Contents |
+|---|---|
+| [Testing strategy](docs/testing/testing-strategy.md) | Test layers, data isolation, how to run, coverage by area, rules for new code, known gaps |
+| [Test cases](docs/testing/test-cases.md) | Test cases per area (auth, profile, events, discovery, interests, chat, safety, notifications, payments, admin), automated vs manual |
+| [Security testing](docs/testing/security-testing.md) | Security QA results by category, **findings and fixes**, accepted risks, how to re-run |
+| [Release checklist](docs/testing/release-checklist.md) | Code, database, staging, production configuration, post-deploy and sign-off |
+
 ### Admin
 
 | Document | Contents |
@@ -303,6 +312,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **5b** | Notifications | ✅ In-app notifications (interest received/accepted, match, collapsed chat messages, event reminders, safety notices, report reviewed), unread/read, mark one/all, cursor pagination, per-type preferences, live `notification:new`, 90-day retention, admin monitoring. ⏳ Verification trigger (with the verification flow), web push/email | ✅ Done |
 | **5c** | Event pass payments | ✅ Razorpay orders with server-computed amounts, idempotency keys, capacity holds, checkout signature + API verification, signed webhooks with de-duplication, reconciliation job, bookings with codes, automatic refunds (sold out, duplicates, unavailable events), admin refunds, pass settings, payments back office, booking notifications. ⏳ QR check-in, partial refunds, invoices | ✅ Done |
 | **5d** | Admin dashboard | ✅ Aggregate metrics (members, active, verified, suspended, events, matches, pending reports, bookings, revenue), date and city filters, role-scoped sections, daily/weekly trend charts, paginated per-event table, audited per-event sales CSV | ✅ Done |
+| **5e** | QA | ✅ Security QA (unauthorized access, JWT forgery, privilege escalation, IDOR, injection, XSS, uploads, CSRF, rate limits, logging), security test suite, 3 findings fixed (public profile visibility, phone numbers in logs, destructive DB commands on staging), test strategy, test cases, release checklist | ✅ Done |
 | **6** | Hardening & launch | Security review, load test, Nginx/PM2/VPS, TLS, backups & restore drill, legal pages, SMS DLT, runbooks | Planned |
 
 ### Post-MVP (indicative)

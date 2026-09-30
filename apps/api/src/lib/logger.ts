@@ -1,4 +1,4 @@
-import { pino, type Logger } from 'pino';
+import { pino, type DestinationStream, type Logger } from 'pino';
 import type { ServerEnv } from '@garba-partner/config/server';
 
 /**
@@ -16,13 +16,45 @@ const REDACT_PATHS = [
   '*.accessToken',
   '*.refreshToken',
   '*.phone',
+  // Query strings (e.g. admin user search by phone number: QA finding, see docs/testing/security-testing.md)
+  'req.query.q',
+  'req.query.phone',
+  'req.query.code',
+  'req.query.token',
 ];
 
-export function createLogger(env: Pick<ServerEnv, 'LOG_LEVEL' | 'NODE_ENV'>): Logger {
-  return pino({
+/** Query parameters whose values never reach the logs (they can hold phone numbers or secrets). */
+const SENSITIVE_QUERY_KEYS = new Set(['q', 'phone', 'code', 'token']);
+
+/** `/admin/users?q=9876543210&limit=20` → `/admin/users?q=%5BREDACTED%5D&limit=20`. */
+export function redactUrl(url: string | undefined): string | undefined {
+  if (!url) return url;
+  const index = url.indexOf('?');
+  if (index < 0) return url;
+  const params = new URLSearchParams(url.slice(index + 1));
+  let changed = false;
+  for (const key of new Set(params.keys())) {
+    if (SENSITIVE_QUERY_KEYS.has(key)) {
+      params.set(key, '[REDACTED]');
+      changed = true;
+    }
+  }
+  return changed ? `${url.slice(0, index)}?${params.toString()}` : url;
+}
+
+/** `destination` is for tests that inspect log output (no pretty transport then). */
+export function createLogger(
+  env: Pick<ServerEnv, 'LOG_LEVEL' | 'NODE_ENV'>,
+  destination?: DestinationStream,
+): Logger {
+  const options = {
     level: env.LOG_LEVEL,
     base: { service: 'garba-partner-api' },
     redact: { paths: REDACT_PATHS, censor: '[REDACTED]' },
+  };
+  if (destination) return pino(options, destination);
+  return pino({
+    ...options,
     ...(env.NODE_ENV === 'development'
       ? {
           transport: {

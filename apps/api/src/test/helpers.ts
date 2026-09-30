@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { Express } from 'express';
-import { pino } from 'pino';
+import { pino, type Logger } from 'pino';
 import sharp from 'sharp';
 import request, { type Response } from 'supertest';
 import type { Sequelize } from 'sequelize-typescript';
@@ -89,11 +89,13 @@ export function createTestApp(options: {
   realtime?: RealtimeHub;
   /** Razorpay gateway (tests pass the mocked one from `razorpay-mock.ts`). Default: disabled. */
   payments?: PaymentGateway | null;
+  /** Defaults to a silent logger. */
+  logger?: Logger;
   pingDatabase?: () => Promise<boolean>;
 }): Express {
   return createApp({
     env: options.env ?? createTestEnv(),
-    logger: pino({ level: 'silent' }),
+    logger: options.logger ?? pino({ level: 'silent' }),
     dependencies: {
       sequelize: options.sequelize,
       sms: options.sms ?? devSmsProvider,

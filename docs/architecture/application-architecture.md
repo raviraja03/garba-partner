@@ -453,7 +453,7 @@ Example: `PublicProfileDto` (what other members receive):
 |---|---|---|---|
 | GET | `/partners` | M | ✅ (was `/discovery`) Query: `eventId` (event mode), `cityId`, `minAge`, `maxAge`, `garbaLevels`, `date`, `verifiedOnly`, `cursor`, `limit` → `PartnerDto[]` (profile + highlights, **no score**). Rate limit 60/min. See [discovery](../matching/discovery.md) |
 | GET | `/partners/:id` | M | ✅ One `PartnerDto`, same eligibility rules; otherwise `404` |
-| GET | `/users/:userId/profile` ✅ | M | `PublicProfileDto` (allow-list). `404` if unknown, inactive or incomplete (and, once blocking exists, blocked) |
+| GET | `/users/:userId/profile` ✅ | M | `PublicProfileDto` (allow-list). `404` if unknown, inactive, incomplete, blocked or reported (either way), or not discoverable unless connected (match/pending interest) |
 
 ### 5.6 Interests, matches, chat
 

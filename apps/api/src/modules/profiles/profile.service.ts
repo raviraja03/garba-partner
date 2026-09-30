@@ -1,5 +1,5 @@
 import type { Logger } from 'pino';
-import { Op, type Transaction } from 'sequelize';
+import { Op, QueryTypes, type Transaction } from 'sequelize';
 import type { Sequelize } from 'sequelize-typescript';
 import {
   CURRENT_TERMS_VERSION,
@@ -355,10 +355,11 @@ export function createProfileService(deps: {
 
     async getPublicProfile(viewerId, targetUserId) {
       const today = todayInIndia();
+      const notFound = () => new AppError('NOT_FOUND', { message: 'Profile not found.' });
       // Soft-deleted users are excluded by the paranoid default scope.
       const user = await User.findOne({
         where: { id: targetUserId, status: 'active' },
-        attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt'],
+        attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt', 'hiddenFromDiscovery'],
       });
       const profile = user ? await loadProfile(user.id) : null;
       // Unknown, inactive, incomplete and blocked (either direction) profiles all look the
@@ -369,9 +370,30 @@ export function createProfileService(deps: {
         computeCompletion(profile, today).status !== 'complete' ||
         (await isBlockedEitherWay(viewerId, targetUserId))
       ) {
-        throw new AppError('NOT_FOUND', { message: 'Profile not found.' });
+        throw notFound();
       }
       const preferences = await UserPreference.findOne({ where: { userId: user.id } });
+      if (viewerId !== targetUserId) {
+        // Same visibility as discovery (QA finding: this endpoint used to bypass it). Members who
+        // are connected (active match or pending interest) can always see each other; anyone
+        // else only sees members who are discoverable. A report either way hides the profile.
+        const [relation] = await sequelize.query<{ connected: boolean; reported: boolean }>(
+          `SELECT
+             EXISTS (SELECT 1 FROM matches m WHERE m.status = 'active'
+                       AND ((m.user_a_id = :viewer AND m.user_b_id = :target)
+                         OR (m.user_a_id = :target AND m.user_b_id = :viewer)))
+             OR EXISTS (SELECT 1 FROM partner_interests i WHERE i.status = 'pending'
+                       AND ((i.sender_id = :viewer AND i.receiver_id = :target)
+                         OR (i.sender_id = :target AND i.receiver_id = :viewer))) AS connected,
+             EXISTS (SELECT 1 FROM reports r
+                      WHERE (r.reporter_id = :viewer AND r.reported_user_id = :target)
+                         OR (r.reporter_id = :target AND r.reported_user_id = :viewer)) AS reported`,
+          { type: QueryTypes.SELECT, replacements: { viewer: viewerId, target: targetUserId } },
+        );
+        if (relation?.reported) throw notFound();
+        const discoverable = !user.hiddenFromDiscovery && preferences?.discoveryEnabled === true;
+        if (!relation?.connected && !discoverable) throw notFound();
+      }
       return toPublicProfileDto(user, profile, preferences, media, today);
     },
   };

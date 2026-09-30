@@ -22,6 +22,10 @@ export default defineConfig({
     globalSetup: ['src/test/global-setup.ts'],
     // Integration test files share one database, so files run one at a time.
     fileParallelism: false,
+    // Integration tests create members through the real API (OTP, onboarding, Argon2, image
+    // processing); 5 s was flaky on slower machines (QA finding). Still catches real hangs.
+    testTimeout: 20_000,
+    hookTimeout: 30_000,
     // Integration tests are skipped when no test database is configured.
     env: testDbUrl ? { TEST_DATABASE_URL: testDbUrl } : {},
   },

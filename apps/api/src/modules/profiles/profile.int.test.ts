@@ -457,9 +457,24 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
       'photoVerified',
     ];
 
+    /** Public profiles follow discovery visibility, which is opt-in (QA finding SEC-01). */
+    const discoverable = (userId: string, extra: Record<string, unknown> = {}) =>
+      UserPreference.update({ discoveryEnabled: true, ...extra }, { where: { userId } });
+
+    it('hides members who have not opted into discovery', async () => {
+      const viewer = await completeMember();
+      const target = await completeMember();
+      const view = () =>
+        request(app).get(`/api/v1/users/${target.userId}/profile`).set(auth(viewer.accessToken));
+      expect((await view()).status).toBe(404);
+      await discoverable(target.userId);
+      expect((await view()).status).toBe(200);
+    });
+
     it('shows only the public allow-list — never phone, date of birth, Instagram, preferences or status', async () => {
       const viewer = await completeMember();
       const target = await completeMember({ name: 'Rohan', gender: 'man' });
+      await discoverable(target.userId);
 
       const res = await request(app)
         .get(`/api/v1/users/${target.userId}/profile`)
@@ -486,7 +501,7 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
     it('shows the area only when the member opted in', async () => {
       const viewer = await completeMember();
       const target = await completeMember();
-      await UserPreference.update({ showArea: true }, { where: { userId: target.userId } });
+      await discoverable(target.userId, { showArea: true });
 
       const res = await request(app)
         .get(`/api/v1/users/${target.userId}/profile`)

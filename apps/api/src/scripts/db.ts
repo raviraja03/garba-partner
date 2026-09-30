@@ -22,7 +22,7 @@ const COMMANDS = {
 
 type Command = keyof typeof COMMANDS;
 
-/** Never allowed when APP_ENV=production. */
+/** Only allowed when APP_ENV=development. */
 const DEVELOPMENT_ONLY = new Set<Command>(['migrate:undo:all', 'seed', 'seed:undo', 'reset']);
 /** Allowed in production only with an explicit confirmation flag. */
 const REQUIRES_PRODUCTION_CONFIRMATION = new Set<Command>(['migrate:undo']);
@@ -40,10 +40,12 @@ function usage(): string {
 }
 
 function assertAllowed(command: Command, env: ServerEnv, args: readonly string[]): void {
-  if (env.APP_ENV !== 'production') return;
-  if (DEVELOPMENT_ONLY.has(command)) {
-    throw new Error(`"${command}" is disabled when APP_ENV=production`);
+  // Destructive commands (wipe, reset, dev seed data) only ever run on a development database;
+  // staging holds shared test data too (QA finding SEC-03).
+  if (DEVELOPMENT_ONLY.has(command) && env.APP_ENV !== 'development') {
+    throw new Error(`"${command}" is only allowed when APP_ENV=development`);
   }
+  if (env.APP_ENV !== 'production') return;
   if (REQUIRES_PRODUCTION_CONFIRMATION.has(command) && !args.includes(CONFIRM_PRODUCTION_FLAG)) {
     throw new Error(
       `"${command}" in production requires ${CONFIRM_PRODUCTION_FLAG} (take a backup first)`,

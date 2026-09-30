@@ -6,6 +6,7 @@ import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
 import type { ServerEnv } from '@garba-partner/config/server';
 import { API_PREFIX } from '@garba-partner/shared';
+import { redactUrl } from './lib/logger.js';
 import { resolveRequestId } from './lib/request-id.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFound } from './middlewares/not-found.js';
@@ -35,6 +36,10 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
     pinoHttp({
       logger,
       genReqId: resolveRequestId,
+      // Query strings can carry phone numbers (admin search): never log them in the URL.
+      serializers: {
+        req: (req: { url?: string }) => ({ ...req, url: redactUrl(req.url) }),
+      },
       autoLogging: { ignore: (req) => req.url === HEALTH_PATH },
       customLogLevel: (_req, res, err) => {
         if (err || res.statusCode >= 500) return 'error';

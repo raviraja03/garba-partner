@@ -209,6 +209,8 @@ Returns the member's own profile **exactly as other members would see it** (`Pub
 
 Requires an **active, onboarded** viewer (`authenticateMember` + `requireActiveMember`).
 
+**Visibility (same as discovery):** the profile is returned only if the member is **discoverable** (opted into discovery, not hidden pending moderation) **or** the two members are connected (active match or pending interest). A block or a report in either direction always hides it. Everything else is `404` (QA finding SEC-01, [security testing](../testing/security-testing.md#4-findings-and-fixes)).
+
 **200 OK**
 
 ```json
