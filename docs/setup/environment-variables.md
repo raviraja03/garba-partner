@@ -51,6 +51,7 @@ Setup guide: [docs/database/database-setup.md](../database/database-setup.md).
 | `PHONE_HASH_SECRET` | **yes** | — | api, seeders | ≥ 32 characters (e.g. 32 random bytes, base64). HMAC key for `users.phone_hash`. **Long-lived: rotating it requires a re-hash migration** |
 | `PHONE_ENCRYPTION_KEY` | **yes** | — | api, seeders | 32 bytes, base64-encoded. AES-256-GCM key for `users.phone_encrypted` |
 | `PHONE_ENCRYPTION_KEY_VERSION` | no | `1` | api, seeders | Stored with each ciphertext to support key rotation |
+| `TOTP_ENCRYPTION_KEY` | **yes** | — | api | 32 bytes, base64-encoded. AES-256-GCM key for admin authenticator (TOTP) secrets. **Must differ** from `PHONE_ENCRYPTION_KEY`. Changing it invalidates every enrolled authenticator (each admin must be reset with `reset-two-factor` and enrol again) |
 
 ### Authentication
 
@@ -106,7 +107,6 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 | Phase | Variables |
 |---|---|
 | Production SMS | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` (with a real `SMS_PROVIDER` value) |
-| Admin 2FA | `TOTP_ENCRYPTION_KEY` |
 | Realtime | `VITE_SOCKET_URL` |
 
 Generate secrets with a CSPRNG, e.g. `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.

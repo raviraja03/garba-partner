@@ -2,7 +2,7 @@
 
 > **Source of truth for implemented tables.** Related: [Relationships](relationships.md), [Migration guide](migration-guide.md), [Database setup](database-setup.md), [Database architecture (target design)](../architecture/database-architecture.md)
 
-Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `partner_interests`, `matches`, `messages`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
+Implemented so far: `users`, `user_profiles`, `user_preferences`, `user_sessions`, `user_verifications`, `otp_requests`, `admin_users`, `admin_sessions`, `admin_login_challenges`, `admin_audit_logs`, `cities`, `areas`, `event_organizers`, `events`, `event_attendances`, `partner_interests`, `matches`, `messages`, `blocks`, `reports`, `safety_logs`, plus the migration bookkeeping tables `schema_migrations` and `schema_seeders`. Other tables in the [target design](../architecture/database-architecture.md) are added by later phases.
 
 ## 1. ERD
 
@@ -259,6 +259,9 @@ erDiagram
         smallint failed_login_count
         timestamptz locked_until
         timestamptz last_login_at
+        text totp_secret_encrypted "AES-256-GCM"
+        timestamptz totp_enabled_at
+        bigint totp_last_step
         timestamptz created_at
         timestamptz updated_at
     }
@@ -481,15 +484,18 @@ Admin identities, completely separate from members. **Disabled, never deleted** 
 | `failed_login_count` | smallint | no | 0 | Reset on success or lockout |
 | `locked_until` | timestamptz | yes | | 15-minute lockout after 5 failures |
 | `last_login_at` | timestamptz | yes | | |
+| `totp_secret_encrypted` | text | yes | | Authenticator secret, AES-256-GCM with `TOTP_ENCRYPTION_KEY`. Excluded from the default model scope (`withSecrets` scope to read) |
+| `totp_enabled_at` | timestamptz | yes | | Set when the first code confirmed enrolment |
+| `totp_last_step` | bigint | yes | | Last accepted 30-second step (replay protection) |
 | `created_at` / `updated_at` | timestamptz | no | `now()` | |
 
-Constraints: `admin_users_email_unique`, `admin_users_email_lowercase_check`, `admin_users_name_check`, `admin_users_role_check`, `admin_users_status_check`, `admin_users_password_hash_check` (Argon2id only), `admin_users_failed_login_count_check`.
+Constraints: `admin_users_email_unique`, `admin_users_email_lowercase_check`, `admin_users_name_check`, `admin_users_role_check`, `admin_users_status_check`, `admin_users_password_hash_check` (Argon2id only), `admin_users_failed_login_count_check`, `admin_users_totp_consistency_check` (secret and `totp_enabled_at` are set together). The TOTP columns come from migration `20261003100000-add-admin-two-factor`.
 
-TOTP columns (`totp_secret_encrypted`, `totp_enabled_at`, `must_change_password`) will be added by the admin 2FA migration.
+A forced password change on first login (`must_change_password`) is not implemented yet.
 
 ### 4.8 `admin_sessions`
 
-Same shape and rules as [`user_sessions`](#44-user_sessions), with `admin_id` (FK → `admin_users.id` `ON DELETE CASCADE`) instead of `user_id`. `last_used_at` drives the 30-minute idle timeout. `revoked_reason` ∈ `logout`, `reuse_detected`, `idle_timeout`, `disabled`.
+Same shape and rules as [`user_sessions`](#44-user_sessions), with `admin_id` (FK → `admin_users.id` `ON DELETE CASCADE`) instead of `user_id`. `last_used_at` drives the 30-minute idle timeout. `revoked_reason` ∈ `logout`, `reuse_detected`, `idle_timeout`, `disabled`, `two_factor_reset`.
 
 Constraints and indexes mirror `user_sessions` (`admin_sessions_refresh_token_hash_unique`, `admin_sessions_active_admin_id_idx`, …).
 
@@ -746,6 +752,24 @@ Migration `20261002100000-create-payments`. See [payment flow](../payments/payme
 | `payment_webhook_events` | `event_id` (PK, `X-Razorpay-Event-Id`), `event`, `razorpay_payment_id`, `razorpay_order_id`, `received_at`, `processed_at` | Webhook de-duplication. The payload itself is not stored |
 
 Also: `notifications.booking_id` (FK → `event_bookings` `CASCADE`), notification type `booking` (check `type <> 'booking' OR booking_id IS NOT NULL`), and audit target type `booking`.
+
+### 4.23 `admin_login_challenges`
+
+Migration `20261003100000-add-admin-two-factor`. The second step of admin sign-in ([authentication §3.1](../auth/authentication.md#31-admin-sign-in-password--mandatory-two-factor)).
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | uuid | no | PK |
+| `admin_id` | uuid | no | FK → `admin_users.id` `ON DELETE CASCADE`, indexed |
+| `token_hash` | char(64) | no | SHA-256 of the challenge token (the token itself is never stored). **Unique** |
+| `purpose` | varchar(10) | no | `totp` (enrolled admin) or `setup` (first sign-in) |
+| `pending_secret_encrypted` | text | yes | Setup only: the new secret, AES-256-GCM, until the first code confirms it |
+| `attempts` | smallint | no | 0–10; the challenge is closed after 5 wrong codes |
+| `expires_at` | timestamptz | no | 5 minutes after creation, indexed |
+| `consumed_at` | timestamptz | yes | Set on success, lockout, a newer password step or a 2FA reset |
+| `created_at` | timestamptz | no | |
+
+Checks: `purpose`, `attempts`, and `pending_secret_encrypted` only on `setup` rows.
 
 ## 5. Database functions and triggers
 

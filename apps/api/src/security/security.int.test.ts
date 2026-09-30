@@ -4,9 +4,9 @@ import { SignJWT } from 'jose';
 import sharp from 'sharp';
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
-import { CSRF_HEADER, CSRF_HEADER_VALUE, type AdminRole } from '@garba-partner/shared';
+import { CSRF_HEADER, CSRF_HEADER_VALUE, LIMITS, type AdminRole } from '@garba-partner/shared';
 import { createLogger, redactUrl } from '../lib/logger.js';
-import { User, UserPreference, UserSession } from '../models/index.js';
+import { AdminAuditLog, AdminUser, User, UserPreference, UserSession } from '../models/index.js';
 import { TOKEN_AUDIENCES } from '../modules/auth/token.service.js';
 import { bearer } from '../test/event-fixtures.js';
 import {
@@ -16,6 +16,7 @@ import {
   loginAdmin,
   loginMember,
   newTestPhone,
+  TEST_ADMIN_PASSWORD,
   uniqueIp,
   useTestDatabase,
 } from '../test/helpers.js';
@@ -100,6 +101,7 @@ const ADMIN_ENDPOINTS: [Method, string][] = [
   ['get', '/admin/payments/bookings'],
   ['post', `/admin/payments/bookings/${ID}/refund`],
   ['get', '/admin/dashboard/summary'],
+  ['post', `/admin/admins/${ID}/reset-two-factor`],
 ];
 
 describe.skipIf(!hasTestDatabase)('security (integration)', () => {
@@ -237,6 +239,7 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
         allowed: ['super_admin', 'event_manager'],
       },
       { method: 'post', path: `/admin/payments/bookings/${ID}/refund`, allowed: ['super_admin'] },
+      { method: 'post', path: `/admin/admins/${ID}/reset-two-factor`, allowed: ['super_admin'] },
       {
         method: 'get',
         path: '/admin/dashboard/summary',
@@ -583,6 +586,26 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
       expect(redactUrl('/x?q=98765&limit=5')).toBe('/x?q=%5BREDACTED%5D&limit=5');
       expect(redactUrl('/x?limit=5')).toBe('/x?limit=5');
     });
+
+    it('never logs SQL values or 2FA secrets from error objects', async () => {
+      const lines: string[] = [];
+      const logger = createLogger(
+        { LOG_LEVEL: 'info', NODE_ENV: 'test' },
+        { write: (line: string) => lines.push(line) },
+      );
+      const err = await db()
+        .query('SELECT no_such_column FROM users WHERE phone_hash = :q', {
+          replacements: { q: '9876543210' },
+        })
+        .catch((error: unknown) => error);
+      logger.error({ err }, 'Unhandled error');
+      logger.info({ body: { challengeToken: 'tok-123', secret: 'JBSWY3DP' } }, 'x');
+      const output = lines.join('\n');
+      expect(output).toContain('Unhandled error');
+      expect(output).not.toContain('9876543210');
+      expect(output).not.toContain('tok-123');
+      expect(output).not.toContain('JBSWY3DP');
+    });
   });
 
   describe('error hygiene and headers', () => {
@@ -597,6 +620,104 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
       expect(res.headers['x-content-type-options']).toBe('nosniff');
       expect(res.headers['strict-transport-security']).toBeDefined();
       expect(res.headers['x-frame-options']).toBeDefined();
+      expect(res.headers['referrer-policy']).toBe('no-referrer');
+      expect(res.headers['strict-transport-security']).toMatch(/max-age=31536000/);
+    });
+  });
+
+  describe('security hardening', () => {
+    it('never lets browsers or proxies cache personal responses', async () => {
+      const member = await loginMember(app, ip);
+      const admin = await loginAdmin(app, ip, 'moderator');
+      const privateResponses = [
+        await call('get', '/auth/me').set(bearer(member.accessToken)),
+        await call('get', '/me/profile').set(bearer(member.accessToken)),
+        await call('get', '/notifications').set(bearer(member.accessToken)),
+        await call('post', '/auth/send-otp').set('X-Forwarded-For', ip).send({ phone: 'bad' }),
+        await call('get', '/admin/auth/me').set(bearer(admin.accessToken)),
+        await call('get', '/admin/users').set(bearer(admin.accessToken)),
+      ];
+      privateResponses.forEach((res, i) => {
+        expect(res.headers['cache-control'], String(i)).toMatch(/\bno-store\b/);
+      });
+      // Public, non-personal lists keep their short public cache.
+      expect((await call('get', '/events')).headers['cache-control']).toBe('public, max-age=60');
+    });
+
+    it('allows only our origins, methods and headers in CORS', async () => {
+      const preflight = (origin: string, method = 'POST', headers = 'content-type') =>
+        request(app)
+          .options('/api/v1/auth/send-otp')
+          .set('Origin', origin)
+          .set('Access-Control-Request-Method', method)
+          .set('Access-Control-Request-Headers', headers);
+      for (const origin of [env.WEB_ORIGIN, env.ADMIN_ORIGIN]) {
+        const res = await preflight(origin);
+        expect(res.headers['access-control-allow-origin']).toBe(origin);
+        expect(res.headers['access-control-allow-credentials']).toBe('true');
+      }
+      const allowed = await preflight(env.WEB_ORIGIN, 'PROPFIND', 'x-evil, content-type');
+      expect(allowed.headers['access-control-allow-methods']).toBe('GET,POST,PUT,PATCH,DELETE');
+      expect(allowed.headers['access-control-allow-headers']).not.toMatch(/x-evil/i);
+      expect(
+        (await preflight('https://evil.example')).headers['access-control-allow-origin'],
+      ).toBeUndefined();
+      // Look-alike origins are not prefixes of ours.
+      expect(
+        (await preflight(`${env.WEB_ORIGIN}.evil.example`)).headers['access-control-allow-origin'],
+      ).toBeUndefined();
+    });
+
+    it('applies a global per-IP request limit (webhooks exempt)', async () => {
+      const statuses: number[] = [];
+      for (let i = 0; i <= LIMITS.API_REQUESTS_PER_MINUTE; i += 1) {
+        statuses.push((await call('get', '/health').set('X-Forwarded-For', ip)).status);
+      }
+      expect(statuses.slice(0, LIMITS.API_REQUESTS_PER_MINUTE).every((s) => s !== 429)).toBe(true);
+      const limited = await call('get', '/events').set('X-Forwarded-For', ip);
+      expect(limited.status).toBe(429);
+      expect(limited.body).toMatchObject({ success: false, error: { code: 'RATE_LIMITED' } });
+      expect(limited.headers['retry-after']).toBeDefined();
+      // Razorpay's retries must still reach the (signature-verified) webhook.
+      const webhook = await call('post', '/webhooks/razorpay').set('X-Forwarded-For', ip).send({});
+      expect(webhook.status).not.toBe(429);
+      // Other clients are unaffected.
+      expect((await call('get', '/health').set('X-Forwarded-For', uniqueIp())).status).not.toBe(
+        429,
+      );
+    });
+
+    it('lets only another super admin reset two-factor sign-in, ending all sessions', async () => {
+      const superAdmin = await loginAdmin(app, ip, 'super_admin');
+      const moderator = await loginAdmin(app, ip, 'moderator');
+      const reset = (actor: string, target: string, body: object = { reason: 'Lost phone' }) =>
+        call('post', `/admin/admins/${target}/reset-two-factor`).set(bearer(actor)).send(body);
+
+      expect((await reset(moderator.accessToken, superAdmin.adminId)).status).toBe(403);
+      const self = await reset(superAdmin.accessToken, superAdmin.adminId);
+      expect(self.status).toBe(403);
+      expect((await reset(superAdmin.accessToken, moderator.adminId, {})).status).toBe(400);
+      expect((await reset(superAdmin.accessToken, randomUUID())).status).toBe(404);
+
+      const done = await reset(superAdmin.accessToken, moderator.adminId);
+      expect(done.status).toBe(200);
+      expect(done.body.data).toEqual({ adminId: moderator.adminId, twoFactorEnabled: false });
+
+      // The moderator's session ends immediately and the old authenticator is forgotten.
+      const me = await call('get', '/admin/auth/me').set(bearer(moderator.accessToken));
+      expect(me.status).toBe(401);
+      const stored = await AdminUser.scope('withSecrets').findByPk(moderator.adminId);
+      expect(stored?.totpSecretEncrypted).toBeNull();
+      expect(stored?.totpEnabledAt).toBeNull();
+      const login = await call('post', '/admin/auth/login')
+        .set('X-Forwarded-For', ip)
+        .send({ email: moderator.email, password: TEST_ADMIN_PASSWORD });
+      expect(login.body.data.method).toBe('setup');
+
+      const audit = await AdminAuditLog.findOne({
+        where: { action: 'admin.two_factor_reset', targetId: moderator.adminId },
+      });
+      expect(audit?.adminId).toBe(superAdmin.adminId);
     });
   });
 });

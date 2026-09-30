@@ -424,7 +424,7 @@ Authentication & sessions
 - [ ] Test OTP mode impossible in production (boot fails).
 - [ ] Access token in memory only. Refresh cookie `HttpOnly; Secure; SameSite=Strict`, path-scoped. Rotation + reuse detection tested.
 - [ ] Member and admin tokens use different secrets and audiences. Cross-use rejected (test).
-- [ ] Admin: Argon2id, mandatory TOTP, lockout, idle timeout, forced first-login setup.
+- [ ] Admin: Argon2id, mandatory TOTP, lockout, idle timeout, forced first-login setup. *(All implemented except the forced password change: see [security checklist](../security/security-checklist.md).)*
 
 Authorization & safety
 - [ ] Every social endpoint uses `authenticateMember` + `requireActiveMember`. Every admin endpoint uses `authenticateAdmin` + `requirePermission(permission)`.

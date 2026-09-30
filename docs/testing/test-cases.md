@@ -21,6 +21,11 @@ Key test cases per area. **Auto** = automated in the named suite (under `apps/ap
 | AUTH-11 | Admin idle > 30 min then refresh | Session revoked (`idle_timeout`) | Auto |
 | AUTH-12 | Session refresh records activity at most once an hour | `last_active_at` updated/not updated | Auto |
 | AUTH-13 | Sign in on the web on a phone-width screen, refresh the page, stay signed in | Silent refresh; no token in local storage | Manual |
+| AUTH-14 | Admin correct password only | A challenge, no session and no cookie | Auto `admin-auth.int.test.ts` |
+| AUTH-15 | Admin first sign-in: enrol authenticator, wrong code, right code | Secret stored encrypted; session only after a valid code; `admin.totp_enrolled` + `admin.login` audited | Auto `admin-auth.int.test.ts` |
+| AUTH-16 | Admin code replayed; expired challenge; 5 wrong codes | `MFA_CODE_INVALID`; `MFA_CHALLENGE_INVALID`; lockout audited | Auto `admin-auth.int.test.ts` |
+| AUTH-17 | 2FA reset: moderator, self, another super admin | `403`, `403`, `200` + target's sessions revoked + audited | Auto `security` |
+| AUTH-18 | Admin panel sign-in with a real authenticator app (enrol, sign out, sign in again) | Codes accepted; "open in authenticator app" link works on mobile | Manual |
 
 ## Profile and verification
 

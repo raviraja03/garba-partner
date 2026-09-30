@@ -5,7 +5,7 @@ import helmet from 'helmet';
 import type { Logger } from 'pino';
 import { pinoHttp } from 'pino-http';
 import type { ServerEnv } from '@garba-partner/config/server';
-import { API_PREFIX } from '@garba-partner/shared';
+import { API_PREFIX, CSRF_HEADER, REQUEST_ID_HEADER } from '@garba-partner/shared';
 import { redactUrl } from './lib/logger.js';
 import { resolveRequestId } from './lib/request-id.js';
 import { errorHandler } from './middlewares/error-handler.js';
@@ -48,8 +48,36 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
       },
     }),
   );
-  app.use(helmet());
-  app.use(cors({ origin: [env.WEB_ORIGIN, env.ADMIN_ORIGIN], credentials: true }));
+  app.use(
+    helmet({
+      // 1 year; Nginx sends the same header in production (docs/security/security-best-practices.md).
+      strictTransportSecurity: { maxAge: 31_536_000, includeSubDomains: true },
+      referrerPolicy: { policy: 'no-referrer' },
+    }),
+  );
+  // Strict CORS: only our two front ends, only the methods and headers they use.
+  app.use(
+    cors({
+      origin: [env.WEB_ORIGIN, env.ADMIN_ORIGIN],
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      allowedHeaders: [
+        'Authorization',
+        'Content-Type',
+        CSRF_HEADER,
+        'Idempotency-Key',
+        REQUEST_ID_HEADER,
+      ],
+      exposedHeaders: [REQUEST_ID_HEADER, 'Retry-After'],
+      maxAge: 600,
+    }),
+  );
+  // API responses carry personal data and tokens: never cached by browsers or proxies unless a
+  // public route (events, cities) explicitly opts in with its own Cache-Control.
+  app.use(API_PREFIX, (_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.use(
     express.json({
       limit: '100kb',

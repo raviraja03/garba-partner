@@ -270,9 +270,13 @@ describe.skipIf(!hasTestDatabase)('safety and moderation system (integration)', 
       const sanction = await UserSanction.findOne({ where: { userId: b.userId } });
       expect(sanction?.revokedAt).not.toBeNull();
       expect(sanction?.revokedByAdminId).toBe(moderator.adminId);
-      const actions = (await AdminAuditLog.findAll({ order: [['createdAt', 'ASC']] })).map(
-        (log) => log.action,
-      );
+      // Only the actions on the member (the admin's sign-in is audited separately).
+      const actions = (
+        await AdminAuditLog.findAll({
+          where: { targetType: 'user', targetId: b.userId },
+          order: [['createdAt', 'ASC']],
+        })
+      ).map((log) => log.action);
       expect(actions).toEqual(['user.restrict_chat', 'user.lift_chat_restriction']);
     });
 

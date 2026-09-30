@@ -177,7 +177,7 @@ Rules:
 
 | Area | Packages |
 |---|---|
-| API | express, socket.io, sequelize, sequelize-typescript, pg, umzug, reflect-metadata, jose (JWT), @node-rs/argon2 (admin passwords), otplib (admin TOTP, planned), helmet, cors, cookie-parser, express-rate-limit, multer, sharp, cloudinary, pino, pino-http, node-cron, date-fns, date-fns-tz |
+| API | express, socket.io, sequelize, sequelize-typescript, pg, umzug, reflect-metadata, jose (JWT), @node-rs/argon2 (admin passwords), helmet, cors, cookie-parser, express-rate-limit, multer, sharp, cloudinary, pino, pino-http, node-cron, date-fns, date-fns-tz |
 | Web/Admin | react, react-dom, react-router (v7), @tanstack/react-query, react-hook-form, @hookform/resolvers, socket.io-client, tailwindcss, date-fns |
 | Shared | zod (the `zod/mini` API, for small browser bundles) |
 | Dev | typescript, vite, @vitejs/plugin-react, vitest, supertest, @testing-library/react, eslint + plugins, prettier, concurrently |

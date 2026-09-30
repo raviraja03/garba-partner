@@ -15,12 +15,28 @@ const REDACT_PATHS = [
   '*.token',
   '*.accessToken',
   '*.refreshToken',
+  '*.challengeToken',
+  '*.secret',
+  '*.otpauthUri',
   '*.phone',
   // Query strings (e.g. admin user search by phone number: QA finding, see docs/testing/security-testing.md)
   'req.query.q',
   'req.query.phone',
   'req.query.code',
   'req.query.token',
+  // Sequelize errors carry the SQL (with inlined replacements), bind values and, for unique
+  // violations, the conflicting values (`fields`, `errors`, `detail`), which can hold search
+  // terms or personal data. The message, code and stack are enough to debug.
+  'err.sql',
+  'err.parameters',
+  'err.fields',
+  'err.errors',
+  'err.parent.sql',
+  'err.parent.parameters',
+  'err.parent.detail',
+  'err.original.sql',
+  'err.original.parameters',
+  'err.original.detail',
 ];
 
 /** Query parameters whose values never reach the logs (they can hold phone numbers or secrets). */

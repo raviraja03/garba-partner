@@ -18,7 +18,7 @@ This page records the security QA of the monorepo (web, admin, api): what was te
 
 | Category | How it was tested | Result |
 |---|---|---|
-| **Unauthorized access** | Sweep of **46 member endpoints** and **21 admin endpoints**: no token, a garbage token, and the other audience's token (admin↔member) | All `401` ✅ |
+| **Unauthorized access** | Sweep of **46 member endpoints** and **22 admin endpoints**: no token, a garbage token, and the other audience's token (admin↔member) | All `401` ✅ |
 | **Invalid JWT** | Forged with a wrong secret; expired; wrong audience; `alg: none` unsigned; payload tampered (signature reused); valid signature but another member's session ID | All `401` ✅ (`algorithms: ['HS256']`, issuer/audience pinned, session ↔ subject checked in DB) |
 | **Expired / revoked session** | Logout, DB session expiry, ban (`403 ACCOUNT_BANNED`), suspension, admin idle timeout (existing admin-auth tests) | Access ends on the next request ✅ (sessions are re-checked on every request and socket event) |
 | **Privilege escalation** | Role × permission matrix (super admin / moderator / event manager) over 11 representative admin actions; member mass assignment (`status`, `photoVerifiedAt`, `role`, `hiddenFromDiscovery`) | Server-enforced `403`; strict schemas `400` ✅ |
@@ -52,6 +52,8 @@ This page records the security QA of the monorepo (web, admin, api): what was te
 
 No critical findings. All high findings are fixed and covered by regression tests.
 
+The later **security hardening** phase found and fixed four more high issues (no admin 2FA, no global rate limit, cacheable personal responses, admin sign-in missing from the audit log) and three medium/low ones. They are listed in [security checklist §4](../security/security-checklist.md#4-hardening-findings-this-phase), with the tests in the `security hardening` block of `security.int.test.ts` and in `env-rules.test.ts`.
+
 ## 5. Accepted risks and follow-ups
 
 | Item | Severity | Why accepted / plan |
@@ -62,13 +64,14 @@ No critical findings. All high findings are fixed and covered by regression test
 | In-memory rate limits | Low (single process) | Move to Redis before running several API processes |
 | Photo/identity verification review not implemented | Gap | Only phone OTP verification exists; verified flags are set by trusted code paths only (tested) |
 | No automated browser tests | Gap | See [testing strategy §8](testing-strategy.md#8-known-gaps) |
-| Production CSP/HSTS at Nginx not yet deployed | Deployment | [Release checklist](release-checklist.md) item; CSP documented in [security architecture §8.2](../architecture/security-architecture.md#82-security-headers) |
+| Production CSP/HSTS at Nginx not yet deployed | Deployment | [Release checklist](release-checklist.md) item; configuration in [security best practices §5](../security/security-best-practices.md#5-nginx-and-deployment-assumptions) |
+| Forced admin password change on first sign-in not implemented | Medium | Mandatory TOTP limits the impact of a leaked initial password ([security checklist §5](../security/security-checklist.md#5-before-launch-open-items)) |
 
 ## 6. How to re-run
 
 ```bash
 cd apps/api
-TEST_DATABASE_URL=postgres://…/garba_partner_test npx vitest run src/security
+TEST_DATABASE_URL=postgres://…/garba_partner_test npx vitest run src/security   # attack suite + env security rules
 npm audit --omit=dev   # from the repo root
 ```
 

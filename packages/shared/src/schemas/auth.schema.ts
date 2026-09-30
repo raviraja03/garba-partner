@@ -49,3 +49,18 @@ export const adminLoginSchema = z.strictObject({
   password: z.string().check(z.minLength(1, 'Enter your password.'), z.maxLength(256)),
 });
 export type AdminLoginInput = z.input<typeof adminLoginSchema>;
+
+const challengeToken = z
+  .string()
+  .check(z.regex(/^[A-Za-z0-9_-]{43}$/, 'Invalid sign-in challenge.'));
+
+/** `POST /api/v1/admin/auth/login/totp-setup`: first sign-in, get the authenticator secret. */
+export const adminTotpSetupSchema = z.strictObject({ challengeToken });
+export type AdminTotpSetupInput = z.input<typeof adminTotpSetupSchema>;
+
+/** `POST /api/v1/admin/auth/login/verify`: the 6-digit authenticator code. */
+export const adminLoginVerifySchema = z.strictObject({
+  challengeToken,
+  code: z.string().check(z.trim(), z.regex(/^\d{6}$/, 'Enter the 6-digit code.')),
+});
+export type AdminLoginVerifyInput = z.input<typeof adminLoginVerifySchema>;

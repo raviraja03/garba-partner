@@ -48,6 +48,8 @@ export function createAuthRateLimiters() {
     verifyOtp: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 30 }),
     refresh: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 60 }),
     adminLogin: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 10 }),
+    // Second factor (setup + code): per-challenge attempts and account lockout apply too.
+    adminMfa: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 30 }),
   };
 }
 

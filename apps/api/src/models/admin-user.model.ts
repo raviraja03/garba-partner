@@ -26,10 +26,11 @@ import { AdminSession } from './admin-session.model.js';
 /**
  * Admin panel identity — a separate table, login method and token audience from members.
  * Admins are disabled (`status`), never deleted, so audit references stay valid.
- * `passwordHash` is excluded by default; load it only via `AdminUser.scope('withPassword')`.
+ * `passwordHash` and `totpSecretEncrypted` are excluded by default; load them only via
+ * `AdminUser.scope('withSecrets')` (alias `withPassword`).
  */
-@DefaultScope(() => ({ attributes: { exclude: ['passwordHash'] } }))
-@Scopes(() => ({ withPassword: {} }))
+@DefaultScope(() => ({ attributes: { exclude: ['passwordHash', 'totpSecretEncrypted'] } }))
+@Scopes(() => ({ withPassword: {}, withSecrets: {} }))
 @Table({ tableName: 'admin_users' })
 export class AdminUser extends Model<
   InferAttributes<AdminUser>,
@@ -73,6 +74,17 @@ export class AdminUser extends Model<
 
   @Column({ type: DataType.DATE, allowNull: true })
   lastLoginAt!: CreationOptional<Date | null>;
+
+  /** Authenticator secret, AES-256-GCM (TOTP_ENCRYPTION_KEY). Null until enrolled. */
+  @Column({ type: DataType.TEXT, allowNull: true })
+  totpSecretEncrypted!: CreationOptional<string | null>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  totpEnabledAt!: CreationOptional<Date | null>;
+
+  /** Last accepted 30-second step: codes at or before it are refused (no replay). */
+  @Column({ type: DataType.BIGINT, allowNull: true })
+  totpLastStep!: CreationOptional<string | number | null>;
 
   @CreatedAt
   override createdAt!: CreationOptional<Date>;

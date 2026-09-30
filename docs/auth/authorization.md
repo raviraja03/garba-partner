@@ -62,6 +62,8 @@ Defined once in `packages/shared/src/constants/admin.ts` (`ROLE_PERMISSIONS`). *
 | `safety_logs:view` | ✅ | ✅ | ❌ |
 | `admins:manage` | ✅ | ❌ | ❌ |
 
+`admins:manage` currently guards `POST /api/v1/admin/admins/:adminId/reset-two-factor` (lost authenticator; never one's own, see [authentication §3.1](authentication.md#31-admin-sign-in-password--mandatory-two-factor)).
+
 The [admin dashboard](../admin/dashboard.md) is open to every role (`dashboard:view`), but each section needs the permission that governs its data (e.g. revenue needs `payments:view`).
 
 `GET /api/v1/admin/auth/me` returns the admin's `permissions`. The admin panel shows only permitted navigation items, and `RequireAdmin permission="…"` redirects on the client. This is UX only.
@@ -74,7 +76,8 @@ The [admin dashboard](../admin/dashboard.md) is open to every role (`dashboard:v
 | Separate JWT secrets **and** audiences | A token from one side is rejected by the other side's middleware (tested both ways) |
 | Separate cookies and cookie paths (`gp_rt` on `/api/v1/auth`, `gp_admin_rt` on `/api/v1/admin/auth`) | Refresh tokens are never sent to the other side's endpoints |
 | Separate CSRF header values (`gp-web` / `gp-admin`) and allowed origins | A member page can't refresh an admin session |
-| Separate route prefixes (`/api/v1/auth`, `/api/v1/admin/auth`) | Nginx will expose only the admin prefix on the admin host |
+| Separate route prefixes (`/api/v1/auth`, `/api/v1/admin/auth`) | Nginx exposes `/api/v1/admin/` only on the admin host ([security best practices §5](../security/security-best-practices.md#5-nginx-and-deployment-assumptions)) |
+| Mandatory admin TOTP | A stolen admin password alone never yields a session |
 
 ## 5. Frontend route protection
 

@@ -93,9 +93,10 @@ Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-
 ## Logging in locally
 
 - **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
-- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. The event manager (`events@…`) manages events and organizers; moderators can view them only.
+- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. Admin sign-in always needs a **6-digit code from an authenticator app**: on the first sign-in the page shows a key to add to any TOTP app (Google Authenticator, Microsoft Authenticator, 1Password…). The event manager (`events@…`) manages events and organizers; moderators can view them only.
 - **Events** (http://localhost:5173/events): public, no login needed. The seed adds three published events and one draft.
-- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password.
+- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password. The admin enrols an authenticator app at their first sign-in.
+- **`.env`:** `TOTP_ENCRYPTION_KEY` is required (32 random bytes, base64, different from `PHONE_ENCRYPTION_KEY`). Add it to an existing `.env` or the API refuses to start.
 
 Details: [docs/auth/authentication.md](docs/auth/authentication.md).
 
@@ -226,6 +227,14 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Security testing](docs/testing/security-testing.md) | Security QA results by category, **findings and fixes**, accepted risks, how to re-run |
 | [Release checklist](docs/testing/release-checklist.md) | Code, database, staging, production configuration, post-deploy and sign-off |
 
+### Security
+
+| Document | Contents |
+|---|---|
+| [Security checklist](docs/security/security-checklist.md) | Current controls by area (auth, sessions, authorization, CORS/headers, rate limits, validation, uploads, database, Socket.IO, secrets, logging, audit), hardening findings and fixes, open items, residual risks |
+| [Threat model](docs/security/threat-model.md) | Assets, actors, trust boundaries, entry points, STRIDE threats with mitigations, product abuse cases, assumptions |
+| [Security best practices](docs/security/security-best-practices.md) | Rules for API and frontend code, secrets and key rotation, **Nginx configuration and deployment assumptions**, admin operations, PR checklist |
+
 ### Admin
 
 | Document | Contents |
@@ -305,7 +314,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | — | Architecture & docs | Product, architecture and development documentation | ✅ Done |
 | **0** | Foundation | Monorepo, `packages/config` & `packages/shared`, TypeScript/ESLint/Prettier, API skeleton (health, envelope, error handling, redacted logging, tests), web/admin shells, setup docs | ✅ Done. Still open from the planned scope: CI workflow, PR template |
 | **1** | Member auth & profile | ✅ Database layer. ✅ Authentication (member OTP, admin password, sessions, middleware). ✅ **Profiles:** onboarding with 18+ gate, profile + preferences API, Cloudinary photo upload with EXIF stripping, completion % and status, public profile, cities/areas, admin user list/detail/suspend/reactivate + audit log. ⏳ **Remaining:** account deletion, "log out of all devices" UI | 🟡 Nearly done |
-| **2** | Admin foundation & events | ✅ **Events:** organizers (public profile + private contact, verify, archive), events CRUD, publish/unpublish, verify, archive/restore, image upload, public list/detail with filters, sorting and pagination, web events pages. ⏳ **Remaining:** admin TOTP 2FA + forced password change, admin management, cities/areas CRUD, attendance ("going"/"looking for a partner"), event cancellation with notice, in-app notifications | 🟡 In progress |
+| **2** | Admin foundation & events | ✅ **Events:** organizers (public profile + private contact, verify, archive), events CRUD, publish/unpublish, verify, archive/restore, image upload, public list/detail with filters, sorting and pagination, web events pages. ⏳ **Remaining:** forced password change, admin management UI, cities/areas CRUD, attendance ("going"/"looking for a partner"), event cancellation with notice, in-app notifications | 🟡 In progress |
 | **3** | Discovery, interests, matches & safety core | ✅ **Discovery** (`/partners`, mutual preferences, filters, deterministic ranking without exposing scores). ✅ **Interests & matches:** send/accept/reject/withdraw, mutual interest → exactly one match (DB-enforced), unmatch, block/report end matches, admin match history + close match + interaction restriction. ✅ Event attendance, **block**, **report user**, auto-hide. ⏳ **Remaining:** admin report queue, sanctions from reports | 🟡 Nearly done |
 | **4** | Chat | ✅ Socket.IO chat (handshake auth, per-event session checks), history, read receipts, unread counts, REST fallback, message reports with evidence snapshots, contact-sharing nudge, live enforcement of blocks/unmatch/sanctions, admin reports queue with audited conversation review. ⏳ Retention purge job (hardening phase) | ✅ Done |
 | **5** | Safety & moderation | ✅ Product report reasons, block/unblock UI, warnings with acknowledgement, chat restriction, timed suspensions, bans (manual, reviewed), sanction history, expiry job, suspicious-activity flags, scam/money warnings, safety centre, community guidelines, safety and audit log viewers. ⏳ Photo verification and photo/verification review queues, `banned_phone_hashes` (with account deletion) | ✅ Done (moderation) |
@@ -313,7 +322,8 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **5c** | Event pass payments | ✅ Razorpay orders with server-computed amounts, idempotency keys, capacity holds, checkout signature + API verification, signed webhooks with de-duplication, reconciliation job, bookings with codes, automatic refunds (sold out, duplicates, unavailable events), admin refunds, pass settings, payments back office, booking notifications. ⏳ QR check-in, partial refunds, invoices | ✅ Done |
 | **5d** | Admin dashboard | ✅ Aggregate metrics (members, active, verified, suspended, events, matches, pending reports, bookings, revenue), date and city filters, role-scoped sections, daily/weekly trend charts, paginated per-event table, audited per-event sales CSV | ✅ Done |
 | **5e** | QA | ✅ Security QA (unauthorized access, JWT forgery, privilege escalation, IDOR, injection, XSS, uploads, CSRF, rate limits, logging), security test suite, 3 findings fixed (public profile visibility, phone numbers in logs, destructive DB commands on staging), test strategy, test cases, release checklist | ✅ Done |
-| **6** | Hardening & launch | Security review, load test, Nginx/PM2/VPS, TLS, backups & restore drill, legal pages, SMS DLT, runbooks | Planned |
+| **5f** | Security hardening | ✅ **Mandatory admin two-factor sign-in** (TOTP, encrypted secrets, single-use challenges, replay protection, lockout across both factors, super-admin reset), admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change | ✅ Done |
+| **6** | Hardening & launch | Load test, Nginx/PM2/VPS (config in [security best practices §5](docs/security/security-best-practices.md#5-nginx-and-deployment-assumptions)), TLS, backups & restore drill, legal pages, SMS DLT, Redis-backed rate limits, runbooks | Planned |
 
 ### Post-MVP (indicative)
 

@@ -293,7 +293,7 @@ Defined in `packages/shared/src/errors/error-codes.ts`.
 | `PHOTO_LIMIT_REACHED` | 409 | More than 6 photos |
 | `LAST_PHOTO` | 409 | Deleting the only photo while discovery is enabled |
 | `INVALID_IMAGE` | 400 | Not a decodable JPEG/PNG/WebP, too small or too large |
-| `ADMIN_TOTP_REQUIRED` / `ADMIN_TOTP_INVALID` / `ADMIN_LOCKED` | 401/423 | Admin login steps |
+| `MFA_CODE_INVALID` / `MFA_CHALLENGE_INVALID` / `ACCOUNT_LOCKED` | 401/401/423 | Admin sign-in second step ([authentication §3.1](../auth/authentication.md#31-admin-sign-in-password--mandatory-two-factor)) |
 | `INTERNAL_ERROR` | 500 | Anything unexpected |
 
 ### 4.6 Validation
@@ -490,9 +490,9 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/admin/auth/login` ✅ | P (rate limited, lockout). Today → `AdminSessionDto` + admin refresh cookie. With TOTP (planned) → `{ challengeId, requiresSetup }` |
-| POST | `/admin/auth/totp` | *(planned)* challenge → access token + admin refresh cookie |
-| POST | `/admin/auth/setup` | *(planned)* challenge (first login): new password + TOTP enrolment confirm |
+| POST | `/admin/auth/login` ✅ | P (rate limited, lockout) → `AdminLoginChallengeDto { challengeToken, method: 'totp'\|'setup', expiresAt }`. Never a session |
+| POST | `/admin/auth/login/totp-setup` ✅ | P, `setup` challenge → `{ secret, otpauthUri }` (first sign-in) |
+| POST | `/admin/auth/login/verify` ✅ | P, challenge + 6-digit code → `AdminSessionDto` + admin refresh cookie |
 | POST | `/admin/auth/refresh` ✅, `/admin/auth/logout` ✅ | cookie (+ `X-Requested-With: gp-admin`) / any admin |
 | GET | `/admin/auth/me` ✅ | any admin → `AdminMeDto` (incl. permissions) |
 | GET | `/admin/dashboard/summary`, `/trends`, `/events`, `/events/export` | ✅ `dashboard:view` + per-section permissions ([dashboard](../admin/dashboard.md)) |
@@ -518,7 +518,7 @@ Example: `PublicProfileDto` (what other members receive):
 | GET/POST/PATCH | `/admin/cities`, `/admin/cities/:id`, `/admin/cities/:id/areas`, `/admin/areas/:id` | `locations:manage` |
 | GET | `/admin/audit-logs` | `audit:view` |
 | GET/POST/PATCH | `/admin/admins`, `/admin/admins/:id` | `admins:manage` |
-| POST | `/admin/admins/:id/reset-totp` | `admins:manage` |
+| POST | `/admin/admins/:id/reset-two-factor` ✅ | `admins:manage` — `{ reason }`, never one's own; ends the admin's sessions |
 
 Every admin write handler calls `auditService.log({ adminId, action, targetType, targetId, metadata, ip })` **inside the same transaction** as the change.
 

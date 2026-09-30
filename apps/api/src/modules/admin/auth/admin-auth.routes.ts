@@ -12,7 +12,10 @@ export function createAdminAuthRouter(deps: {
   const { controller, authenticateAdmin, csrf, limiters } = deps;
   const router = Router();
 
+  // Two steps: password → challenge, then the authenticator code → session.
   router.post('/login', limiters.adminLogin, controller.login);
+  router.post('/login/totp-setup', limiters.adminMfa, controller.setupTotp);
+  router.post('/login/verify', limiters.adminMfa, controller.verify);
   router.post('/refresh', limiters.refresh, csrf, controller.refresh);
   router.post('/logout', authenticateAdmin, controller.logout);
   router.get('/me', authenticateAdmin, controller.me);

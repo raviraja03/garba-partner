@@ -36,6 +36,9 @@ export const LIMITS = {
   // Admin login
   ADMIN_MAX_FAILED_LOGINS: 5,
   ADMIN_LOCKOUT_MINUTES: 15,
+  /** Admin two-factor sign-in (docs/security/security-best-practices.md): challenge lifetime. */
+  ADMIN_CHALLENGE_TTL_SECONDS: 300,
+  ADMIN_CHALLENGE_MAX_ATTEMPTS: 5,
   ADMIN_PASSWORD_MIN_LENGTH: 12,
 
   // Identity verification (docs/safety/identity-verification.md)

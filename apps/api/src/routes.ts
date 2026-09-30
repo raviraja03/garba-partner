@@ -10,6 +10,7 @@ import {
   createIpRateLimiter,
   createMemberRateLimiter,
 } from './middlewares/rate-limit.js';
+import { createAdminAdminsRouter } from './modules/admin/admins/admin-admins.routes.js';
 import { createAdminAuthController } from './modules/admin/auth/admin-auth.controller.js';
 import { createAdminAuthRouter } from './modules/admin/auth/admin-auth.routes.js';
 import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.js';
@@ -118,6 +119,19 @@ export function createApiRouter(options: {
   const notifier = createNotifier({ sequelize, media, hub, logger });
 
   const router = Router();
+  // Global per-IP ceiling (on top of the per-endpoint limits). Signed Razorpay webhooks are
+  // exempt: they come from Razorpay's servers and are verified by signature.
+  const globalLimiter = createIpRateLimiter({
+    windowMs: 60 * 1000,
+    limit: LIMITS.API_REQUESTS_PER_MINUTE,
+  });
+  router.use((req, res, next) => {
+    if (req.path.startsWith('/webhooks/')) {
+      next();
+      return;
+    }
+    void globalLimiter(req, res, next);
+  });
   router.use('/health', createHealthRouter(dependencies));
   router.use('/cities', createLocationsRouter());
   router.use(
@@ -138,6 +152,7 @@ export function createApiRouter(options: {
       limiters,
     }),
   );
+  router.use('/admin/admins', createAdminAdminsRouter({ sequelize, env, authenticateAdmin }));
   router.use(
     '/me',
     createMyProfileRouter({

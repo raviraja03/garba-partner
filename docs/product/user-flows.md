@@ -477,8 +477,8 @@ The admin panel is a separate app (`apps/admin`) on its own subdomain. Every act
 ### 12.1 Admin login
 
 1. `admin.<domain>` → email + password → `POST /api/v1/admin/auth/login` → returns `challengeId` (no tokens yet).
-2. TOTP code from an authenticator app → access token + admin refresh cookie. *(TOTP is planned; the current implementation issues the session directly after the password step — see [authentication §7](../auth/authentication.md#7-known-limitations-to-address-before-launch).)*
-3. First login (account created by a super admin with a one-time temporary password): forced password change and TOTP enrolment (QR code) before anything else.
+2. TOTP code from an authenticator app → access token + admin refresh cookie. See [authentication §3.1](../auth/authentication.md#31-admin-sign-in-password--mandatory-two-factor).
+3. First login (account created by a super admin with a one-time temporary password): TOTP enrolment before anything else (implemented: secret shown for manual entry plus an `otpauth://` link; no QR code yet). The forced password change is not implemented yet.
 4. Lockout: 5 failed password or TOTP attempts → the account is locked for 15 min and the event is audit-logged.
 
 ### 12.2 Report handling

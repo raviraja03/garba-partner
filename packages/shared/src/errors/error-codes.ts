@@ -23,6 +23,13 @@ export const ERROR_CODES = {
   },
   REFRESH_INVALID: { httpStatus: 401, message: 'Your session has ended. Please log in again.' },
   INVALID_CREDENTIALS: { httpStatus: 401, message: 'Incorrect email or password.' },
+  /** Admin two-factor sign-in: wrong authenticator code. */
+  MFA_CODE_INVALID: { httpStatus: 401, message: 'That code is not correct. Try the current code.' },
+  /** Admin two-factor sign-in: the challenge expired, was used, or ran out of attempts. */
+  MFA_CHALLENGE_INVALID: {
+    httpStatus: 401,
+    message: 'This sign-in has expired. Please enter your email and password again.',
+  },
   ACCOUNT_LOCKED: {
     httpStatus: 423,
     message: 'Too many failed attempts. Please try again later.',
