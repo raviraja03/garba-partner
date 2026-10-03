@@ -1,5 +1,4 @@
 import { AdminAuditLog } from './admin-audit-log.model.js';
-import { AdminLoginChallenge } from './admin-login-challenge.model.js';
 import { AdminSession } from './admin-session.model.js';
 import { AdminUser } from './admin-user.model.js';
 import { Area } from './area.model.js';
@@ -32,7 +31,6 @@ export {
   AUDIT_TARGET_TYPES,
   type AuditTargetType,
 } from './admin-audit-log.model.js';
-export { AdminLoginChallenge } from './admin-login-challenge.model.js';
 export { AdminSession } from './admin-session.model.js';
 export { AdminUser } from './admin-user.model.js';
 export { Area } from './area.model.js';
@@ -89,5 +87,4 @@ export const MODELS = [
   Payment,
   EventBooking,
   PaymentWebhookEvent,
-  AdminLoginChallenge,
 ];

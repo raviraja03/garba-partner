@@ -173,7 +173,6 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `PHONE_HASH_SECRET` | api | ≥ 32 random bytes. **Never rotate without a re-hash migration** |
 | `PHONE_ENCRYPTION_KEY` | api | 32-byte key, base64 (AES-256-GCM) |
 | `PHONE_ENCRYPTION_KEY_VERSION` | api | `1` |
-| `TOTP_ENCRYPTION_KEY` | api | 32-byte key, base64 (encrypts admin TOTP secrets) |
 | `SMS_PROVIDER` | api | `dev` today (no SMS; code returned in the response, **only accepted when `APP_ENV=development`**). A real provider (e.g. `msg91`) is added before launch |
 | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` | api | Provider credentials / DLT IDs |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | api | Cloudinary credentials |

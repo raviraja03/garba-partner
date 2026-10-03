@@ -138,17 +138,11 @@ The web client also serialises refreshes across tabs with the Web Locks API.
 | `role` | varchar(20) | `super_admin` \| `moderator` \| `event_manager` |
 | `password_hash` | text | Argon2id |
 | `must_change_password` | boolean | `true` for newly created accounts |
-| `totp_secret_encrypted` | text null | AES-256-GCM with `TOTP_ENCRYPTION_KEY` |
-| `totp_enabled_at` | timestamptz null | |
 | `status` | varchar(20) | `active` \| `disabled` |
 | `failed_login_count` | smallint | Reset on success |
 | `locked_until` | timestamptz null | |
 | `last_login_at` | timestamptz null | |
 | `created_by_admin_id` | uuid null FK → admin_users | |
-
-#### `admin_login_challenges`
-
-`id` uuid PK, `admin_id` FK, `purpose` (`totp` \| `setup`), `attempts` smallint, `expires_at` (5 min), `consumed_at` null. Purged daily.
 
 #### `admin_sessions`
 

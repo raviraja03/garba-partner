@@ -5,22 +5,13 @@ import type { ServerEnv } from '@garba-partner/config/server';
 import {
   LIMITS,
   ROLE_PERMISSIONS,
-  type AdminLoginChallengeDto,
   type AdminMeDto,
   type AdminSessionDto,
-  type AdminTotpSetupDto,
 } from '@garba-partner/shared';
 import { AppError } from '../../../lib/app-error.js';
-import {
-  decryptString,
-  encryptString,
-  hmacSha256Hex,
-  randomToken,
-  sha256Hex,
-} from '../../../lib/crypto.js';
+import { hmacSha256Hex, randomToken, sha256Hex } from '../../../lib/crypto.js';
 import { verifyAgainstDummy, verifyPassword } from '../../../lib/passwords.js';
-import { generateTotpSecret, otpauthUri, verifyTotp } from '../../../lib/totp.js';
-import { AdminLoginChallenge, AdminSession, AdminUser } from '../../../models/index.js';
+import { AdminSession, AdminUser } from '../../../models/index.js';
 import { recordAdminAction } from '../audit/audit.service.js';
 import type { ClientContext } from '../../auth/auth.service.js';
 import type { TokenService } from '../../auth/token.service.js';
@@ -35,12 +26,8 @@ export interface IssuedAdminSession {
 }
 
 export interface AdminAuthService {
-  /** Step 1: email + password → a second-factor challenge (never a session). */
-  login(email: string, password: string, client: ClientContext): Promise<AdminLoginChallengeDto>;
-  /** First sign-in only: the authenticator secret for a `setup` challenge. */
-  setupTotp(challengeToken: string): Promise<AdminTotpSetupDto>;
-  /** Step 2: the authenticator code → session (enrols the authenticator on first sign-in). */
-  verify(challengeToken: string, code: string, client: ClientContext): Promise<IssuedAdminSession>;
+  /** Email + password → session. */
+  login(email: string, password: string, client: ClientContext): Promise<IssuedAdminSession>;
   refresh(refreshToken: string, client: ClientContext): Promise<IssuedAdminSession>;
   logout(adminId: string, sessionId: string, client: ClientContext): Promise<void>;
   getMe(adminId: string): Promise<AdminMeDto>;
@@ -57,14 +44,8 @@ export function toAdminMeDto(admin: AdminUser): AdminMeDto {
 }
 
 type LoginOutcome =
-  { kind: 'challenge'; challenge: AdminLoginChallengeDto } | { kind: 'rejected'; error: AppError };
-
-type VerifyOutcome =
   | { kind: 'success'; admin: AdminUser; sessionId: string; refreshToken: string; expiresAt: Date }
   | { kind: 'rejected'; error: AppError };
-
-/** Shown in authenticator apps. */
-const TOTP_ISSUER = 'Garba Partner Admin';
 
 type RefreshOutcome =
   | { kind: 'success'; admin: AdminUser; sessionId: string; refreshToken: string; expiresAt: Date }
@@ -100,9 +81,6 @@ export function createAdminAuthService(deps: {
     };
   }
 
-  const lockedError = (remainingMs = LIMITS.ADMIN_LOCKOUT_MINUTES * MINUTE_MS) =>
-    new AppError('ACCOUNT_LOCKED', { retryAfterSeconds: Math.ceil(remainingMs / 1000) });
-
   function audit(
     adminId: string,
     action: string,
@@ -117,53 +95,27 @@ export function createAdminAuthService(deps: {
     );
   }
 
-  /**
-   * A failed password or authenticator code. Five in a row lock the account for 15 minutes
-   * (audited). Returns true if this failure locked it.
-   */
+  /** A failed password. Five in a row lock the account for 15 minutes (audited). */
   async function registerFailure(
     admin: AdminUser,
     client: ClientContext,
-    factor: 'password' | 'totp',
     transaction: Transaction,
   ): Promise<boolean> {
     const failures = admin.failedLoginCount + 1;
     if (failures >= LIMITS.ADMIN_MAX_FAILED_LOGINS) {
       const lockedUntil = new Date(Date.now() + LIMITS.ADMIN_LOCKOUT_MINUTES * MINUTE_MS);
       await admin.update({ failedLoginCount: 0, lockedUntil }, { transaction });
-      await AdminLoginChallenge.update(
-        { consumedAt: new Date() },
-        { where: { adminId: admin.id, consumedAt: null }, transaction },
-      );
-      await audit(admin.id, 'admin.lockout', client, { factor }, transaction);
-      logger.warn({ adminId: admin.id, factor }, 'Admin account locked after failed sign-ins');
+      await audit(admin.id, 'admin.lockout', client, {}, transaction);
+      logger.warn({ adminId: admin.id }, 'Admin account locked after failed sign-ins');
       return true;
     }
     await admin.update({ failedLoginCount: failures }, { transaction });
     return false;
   }
 
-  /** A live challenge (unused, unexpired, attempts left), locked for update. */
-  async function openChallenge(token: string, transaction: Transaction) {
-    const challenge = await AdminLoginChallenge.findOne({
-      where: { tokenHash: sha256Hex(token) },
-      lock: transaction.LOCK.UPDATE,
-      transaction,
-    });
-    if (
-      !challenge ||
-      challenge.consumedAt ||
-      challenge.expiresAt.getTime() <= Date.now() ||
-      challenge.attempts >= LIMITS.ADMIN_CHALLENGE_MAX_ATTEMPTS
-    ) {
-      throw new AppError('MFA_CHALLENGE_INVALID');
-    }
-    return challenge;
-  }
-
   return {
     async login(email, password, client) {
-      const candidate = await AdminUser.scope('withSecrets').findOne({ where: { email } });
+      const candidate = await AdminUser.scope('withPassword').findOne({ where: { email } });
       if (candidate?.status !== 'active') {
         // Same work and same error whether the account is unknown or disabled.
         await verifyAgainstDummy(password);
@@ -193,123 +145,19 @@ export function createAdminAuthService(deps: {
         }
 
         if (!passwordOk) {
-          const locked = await registerFailure(admin, client, 'password', transaction);
-          return {
-            kind: 'rejected',
-            error: locked ? lockedError() : new AppError('INVALID_CREDENTIALS'),
-          };
-        }
-
-        // The password alone never signs an admin in: a second factor is always required.
-        // (The failure counter is only reset once the second factor succeeds.)
-        await AdminLoginChallenge.update(
-          { consumedAt: now },
-          { where: { adminId: admin.id, consumedAt: null }, transaction },
-        );
-        const token = randomToken();
-        const expiresAt = new Date(now.getTime() + LIMITS.ADMIN_CHALLENGE_TTL_SECONDS * 1000);
-        const method = admin.totpEnabledAt ? 'totp' : 'setup';
-        await AdminLoginChallenge.create(
-          { adminId: admin.id, tokenHash: sha256Hex(token), purpose: method, expiresAt },
-          { transaction },
-        );
-        return {
-          kind: 'challenge',
-          challenge: { challengeToken: token, method, expiresAt: expiresAt.toISOString() },
-        };
-      });
-
-      if (outcome.kind === 'rejected') throw outcome.error;
-      return outcome.challenge;
-    },
-
-    async setupTotp(challengeToken) {
-      return sequelize.transaction(async (transaction) => {
-        const challenge = await openChallenge(challengeToken, transaction);
-        if (challenge.purpose !== 'setup') throw new AppError('MFA_CHALLENGE_INVALID');
-        const admin = await AdminUser.findByPk(challenge.adminId, { transaction });
-        if (admin?.status !== 'active') throw new AppError('MFA_CHALLENGE_INVALID');
-        // The same secret for repeated calls on one challenge (e.g. a page reload).
-        let secret: string;
-        if (challenge.pendingSecretEncrypted) {
-          secret = decryptString(challenge.pendingSecretEncrypted, env.TOTP_ENCRYPTION_KEY);
-        } else {
-          secret = generateTotpSecret();
-          await challenge.update(
-            { pendingSecretEncrypted: encryptString(secret, env.TOTP_ENCRYPTION_KEY) },
-            { transaction },
-          );
-        }
-        return {
-          secret,
-          otpauthUri: otpauthUri({ issuer: TOTP_ISSUER, account: admin.email, secret }),
-        };
-      });
-    },
-
-    async verify(challengeToken, code, client) {
-      const outcome = await sequelize.transaction(async (transaction): Promise<VerifyOutcome> => {
-        const now = new Date();
-        const challenge = await openChallenge(challengeToken, transaction);
-        const admin = await AdminUser.scope('withSecrets').findByPk(challenge.adminId, {
-          lock: transaction.LOCK.UPDATE,
-          transaction,
-        });
-        if (admin?.status !== 'active') {
-          return { kind: 'rejected', error: new AppError('MFA_CHALLENGE_INVALID') };
-        }
-        if (admin.lockedUntil && admin.lockedUntil.getTime() > now.getTime()) {
-          await challenge.update({ consumedAt: now }, { transaction });
-          return {
-            kind: 'rejected',
-            error: lockedError(admin.lockedUntil.getTime() - now.getTime()),
-          };
-        }
-
-        const encrypted =
-          challenge.purpose === 'setup'
-            ? challenge.pendingSecretEncrypted
-            : admin.totpSecretEncrypted;
-        if (!encrypted) {
-          return { kind: 'rejected', error: new AppError('MFA_CHALLENGE_INVALID') };
-        }
-        const secret = decryptString(encrypted, env.TOTP_ENCRYPTION_KEY);
-        const lastUsedStep =
-          challenge.purpose === 'totp' && admin.totpLastStep !== null
-            ? Number(admin.totpLastStep)
-            : null;
-        const step = verifyTotp(secret, code, { now: now.getTime(), lastUsedStep });
-
-        if (step === null) {
-          const attempts = challenge.attempts + 1;
-          const locked = await registerFailure(admin, client, 'totp', transaction);
-          await challenge.update(
-            {
-              attempts,
-              consumedAt: locked || attempts >= LIMITS.ADMIN_CHALLENGE_MAX_ATTEMPTS ? now : null,
-            },
-            { transaction },
-          );
+          const locked = await registerFailure(admin, client, transaction);
           return {
             kind: 'rejected',
             error: locked
-              ? lockedError()
-              : attempts >= LIMITS.ADMIN_CHALLENGE_MAX_ATTEMPTS
-                ? new AppError('MFA_CHALLENGE_INVALID')
-                : new AppError('MFA_CODE_INVALID'),
+              ? new AppError('ACCOUNT_LOCKED', {
+                  retryAfterSeconds: LIMITS.ADMIN_LOCKOUT_MINUTES * 60,
+                })
+              : new AppError('INVALID_CREDENTIALS'),
           };
         }
 
-        await challenge.update({ consumedAt: now }, { transaction });
-        const enrolled = challenge.purpose === 'setup';
         await admin.update(
-          {
-            failedLoginCount: 0,
-            lockedUntil: null,
-            lastLoginAt: now,
-            totpLastStep: step,
-            ...(enrolled ? { totpSecretEncrypted: encrypted, totpEnabledAt: now } : {}),
-          },
+          { failedLoginCount: 0, lockedUntil: null, lastLoginAt: now },
           { transaction },
         );
         const refreshToken = randomToken();
@@ -324,7 +172,6 @@ export function createAdminAuthService(deps: {
           },
           { transaction },
         );
-        if (enrolled) await audit(admin.id, 'admin.totp_enrolled', client, {}, transaction);
         await audit(admin.id, 'admin.login', client, { sessionId: session.id }, transaction);
         return { kind: 'success', admin, sessionId: session.id, refreshToken, expiresAt };
       });

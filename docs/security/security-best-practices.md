@@ -32,12 +32,12 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 - User values only through `replacements` / bind parameters. Interpolate **only** server constants (column names from an allow-list, fixed SQL fragments).
 - Wrap multi-step changes in a transaction; lock rows (`FOR UPDATE`) that decide money, counters or one-time tokens.
 - Store secrets and one-time tokens **hashed** (SHA-256 for random tokens, HMAC for low-entropy values like OTPs and phone numbers) and personal data that must be read back **encrypted** (AES-256-GCM, `lib/crypto.ts`). One key per purpose.
-- Sensitive columns are excluded from the default model scope (`passwordHash`, `totpSecretEncrypted`); use an explicit scope to read them.
+- Sensitive columns are excluded from the default model scope (`passwordHash`); use an explicit scope to read them.
 - Never modify production data with ad-hoc scripts. Destructive CLI commands are development-only.
 
 ### 2.4 Logging
 
-- Log events, not data: IDs and codes, never phone numbers, OTPs, tokens, passwords, TOTP secrets, message text or search terms.
+- Log events, not data: IDs and codes, never phone numbers, OTPs, tokens, passwords, message text or search terms.
 - The logger redacts known keys (`lib/logger.ts`) and query parameters (`redactUrl`). When you add a sensitive field or query parameter, **add it to the redaction list** in the same PR.
 - Database errors are logged without SQL text, bind values or constraint details. Don't log a Sequelize error's `sql` yourself.
 - Client IPs are stored only as HMACs (audit log, OTP limits).
@@ -45,7 +45,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 ### 2.5 Audit
 
 - Every admin write calls `recordAdminAction(…)` **inside the same transaction** as the change, with a `reason` where the action affects a member.
-- Authentication events for admins (sign-in, enrolment, lockout, logout, 2FA reset) are audited. Keep it that way for any new admin auth flow.
+- Authentication events for admins (sign-in, lockout, logout) are audited. Keep it that way for any new admin auth flow.
 - The audit log is append-only; never add an update or delete path.
 
 ### 2.6 Files and media
@@ -71,7 +71,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 - `VITE_*` variables are public: never put secrets in them.
 - Client-side guards (`RequireAuth`, `RequireAdmin`) are UX. The API decides.
 - Don't load third-party scripts except Razorpay Checkout (loaded only when a member starts a payment). Any new origin needs a CSP change (§5).
-- Admin sign-in is always two-step (password, then authenticator code). Don't add a "remember this device" that skips the code.
+- Admin sign-in is email + password only. Use strong, unique passwords (a password manager) for every admin account.
 
 ## 4. Secrets and keys
 
@@ -80,8 +80,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 | `JWT_ACCESS_SECRET` | Member access tokens | `JWT_ADMIN_ACCESS_SECRET` | Rotating invalidates current access tokens at once; clients get new ones through refresh |
 | `JWT_ADMIN_ACCESS_SECRET` | Admin access tokens | `JWT_ACCESS_SECRET` | Same |
 | `PHONE_HASH_SECRET` | Phone lookups (HMAC) | — | Needs a re-hash migration |
-| `PHONE_ENCRYPTION_KEY` (+ `_VERSION`) | Phone ciphertext | `TOTP_ENCRYPTION_KEY` | Versioned: re-encrypt in the background |
-| `TOTP_ENCRYPTION_KEY` | Admin authenticator secrets | `PHONE_ENCRYPTION_KEY` | Changing it invalidates every enrolment: reset each admin's 2FA and re-enrol |
+| `PHONE_ENCRYPTION_KEY` (+ `_VERSION`) | Phone ciphertext | — | Versioned: re-encrypt in the background |
 | `OTP_HMAC_SECRET` | OTP hashes, IP HMACs, audit IP hashes | — | Invalidates pending OTPs (5 min) |
 | `CLOUDINARY_API_SECRET`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Providers | Webhook ≠ key secret | Rotate in the provider dashboard first |
 
@@ -216,15 +215,15 @@ If the admin panel starts calling another public route, add it to the admin host
 
 ## 6. Admin operations
 
-- **Creating admins:** `npm run admin:create -- --email … --name … --role …` prints a random password once. Give it to the person over a secure channel. On first sign-in they must enrol an authenticator app before getting a session.
-- **Lost phone:** another super admin resets their two-factor sign-in (`POST /api/v1/admin/admins/:adminId/reset-two-factor` with a reason). This ends all their sessions and is audited. Verify the request out of band (call the person) before resetting.
-- **At least two super admins**, so a reset is always possible; super admins limited to named people.
+- **Creating admins:** `npm run admin:create -- --email … --name … --role …` prints a random password once. Give it to the person over a secure channel.
+- **Compromised password:** disable the account immediately (all sessions end), then create a new one with `admin:create` and review the audit log for that admin.
+- **At least two super admins**, so one can always disable another's account; super admins limited to named people.
 - **Review the audit log** regularly for `admin.lockout`, unusual `admin.login` IP patterns, phone reveals and refunds.
 - **Leaving staff:** disable the account (sessions end immediately); never delete it (audit references stay valid).
 
 ## 7. Dependencies
 
-- Don't add a dependency for something small we can write and test (e.g. TOTP is ~100 lines in `lib/totp.ts`, tested against the RFC vectors).
+- Don't add a dependency for something small we can write and test .
 - Run `npm audit --omit=dev` before every release; review moderate issues against the [accepted risks](../testing/security-testing.md#5-accepted-risks-and-follow-ups).
 - Keep the lockfile committed; update dependencies deliberately, one area at a time, with the full check.
 

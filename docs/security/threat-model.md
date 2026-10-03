@@ -20,7 +20,7 @@ Review this model when a feature adds a new data type, a new external provider, 
 | Profile photos and chat messages | Privacy; harassment evidence | Cloudinary (re-encoded images); `messages` |
 | Blocks, reports, safety logs | Safety of reporters; must never leak to the reported member | `blocks`, `reports`, `safety_logs` |
 | Sessions and tokens | Account takeover | Hashed refresh tokens; in-memory access tokens |
-| Admin accounts | Full access to member data and moderation | `admin_users` (Argon2id + TOTP) |
+| Admin accounts | Full access to member data and moderation | `admin_users` (Argon2id; no second factor) |
 | Payments and bookings | Money; fraud | `orders`, `payments`, `event_bookings`; card data stays at Razorpay |
 | Secrets and keys | Everything above | Environment / secret store only |
 | Audit log | Accountability of admins | `admin_audit_logs` (append-only) |
@@ -69,7 +69,7 @@ flowchart LR
 | Boundary | What crosses it | Main controls |
 |---|---|---|
 | **B1** member browser → API | Untrusted requests, uploads, socket events | TLS, strict CORS, zod validation, member JWT + DB session check, CSRF on cookie routes, rate limits, upload re-encoding |
-| **B2** admin browser → API | Privileged requests | Admin host only (Nginx), password + TOTP, separate secret/audience/cookie, permission checks, audit log, idle timeout |
+| **B2** admin browser → API | Privileged requests | Admin host only (Nginx), password, separate secret/audience/cookie, permission checks, audit log, idle timeout |
 | **B3** Razorpay → API | Payment state changes | HMAC over the raw body, event de-duplication, amounts from our DB only |
 | **B4** API → PostgreSQL | All data | Parameterised queries, least-privilege role, TLS, migrations only |
 | **B5** API → providers | Images, SMS, payment orders | Secrets from env, signed requests, no personal data beyond what the provider needs |
@@ -83,7 +83,7 @@ flowchart LR
 | `/api/v1/events`, `/api/v1/cities`, `/api/v1/health` | None | Public, non-personal data only |
 | All other member routes | Member JWT + live session | Status checks, block checks, per-member limits |
 | Socket.IO `/socket.io` | Member JWT at handshake + per-event session check | Payload size and event rate limits |
-| `POST /api/v1/admin/auth/login`, `login/totp-setup`, `login/verify` | None → challenge → session | Per-IP limits, account lockout across both factors |
+| `POST /api/v1/admin/auth/login` | None → session | Per-IP limits, account lockout |
 | All other `/api/v1/admin/*` routes | Admin JWT + live session + permission | Audit log on every write |
 | `POST /api/v1/webhooks/razorpay` | HMAC signature | Exempt from the global per-IP limit |
 | `admin:create`, `db` CLI | Server shell access | Destructive DB commands refused outside development |
@@ -97,9 +97,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 | # | Threat | Mitigations | Residual |
 |---|---|---|---|
 | S1 | OTP brute force or SMS bombing of a phone number | Hashed OTPs, 5 attempts per code, cooldown and hourly/daily caps per number stored in PostgreSQL (rotating IPs don't help), per-IP limits, global per-IP ceiling | L |
-| S2 | Admin password phishing, reuse or guessing | Argon2id, **mandatory TOTP**, lockout after 5 failures across both factors, generic errors, dummy hash for unknown emails, per-IP limits, audit of sign-ins and lockouts | L |
-| S3 | Stolen admin TOTP secret from the database | Secret encrypted with a dedicated key (`TOTP_ENCRYPTION_KEY`, not stored in the DB); the password is still required | L |
-| S4 | Replayed TOTP code (shoulder-surfing, phishing proxy) | Last accepted step stored; a code is accepted once. A real-time phishing proxy can still relay one code → admin host restriction, short sessions, audit | M |
+| S2 | Admin password phishing, reuse or guessing | Argon2id, lockout after 5 failures, generic errors, dummy hash for unknown emails, per-IP limits, audit of sign-ins and lockouts. **No second factor** (TOTP removed on request) | **H** |
 | S5 | Forged or tampered JWT; `alg: none`; cross-use of member/admin tokens | HS256 pinned, issuer/audience checked, separate secrets and audiences, DB session check | L |
 | S6 | Stolen refresh cookie | `HttpOnly`, `Secure`, `SameSite=Strict`, path-scoped; rotation with reuse detection revokes the family | L |
 | S7 | Forged payment success from the client | Client status never trusted; checkout signature verified server-side; webhook HMAC | L |
@@ -120,7 +118,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 | # | Threat | Mitigations | Residual |
 |---|---|---|---|
 | R1 | An admin denies a sanction, refund or phone reveal | Append-only audit log in the same transaction as the change, with admin ID, target, reason, IP HMAC | L |
-| R2 | Unclear who signed in as an admin, or when an account was attacked | `admin.login`, `admin.totp_enrolled`, `admin.lockout`, `admin.logout`, `admin.two_factor_reset` audited | L |
+| R2 | Unclear who signed in as an admin, or when an account was attacked | `admin.login`, `admin.lockout`, `admin.logout` audited | L |
 | R3 | A member denies sending a reported message | Messages stored server-side; message reports keep an evidence snapshot that survives deletion | L |
 
 ### 6.4 Information disclosure
@@ -136,7 +134,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 | I7 | Stack traces or SQL in error responses | Central error handler; generic `INTERNAL_ERROR` | L |
 | I8 | Reporter identity leaked to the reported member | Reports are never shown to the reported member; sanctions show neutral reasons | L |
 | I9 | Scraping of profiles | Discovery is opt-in and paginated; per-member and global per-IP limits; no bulk export of members | M |
-| I10 | Leaked database backup | Phones encrypted, OTPs/tokens hashed, TOTP secrets encrypted, keys outside the database | M (depends on backup handling) |
+| I10 | Leaked database backup | Phones encrypted, OTPs/tokens hashed, keys outside the database | M (depends on backup handling) |
 
 ### 6.5 Denial of service
 
@@ -153,8 +151,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 | # | Threat | Mitigations | Residual |
 |---|---|---|---|
 | E1 | Member reaching admin routes | Separate identity tables, secrets, audiences, cookies; admin API only on the admin host (Nginx) | L |
-| E2 | Moderator performing super-admin actions (unban, refund, audit, 2FA reset) | Permission checks on the server for every route; tested matrix | L |
-| E3 | An admin with a stolen session swapping the authenticator | `totp-setup` works only on `setup` challenges; reset needs **another** super admin; reset ends all sessions | L |
+| E2 | Moderator performing super-admin actions (unban, refund, audit) | Permission checks on the server for every route; tested matrix | L |
 | E4 | Banned/suspended member bypassing restrictions through another API or the socket | Status checked on every request and socket event; block checks in every interaction path | L |
 | E5 | Compromised dependency | Minimal dependencies, lockfile, `npm audit` in the release checklist | M |
 
@@ -178,11 +175,11 @@ These must stay true; if one changes, revisit this model.
 3. Secrets live in a secret store or protected env files readable only by the service user, and differ per environment.
 4. One API process (in-memory limiters). Running several requires a shared limiter store first.
 5. PostgreSQL is not reachable from the internet; the API uses a DML-only role.
-6. Admins keep their authenticator on a separate device from the one they sign in with, where possible.
 
 ## 9. Top residual risks
 
-1. **Forced password change for new admins is missing** (M): accounts from `admin:create` keep the printed password. Mitigated by mandatory TOTP.
+1. **No admin second factor** (H): admin TOTP was removed on request, so an admin password alone gives full access.
+1. **Forced password change for new admins is missing** (M): accounts from `admin:create` keep the printed password. Not mitigated by a second factor.
 2. **Single host and in-memory limits** (M): a restart resets limiter windows; volumetric attacks rely on Nginx and the provider.
-3. **Real-time phishing of admins** (M): TOTP can be relayed within 30 seconds. Phishing-resistant factors (WebAuthn) are the long-term answer.
+3. **Phishing of admins** (H): with password-only sign-in a phished password is enough. A second factor (ideally phishing-resistant, e.g. WebAuthn) is the long-term answer.
 4. **Scraping by registered members** (M): bounded by limits and opt-in discovery, not eliminated.

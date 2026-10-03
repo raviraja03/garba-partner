@@ -48,7 +48,6 @@ export const ADMIN_SESSION_REVOKE_REASONS = [
   'reuse_detected',
   'idle_timeout',
   'disabled',
-  'two_factor_reset',
 ] as const;
 export type AdminSessionRevokeReason = (typeof ADMIN_SESSION_REVOKE_REASONS)[number];
 

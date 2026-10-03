@@ -80,9 +80,6 @@ export const serverEnvSchema = z
     PHONE_ENCRYPTION_KEY: aes256KeySchema,
     PHONE_ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).max(32_767).default(1),
 
-    /** AES-256-GCM key for admin authenticator (TOTP) secrets. Must differ from the phone key. */
-    TOTP_ENCRYPTION_KEY: aes256KeySchema,
-
     /** HMAC key for OTP codes and client IP hashes. */
     OTP_HMAC_SECRET: secretSchema,
     SMS_PROVIDER: z.enum(SMS_PROVIDERS).default('dev'),
@@ -189,14 +186,6 @@ export const serverEnvSchema = z
         code: 'custom',
         path: ['TEST_DATABASE_URL'],
         message: 'must point to a different database than DATABASE_URL (tests truncate tables)',
-      });
-    }
-
-    if (env.TOTP_ENCRYPTION_KEY === env.PHONE_ENCRYPTION_KEY) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['TOTP_ENCRYPTION_KEY'],
-        message: 'must differ from PHONE_ENCRYPTION_KEY (one key per purpose)',
       });
     }
 

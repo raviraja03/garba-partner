@@ -15,9 +15,7 @@ const REDACT_PATHS = [
   '*.token',
   '*.accessToken',
   '*.refreshToken',
-  '*.challengeToken',
   '*.secret',
-  '*.otpauthUri',
   '*.phone',
   // Query strings (e.g. admin user search by phone number: QA finding, see docs/testing/security-testing.md)
   'req.query.q',

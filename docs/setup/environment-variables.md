@@ -51,7 +51,6 @@ Setup guide: [docs/database/database-setup.md](../database/database-setup.md).
 | `PHONE_HASH_SECRET` | **yes** | — | api, seeders | ≥ 32 characters (e.g. 32 random bytes, base64). HMAC key for `users.phone_hash`. **Long-lived: rotating it requires a re-hash migration** |
 | `PHONE_ENCRYPTION_KEY` | **yes** | — | api, seeders | 32 bytes, base64-encoded. AES-256-GCM key for `users.phone_encrypted` |
 | `PHONE_ENCRYPTION_KEY_VERSION` | no | `1` | api, seeders | Stored with each ciphertext to support key rotation |
-| `TOTP_ENCRYPTION_KEY` | **yes** | — | api | 32 bytes, base64-encoded. AES-256-GCM key for admin authenticator (TOTP) secrets. **Must differ** from `PHONE_ENCRYPTION_KEY`. Changing it invalidates every enrolled authenticator (each admin must be reset with `reset-two-factor` and enrol again) |
 
 ### Authentication
 

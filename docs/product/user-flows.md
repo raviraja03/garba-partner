@@ -476,10 +476,10 @@ The admin panel is a separate app (`apps/admin`) on its own subdomain. Every act
 
 ### 12.1 Admin login
 
-1. `admin.<domain>` → email + password → `POST /api/v1/admin/auth/login` → returns `challengeId` (no tokens yet).
-2. TOTP code from an authenticator app → access token + admin refresh cookie. See [authentication §3.1](../auth/authentication.md#31-admin-sign-in-password--mandatory-two-factor).
-3. First login (account created by a super admin with a one-time temporary password): TOTP enrolment before anything else (implemented: secret shown for manual entry plus an `otpauth://` link; no QR code yet). The forced password change is not implemented yet.
-4. Lockout: 5 failed password or TOTP attempts → the account is locked for 15 min and the event is audit-logged.
+1. `admin.<domain>` → email + password → `POST /api/v1/admin/auth/login` → access token + admin refresh cookie. See [authentication §3.1](../auth/authentication.md#31-post-apiv1adminauthlogin).
+2. There is no second factor (admin TOTP was removed on request).
+3. First login (account created by a super admin with a one-time temporary password): a forced password change is planned but not implemented yet.
+4. Lockout: 5 failed passwords → the account is locked for 15 min and the event is audit-logged.
 
 ### 12.2 Report handling
 
@@ -545,7 +545,7 @@ Triggered from a report resolution or directly from the user detail page (with a
 
 ### 12.9 Admin account management (super admin)
 
-- Create an admin (email, name, role) with a temporary password; deactivate an admin; change a role; reset TOTP. All audited.
+- Create an admin (email, name, role) with a temporary password; deactivate an admin; change a role. All audited.
 
 ### 12.10 Dashboard
 

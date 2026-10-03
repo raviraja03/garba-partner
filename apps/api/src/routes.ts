@@ -10,7 +10,6 @@ import {
   createIpRateLimiter,
   createMemberRateLimiter,
 } from './middlewares/rate-limit.js';
-import { createAdminAdminsRouter } from './modules/admin/admins/admin-admins.routes.js';
 import { createAdminAuthController } from './modules/admin/auth/admin-auth.controller.js';
 import { createAdminAuthRouter } from './modules/admin/auth/admin-auth.routes.js';
 import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.js';
@@ -152,7 +151,6 @@ export function createApiRouter(options: {
       limiters,
     }),
   );
-  router.use('/admin/admins', createAdminAdminsRouter({ sequelize, env, authenticateAdmin }));
   router.use(
     '/me',
     createMyProfileRouter({

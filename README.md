@@ -93,10 +93,9 @@ Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-
 ## Logging in locally
 
 - **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
-- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. Admin sign-in always needs a **6-digit code from an authenticator app**: on the first sign-in the page shows a key to add to any TOTP app (Google Authenticator, Microsoft Authenticator, 1Password…). The event manager (`events@…`) manages events and organizers; moderators can view them only.
+- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. The event manager (`events@…`) manages events and organizers; moderators can view them only.
 - **Events** (http://localhost:5173/events): public, no login needed. The seed adds three published events and one draft.
-- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password. The admin enrols an authenticator app at their first sign-in.
-- **`.env`:** `TOTP_ENCRYPTION_KEY` is required (32 random bytes, base64, different from `PHONE_ENCRYPTION_KEY`). Add it to an existing `.env` or the API refuses to start.
+- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password.
 
 Details: [docs/auth/authentication.md](docs/auth/authentication.md).
 
@@ -322,7 +321,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **5c** | Event pass payments | ✅ Razorpay orders with server-computed amounts, idempotency keys, capacity holds, checkout signature + API verification, signed webhooks with de-duplication, reconciliation job, bookings with codes, automatic refunds (sold out, duplicates, unavailable events), admin refunds, pass settings, payments back office, booking notifications. ⏳ QR check-in, partial refunds, invoices | ✅ Done |
 | **5d** | Admin dashboard | ✅ Aggregate metrics (members, active, verified, suspended, events, matches, pending reports, bookings, revenue), date and city filters, role-scoped sections, daily/weekly trend charts, paginated per-event table, audited per-event sales CSV | ✅ Done |
 | **5e** | QA | ✅ Security QA (unauthorized access, JWT forgery, privilege escalation, IDOR, injection, XSS, uploads, CSRF, rate limits, logging), security test suite, 3 findings fixed (public profile visibility, phone numbers in logs, destructive DB commands on staging), test strategy, test cases, release checklist | ✅ Done |
-| **5f** | Security hardening | ✅ **Mandatory admin two-factor sign-in** (TOTP, encrypted secrets, single-use challenges, replay protection, lockout across both factors, super-admin reset), admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change | ✅ Done |
+| **5f** | Security hardening | ✅ Admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change. Admin two-factor (authenticator) sign-in was built and then removed on request (migration `20261004100000-remove-admin-two-factor`) | ✅ Done |
 | **6** | Hardening & launch | Load test, Nginx/PM2/VPS (config in [security best practices §5](docs/security/security-best-practices.md#5-nginx-and-deployment-assumptions)), TLS, backups & restore drill, legal pages, SMS DLT, Redis-backed rate limits, runbooks | Planned |
 
 ### Post-MVP (indicative)

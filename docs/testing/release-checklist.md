@@ -33,15 +33,15 @@ Run on staging (test keys, test SMS) with the release build.
 ## 4. Production configuration
 
 - [ ] `APP_ENV=production`, `NODE_ENV=production`; the API refuses to start otherwise-invalid config (env schema).
-- [ ] Secrets set in the secret store only: JWT secrets (different for member/admin), `PHONE_HASH_SECRET`, `PHONE_ENCRYPTION_KEY`, `TOTP_ENCRYPTION_KEY` (different from the phone key), `OTP_HMAC_SECRET`, Cloudinary, SMS, **Razorpay live keys** (`rzp_live_`) and webhook secret.
+- [ ] Secrets set in the secret store only: JWT secrets (different for member/admin), `PHONE_HASH_SECRET`, `PHONE_ENCRYPTION_KEY`, `OTP_HMAC_SECRET`, Cloudinary, SMS, **Razorpay live keys** (`rzp_live_`) and webhook secret.
 - [ ] Razorpay live webhook configured to `https://<api>/api/v1/webhooks/razorpay` with the events in [webhook §3](../payments/webhook.md#3-events-handled); auto-capture on.
 - [ ] Real SMS provider with DLT-approved templates (the dev provider is refused outside development).
 - [ ] `MEDIA_STORAGE=cloudinary` (local storage is refused outside development).
 - [ ] Nginx as in [security best practices §5](../security/security-best-practices.md#5-nginx-and-deployment-assumptions): TLS, HSTS, CSP (including the Razorpay entries), WebSocket upgrade for `/socket.io`, `X-Forwarded-For` appended, API bound to `127.0.0.1`, **`/api/v1/admin/` only on the admin host**, `limit_req`.
 - [ ] `WEB_ORIGIN` / `ADMIN_ORIGIN` are the `https://` production origins (CORS and CSRF depend on them).
 - [ ] Log level `info`; logs shipped and retained; spot-check that logs contain no phone numbers, OTPs or tokens.
-- [ ] Real admins created with `npm run admin:create`; no dev admin accounts; super admins limited to named people (at least two, so a 2FA reset is always possible).
-- [ ] Every admin has enrolled an authenticator app (check `admin.totp_enrolled` in the audit log).
+- [ ] Real admins created with `npm run admin:create`; no dev admin accounts; super admins limited to named people (at least two).
+- [ ] Admin sign-in has no second factor (removed): strong unique admin passwords, admin host restricted in Nginx (ideally an IP allow-list), audit log review scheduled.
 - [ ] Open items in the [security checklist §5](../security/security-checklist.md#5-before-launch-open-items) are closed or explicitly accepted.
 
 ## 5. After deploy

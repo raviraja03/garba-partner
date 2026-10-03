@@ -1,11 +1,6 @@
 import type { Request, RequestHandler, Response } from 'express';
 import type { ServerEnv } from '@garba-partner/config/server';
-import {
-  ADMIN_REFRESH_COOKIE,
-  adminLoginSchema,
-  adminLoginVerifySchema,
-  adminTotpSetupSchema,
-} from '@garba-partner/shared';
+import { ADMIN_REFRESH_COOKIE, adminLoginSchema } from '@garba-partner/shared';
 import { AppError } from '../../../lib/app-error.js';
 import { readCookie, refreshCookieOptions } from '../../../lib/cookies.js';
 import { ok } from '../../../lib/response.js';
@@ -19,8 +14,6 @@ export const ADMIN_AUTH_COOKIE_PATH = '/api/v1/admin/auth';
 
 export interface AdminAuthController {
   login: RequestHandler;
-  setupTotp: RequestHandler;
-  verify: RequestHandler;
   refresh: RequestHandler;
   logout: RequestHandler;
   me: RequestHandler;
@@ -50,24 +43,7 @@ export function createAdminAuthController(
   return {
     async login(req, res) {
       const { email, password } = parseInput(adminLoginSchema, req.body);
-      const challenge = await service.login(email, password, clientContext(req));
-      res.setHeader('Cache-Control', 'no-store');
-      ok(res, challenge, 'Enter the code from your authenticator app');
-    },
-
-    async setupTotp(req, res) {
-      const { challengeToken } = parseInput(adminTotpSetupSchema, req.body);
-      res.setHeader('Cache-Control', 'no-store');
-      ok(
-        res,
-        await service.setupTotp(challengeToken),
-        'Add this account to your authenticator app',
-      );
-    },
-
-    async verify(req, res) {
-      const { challengeToken, code } = parseInput(adminLoginVerifySchema, req.body);
-      sendSession(res, await service.verify(challengeToken, code, clientContext(req)), 'Logged in');
+      sendSession(res, await service.login(email, password, clientContext(req)), 'Logged in');
     },
 
     async refresh(req, res) {

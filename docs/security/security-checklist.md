@@ -25,9 +25,8 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | OTPs are never logged; the dev SMS provider logs nothing and is refused outside `APP_ENV=development` | ✅ | `providers/sms/`, env schema | `auth.int.test.ts`, `env-rules.test.ts` |
 | `send-otp` gives the same response for new, existing and banned numbers | ✅ | `auth.service.ts` | `auth.int.test.ts` |
 | Admin passwords hashed with Argon2id; unknown/disabled admins run a dummy hash (same timing and response) | ✅ | `admin-auth.service.ts` | `admin-auth.int.test.ts` |
-| **Mandatory admin two-factor sign-in (TOTP, RFC 6238)**: the password alone never creates a session; secret encrypted at rest (AES-256-GCM, `TOTP_ENCRYPTION_KEY`); challenge token hashed, 5 min, 5 attempts, single use; codes can't be replayed | ✅ (new) | `admin-auth.service.ts`, `lib/totp.ts` | `admin-auth.int.test.ts`, `totp.test.ts` |
+| Admin second factor (TOTP) | ❌ **Removed** on request: admins sign in with email + password only ([authentication §3.1](../auth/authentication.md#31-post-apiv1adminauthlogin)) | migration `20261004100000-remove-admin-two-factor` | `admin-auth.int.test.ts` (no two-factor endpoints) |
 | Admin lockout: 5 failed passwords **or** codes → locked 15 min, audit-logged | ✅ | `admin-auth.service.ts` | `admin-auth.int.test.ts` |
-| Lost authenticator: reset only by **another** super admin; ends the admin's sessions; audit-logged | ✅ (new) | `modules/admin/admins/admin-admins.routes.ts` | `security.int.test.ts` |
 | Forced password change on an admin's first sign-in | ⏳ | — | — |
 
 ### 2.2 JWT and sessions
@@ -70,7 +69,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 |---|---|---|---|
 | **Global ceiling: 300 requests / minute / IP on every `/api/v1` route** (Razorpay webhooks exempt: signature-verified) | ✅ (new) | `routes.ts` | `security.int.test.ts` "applies a global per-IP request limit" |
 | OTP: per phone number (30 s cooldown, 5/hour, 10/day) and per IP, **in PostgreSQL**; 5 attempts per code | ✅ | `otp.service.ts` | `security.int.test.ts` rate-limit bypass |
-| Refresh 60 / 15 min; admin login 10 / 15 min; admin 2FA steps 30 / 15 min (per IP) | ✅ | `middlewares/rate-limit.ts` | auth suites |
+| Refresh 60 / 15 min; admin login 10 / 15 min (per IP) | ✅ | `middlewares/rate-limit.ts` | auth suites |
 | Per-member limits (interests/day, reports/day, messages, uploads) keyed by user ID | ✅ | module services | module suites |
 | `trust proxy` = loopback only, so a remote client can't spoof `X-Forwarded-For` | ✅ | `app.ts` | review |
 | Nginx `limit_req` as the outer tier | 🟡 | Nginx | release checklist |
@@ -120,11 +119,11 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Control | Status | Where | Test |
 |---|---|---|---|
 | No secrets in source code; all from environment variables validated at boot; `.env` ignored by git | ✅ | `packages/config/src/server/env.ts` | `env-rules.test.ts`, repository scan (§3) |
-| Keys that must differ are enforced at boot (member/admin JWT secrets, phone/TOTP encryption keys, Razorpay secrets); live Razorpay keys only in production; `https` origins and `NODE_ENV=production` in production | ✅ | env schema | `env-rules.test.ts`, `razorpay.gateway.test.ts` |
-| Logs redact `Authorization`, cookies, passwords, OTPs, codes, tokens, 2FA challenge tokens and secrets, phone numbers, sensitive query parameters (`q`, `phone`, `code`, `token`) | ✅ (extended) | `lib/logger.ts` | `security.int.test.ts` SEC-02 |
-| **SQL text, bind values and constraint details are removed from logged database errors** | ✅ (new) | `lib/logger.ts` | `security.int.test.ts` "never logs SQL values or 2FA secrets" |
+| Keys that must differ are enforced at boot (member/admin JWT secrets, Razorpay secrets); live Razorpay keys only in production; `https` origins and `NODE_ENV=production` in production | ✅ | env schema | `env-rules.test.ts`, `razorpay.gateway.test.ts` |
+| Logs redact `Authorization`, cookies, passwords, OTPs, codes, tokens, secrets, phone numbers, sensitive query parameters (`q`, `phone`, `code`, `token`) | ✅ (extended) | `lib/logger.ts` | `security.int.test.ts` SEC-02 |
+| **SQL text, bind values and constraint details are removed from logged database errors** | ✅ (new) | `lib/logger.ts` | `security.int.test.ts` "never logs SQL values or secrets" |
 | Client IPs stored only as HMACs | ✅ | audit/OTP services | review |
-| Admin audit log covers every admin write **and** sign-in, 2FA enrolment, lockout, logout and 2FA reset | ✅ (extended) | `modules/admin/audit/audit.service.ts` | `admin-auth.int.test.ts`, `security.int.test.ts` |
+| Admin audit log covers every admin write **and** sign-in, lockout and logout | ✅ (extended) | `modules/admin/audit/audit.service.ts` | `admin-auth.int.test.ts`, `security.int.test.ts` |
 | Payment webhooks verified server-side (HMAC over the raw body), de-duplicated | ✅ | `modules/payments/` | payments suite |
 
 ## 3. Phase requirements
@@ -147,25 +146,25 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 
 | ID | Severity | Finding | Fix | Test |
 |---|---|---|---|---|
-| **HARD-01** | **High** | Admin sign-in was password-only: one leaked password gave full access to member data and moderation. The security architecture requires mandatory TOTP. | Mandatory two-step sign-in with TOTP enrolment on first sign-in, encrypted secrets, hashed single-use challenges, replay protection, lockout across both factors, super-admin reset. Admin panel updated. Migration `20261003100000-add-admin-two-factor` | `admin-auth.int.test.ts` (12), `totp.test.ts` (8), `security.int.test.ts` |
+| **HARD-01** | **High** | Admin sign-in was password-only: one leaked password gave full access to member data and moderation. The security architecture requires mandatory TOTP. | Implemented (mandatory TOTP, migration `20261003100000-add-admin-two-factor`), then **removed on request** (migration `20261004100000-remove-admin-two-factor`). **Open**: see §5 | — |
 | **HARD-02** | **High** | No global request limit: only a handful of endpoints were limited, so scraping and brute force against other routes were bounded only by Nginx (not yet deployed). `LIMITS.API_REQUESTS_PER_MINUTE` existed but was unused. | Per-IP limiter (300/min) on every `/api/v1` route except the signature-verified webhook | `security.int.test.ts` |
 | **HARD-03** | **High** | `Cache-Control: no-store` was set only on some routes; responses with personal data (profiles, matches, chats, admin lists) could be stored by browsers or shared proxies. | `no-store` on every API response by default; public event/city lists keep their explicit short public cache | `security.int.test.ts` |
-| **HARD-04** | **High** | Admin sign-in, lockout and logout weren't in the audit log, so account takeover attempts and insider sessions couldn't be reconstructed. | `admin.login`, `admin.totp_enrolled`, `admin.lockout`, `admin.logout`, `admin.two_factor_reset` audited in the same transaction | `admin-auth.int.test.ts` |
+| **HARD-04** | **High** | Admin sign-in, lockout and logout weren't in the audit log, so account takeover attempts and insider sessions couldn't be reconstructed. | `admin.login`, `admin.lockout`, `admin.logout` audited in the same transaction | `admin-auth.int.test.ts` |
 | **HARD-05** | Medium | CORS allowed every method and reflected any requested header for our origins. | Explicit methods, allowed and exposed headers, preflight cache 10 min | `security.int.test.ts` |
-| **HARD-06** | Medium | Logged database errors contained the SQL with inlined values, bind parameters and unique-violation details (possible search terms or personal data). | Redaction of `sql`, `parameters`, `fields`, `errors`, `detail` on logged errors (also added 2FA fields) | `security.int.test.ts` |
+| **HARD-06** | Medium | Logged database errors contained the SQL with inlined values, bind parameters and unique-violation details (possible search terms or personal data). | Redaction of `sql`, `parameters`, `fields`, `errors`, `detail` on logged errors | `security.int.test.ts` |
 | **HARD-07** | Low | HSTS used helmet's 180-day default; the referrer policy leaked no data but was not the strictest option. | HSTS 1 year with sub-domains; `Referrer-Policy: no-referrer` on API responses | `security.int.test.ts` |
 
-No critical issues were found. All high issues are fixed and covered by tests. Earlier QA findings (SEC-01 … SEC-03) are in [security testing §4](../testing/security-testing.md#4-findings-and-fixes).
+No critical issues were found. All high issues were fixed and covered by tests. **HARD-01 was later reverted on request**: admin two-factor sign-in was removed, so admin accounts are protected by the password, lockout and audit only. It is the first open item in §5. Earlier QA findings (SEC-01 … SEC-03) are in [security testing §4](../testing/security-testing.md#4-findings-and-fixes).
 
 ## 5. Before launch (open items)
 
+- [ ] 🔴 **Decide on an admin second factor** (HARD-01). Authenticator (TOTP) sign-in was removed on request; without a second factor a leaked or guessed admin password gives full access to member data. At minimum: strong unique passwords, the Nginx admin-host restriction (ideally an IP allow-list) and regular audit-log review.
 - [ ] ⏳ Forced password change on an admin's first sign-in (accounts from `admin:create` keep the printed password until an admin-management screen exists). Until then: deliver passwords over a secure channel and treat the printed password as a one-time secret.
 - [ ] 🟡 Nginx deployed as in [best practices §5](security-best-practices.md#5-nginx-and-deployment-assumptions): TLS, HSTS, CSP, admin API only on the admin host, `limit_req`, API bound to `127.0.0.1`.
-- [ ] 🟡 Separate, CSPRNG-generated production secrets in a secret store (`JWT_*`, `PHONE_*`, `TOTP_ENCRYPTION_KEY`, `OTP_HMAC_SECRET`, Cloudinary, SMS, Razorpay).
+- [ ] 🟡 Separate, CSPRNG-generated production secrets in a secret store (`JWT_*`, `PHONE_*`, `OTP_HMAC_SECRET`, Cloudinary, SMS, Razorpay).
 - [ ] 🟡 Database roles: DML-only API role; migrations with the owner role; TLS to the database.
 - [ ] ⏳ Real SMS provider (the dev provider is refused outside development).
 - [ ] ⏳ Move in-memory rate limiters to a shared store (Redis) before running more than one API process.
-- [ ] Every admin enrolled in two-factor sign-in before production data is loaded.
 
 ## 6. Residual risks
 
@@ -173,7 +172,7 @@ No critical issues were found. All high issues are fixed and covered by tests. E
 |---|---|---|
 | In-memory rate limiters reset on restart and aren't shared between processes | Low (single process) | OTP limits are DB-backed; Redis before scaling out; Nginx `limit_req` |
 | Anyone knowing an admin email can lock the account for 15 minutes | Low | IP limits on every sign-in step; lock is audited; accepted over weaker lockout |
-| TOTP secret shown as text (no QR code) | Low | Deliberate: no extra dependency. The secret is shown once per challenge over TLS, to the admin who just proved the password |
+| No admin second factor | **High** | Removed on request; mitigated only by Argon2id, lockout, per-IP limits, audit and (in deployment) the admin-host restriction |
 | PostgreSQL error messages can echo an invalid value (e.g. "invalid input syntax for type uuid") into logs | Low | Inputs are validated by zod before reaching SQL, so this needs a bug; SQL and parameters are redacted |
 | `uuid` moderate advisory via Sequelize | Moderate | Not reachable (only `v4` used): see [security testing §5](../testing/security-testing.md#5-accepted-risks-and-follow-ups) |
 | Identity verification is a signal, not a guarantee | Product | Never presented as a safety guarantee in copy ([community guidelines](../safety/community-guidelines.md)) |
