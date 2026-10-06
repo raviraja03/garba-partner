@@ -68,7 +68,9 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
         'Idempotency-Key',
         REQUEST_ID_HEADER,
       ],
-      exposedHeaders: [REQUEST_ID_HEADER, 'Retry-After'],
+      // Content-Disposition: the admin panel reads the CSV export's file name from it, and the
+      // panel is on another origin than the API in production.
+      exposedHeaders: [REQUEST_ID_HEADER, 'Retry-After', 'Content-Disposition'],
       maxAge: 600,
     }),
   );

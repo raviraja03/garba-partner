@@ -111,6 +111,8 @@ function start(): void {
     logger.info(
       `API listening on http://${env.API_HOST}:${String(env.API_PORT)}${API_PREFIX} (${env.APP_ENV})`,
     );
+    // PM2 (`wait_ready`) treats the process as up only now (docs/deployment/pm2.md).
+    process.send?.('ready');
   });
 
   let shuttingDown = false;

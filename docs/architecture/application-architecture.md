@@ -580,7 +580,7 @@ The MVP runs a single API process. For multiple processes, add `@socket.io/redis
 
 ### 7.2 Admin API
 
-- Mounted at `/api/v1/admin`, and accepted only on the admin host (`host-guard`).
+- Mounted at `/api/v1/admin` on the API domain. There is no host check in the application (`host-guard` was not built); Nginx can restrict the prefix by IP ([nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel)).
 - `requireAdmin(permission)`: verifies the JWT with `JWT_ADMIN_ACCESS_SECRET` and `aud = 'admin'`, loads `admin_users` + `admin_sessions`, checks the admin is `active`, then checks `ROLE_PERMISSIONS[role].includes(permission)`.
 - Admin refresh cookie: `gp_admin_rt`, `Path=/api/v1/admin/auth`, 12 h absolute, rotating.
 - Member tokens can never authorise admin routes (different secret and audience), and the reverse holds too.

@@ -284,5 +284,5 @@ Integration tests need `TEST_DATABASE_URL` ([database setup](../database/databas
 
 - **No admin second factor.** Admin sign-in is email + password only (authenticator sign-in was removed), so a leaked or guessed admin password gives full access. A **forced password change on first login** is not implemented either: admins created with `admin:create` keep the printed password until they change it through a future admin-management screen. Deliver the password over a secure channel.
 - **No production SMS provider yet.** Only `SMS_PROVIDER=dev` exists, and it is rejected outside `APP_ENV=development`, so staging and production cannot start until a real provider (e.g. MSG91 with DLT templates) is added.
-- The admin API isn't restricted to the admin host in the application; restrict it in Nginx ([security best practices §5](../security/security-best-practices.md#5-nginx-and-deployment-assumptions)).
+- The admin API is reachable on the API domain and is not restricted by host in the application; restrict it by IP in Nginx where possible ([nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel)).
 - In-memory rate limiters reset on restart and aren't shared between processes. The OTP limits are DB-backed, and the rest move to Redis when scaling out.

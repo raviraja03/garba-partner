@@ -125,7 +125,7 @@ Use `blocking:` / `nit:` / `question:` prefixes in review comments.
 1. Merge PRs into `main`. CI must be green.
 2. Create an annotated tag with a changelog summary: `git tag -a v0.3.0 -m "Phase 3: discovery, interests, matches, safety core"`.
 3. Versioning (SemVer-ish for the product): `0.x` until public launch. `MINOR` for phases/features, `PATCH` for fixes. `v1.0.0` at public launch.
-4. Deploy the tag following [system architecture §4.5](../architecture/system-architecture.md#45-deployment-process-mvp).
+4. Deploy the tag following [system architecture §4.5](../architecture/system-architecture.md#45-deployment-process).
 5. Keep the `CHANGELOG.md` (added in Phase 0) up to date. Generating it from Conventional Commits is optional.
 
 **Deploy freeze:** during Navratri nights (18:00–01:00 IST) only hotfixes are allowed.

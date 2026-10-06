@@ -97,7 +97,7 @@ Details: [Razorpay](../payments/razorpay.md).
 
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
-| `VITE_API_BASE_URL` | no | `/api/v1` | web, admin | Same-origin path. Trailing slashes are removed. **Public: never put secrets in `VITE_*` variables** |
+| `VITE_API_BASE_URL` | no | `/api/v1` | web, admin | A same-origin path in development (the Vite dev server proxies it), or the absolute URL on the API domain in production (`https://<API_DOMAIN>/api/v1`). Baked into the bundles at build time. Socket.IO connects to the same origin. Trailing slashes are removed. **Public: never put secrets in `VITE_*` variables** |
 
 ## 3. Planned variables (later phases)
 
@@ -106,7 +106,6 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 | Phase | Variables |
 |---|---|
 | Production SMS | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` (with a real `SMS_PROVIDER` value) |
-| Realtime | `VITE_SOCKET_URL` |
 
 Generate secrets with a CSPRNG, e.g. `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
 
@@ -132,3 +131,44 @@ Vite also reads the root `.env`. If `NODE_ENV=development` is set there, `vite b
 - `.env` and every `.env.*` file except `.env.example` are git-ignored. **Never commit secrets.** If one is committed, rotate it immediately ([git workflow §9](../development/git-workflow.md#9-secrets-and-sensitive-data-in-git)).
 - In production, `.env` lives only on the server, owned by the app user with mode `600`.
 - Validation errors print variable **names**, never values.
+
+## 6. Production
+
+The server has one env file, `/etc/garba-partner/production.env` (owner `root:<deploy group>`, mode `640`), created from [`deploy/env/production.env.example`](../../deploy/env/production.env.example). It holds everything in §2 **plus** the deployment variables below. The API ignores keys it does not know, and only `VITE_*` keys reach the browser bundles. Procedure: [production setup §4](../deployment/production-setup.md#4-environment-file).
+
+Check a file before starting anything: `npm run env:check -w @garba-partner/api` (development) or `NODE_ENV=production npm run env:check:prod -w @garba-partner/api` (built release). It runs the API's own validation and prints the non-secret settings.
+
+### Deployment variables (read by the scripts in `deploy/`, not by the API)
+
+| Variable | Required | Example | Used by | Notes |
+|---|---|---|---|---|
+| `WEB_DOMAIN` | **yes** | `garbamates.in` | Nginx templates, TLS, health checks | Lowercase hostname only |
+| `ADMIN_DOMAIN` | **yes** | `admin.garbamates.in` | same | |
+| `API_DOMAIN` | **yes** | `api.garbamates.in` | same | Must share the registrable domain of the other two |
+| `LETSENCRYPT_EMAIL` | **yes** | `ops@garbamates.in` | certbot | Account contact |
+| `BACKUP_DIR` | no | `/var/backups/garba-partner` | `backup-db.sh` | Mode `700` |
+| `BACKUP_RETENTION_DAYS` | no | `14` | `backup-db.sh` | Local copies only |
+| `BACKUP_GPG_RECIPIENT` | **yes** in production | `backups@garbamates.in` | `backup-db.sh` | **Public** key to encrypt for. Empty → the backup is refused |
+| `BACKUP_RCLONE_REMOTE` | recommended | `b2:garbamates-backups/db` | `backup-db.sh` | Off-site copy |
+
+### Values that must agree
+
+`preflight.sh` fails when they don't:
+
+| Variable | Must equal |
+|---|---|
+| `WEB_ORIGIN` | `https://<WEB_DOMAIN>` |
+| `ADMIN_ORIGIN` | `https://<ADMIN_DOMAIN>` |
+| `VITE_API_BASE_URL` | `https://<API_DOMAIN>/api/v1` |
+| `APP_ENV` | `production` |
+| `API_HOST` | `127.0.0.1` |
+| `MEDIA_STORAGE` | `cloudinary` |
+| `DATABASE_MIGRATION_URL` | set, and different from `DATABASE_URL` (owner role vs DML-only role) |
+
+### Production rules
+
+- `NODE_ENV` is **not** in the file: PM2 sets `NODE_ENV=production` ([`ecosystem.config.cjs`](../../ecosystem.config.cjs)), and the scripts set it for the CLI commands.
+- Format: one `KEY=value` per line, no quotes, no spaces around `=`; URL-encode special characters in database passwords. The deploy scripts read single keys from the file and never execute it.
+- `SMS_PROVIDER`: no production value exists yet (only `dev`, refused outside development). **The API cannot start in production until a real provider is added.**
+- Razorpay: live keys (`rzp_live_`) are required in production and refused elsewhere.
+- Optional path overrides for the scripts (environment of the shell, not the file): `GP_ENV_FILE`, `GP_ROOT` (`/srv/garba-partner`), `GP_LOG_DIR` (`/var/log/garba-partner`), `GP_CERT_NAME`, `GP_ACME_ROOT`, `GP_KEEP_RELEASES` (5).

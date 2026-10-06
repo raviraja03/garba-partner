@@ -181,7 +181,7 @@ Baseline decisions already made (documented in these architecture docs, so no se
 | Decision | Where |
 |---|---|
 | Modular monolith + separate worker process | [System architecture §1, §3](../architecture/system-architecture.md) |
-| Same-origin API behind Nginx, cookie-scoped refresh tokens | [System architecture §4.1](../architecture/system-architecture.md#41-domains-and-routing) |
+| API on its own domain behind Nginx (same registrable domain as the apps), strict CORS, cookie-scoped refresh tokens | [System architecture §4.1](../architecture/system-architecture.md#41-domains-and-routing) |
 | OTP + short JWT + rotating DB-backed refresh tokens | [Security architecture §3](../architecture/security-architecture.md#3-authentication) |
 | Request → accept matching model | [User flows §7](../product/user-flows.md#7-interest-and-matching-flow) |
 | Photo verification (moderator-reviewed) at MVP; ID verification deferred | [User flows §4](../product/user-flows.md#4-photo-verification-flow) |

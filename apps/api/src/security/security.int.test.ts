@@ -651,6 +651,10 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
         const res = await preflight(origin);
         expect(res.headers['access-control-allow-origin']).toBe(origin);
         expect(res.headers['access-control-allow-credentials']).toBe('true');
+        // Production serves the apps and the API on different origins (docs/deployment/).
+        const actual = await request(app).get('/api/v1/health').set('Origin', origin);
+        expect(actual.headers['access-control-allow-origin']).toBe(origin);
+        expect(actual.headers['access-control-expose-headers']).toMatch(/Content-Disposition/);
       }
       const allowed = await preflight(env.WEB_ORIGIN, 'PROPFIND', 'x-evil, content-type');
       expect(allowed.headers['access-control-allow-methods']).toBe('GET,POST,PUT,PATCH,DELETE');

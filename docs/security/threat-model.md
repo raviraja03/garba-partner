@@ -57,7 +57,7 @@ flowchart LR
   RZAPI[Razorpay API]
 
   M -- "HTTPS / WSS (B1)" --> N
-  A -- "HTTPS (B2, admin host)" --> N
+  A -- "HTTPS (B2)" --> N
   RZ -- "HTTPS, HMAC signed (B3)" --> N
   N -- "loopback" --> API
   API -- "TLS (B4)" --> DB
@@ -69,7 +69,7 @@ flowchart LR
 | Boundary | What crosses it | Main controls |
 |---|---|---|
 | **B1** member browser → API | Untrusted requests, uploads, socket events | TLS, strict CORS, zod validation, member JWT + DB session check, CSRF on cookie routes, rate limits, upload re-encoding |
-| **B2** admin browser → API | Privileged requests | Admin host only (Nginx), password, separate secret/audience/cookie, permission checks, audit log, idle timeout |
+| **B2** admin browser → API | Privileged requests | Optional Nginx IP allow-list, password, separate secret/audience/cookie, permission checks, audit log, idle timeout |
 | **B3** Razorpay → API | Payment state changes | HMAC over the raw body, event de-duplication, amounts from our DB only |
 | **B4** API → PostgreSQL | All data | Parameterised queries, least-privilege role, TLS, migrations only |
 | **B5** API → providers | Images, SMS, payment orders | Secrets from env, signed requests, no personal data beyond what the provider needs |
@@ -150,7 +150,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 
 | # | Threat | Mitigations | Residual |
 |---|---|---|---|
-| E1 | Member reaching admin routes | Separate identity tables, secrets, audiences, cookies; admin API only on the admin host (Nginx) | L |
+| E1 | Member reaching admin routes | Separate identity tables, secrets, audiences, cookies; optional Nginx IP allow-list for the admin panel and admin API | L |
 | E2 | Moderator performing super-admin actions (unban, refund, audit) | Permission checks on the server for every route; tested matrix | L |
 | E4 | Banned/suspended member bypassing restrictions through another API or the socket | Status checked on every request and socket event; block checks in every interaction path | L |
 | E5 | Compromised dependency | Minimal dependencies, lockfile, `npm audit` in the release checklist | M |
@@ -171,7 +171,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 These must stay true; if one changes, revisit this model.
 
 1. Nginx terminates TLS and is the only thing listening publicly; the API listens on `127.0.0.1` (`API_HOST`), so `trust proxy = loopback` is correct.
-2. Nginx exposes `/api/v1/admin/` only on the admin host ([best practices §5](security-best-practices.md#5-nginx-and-deployment-assumptions)).
+2. The web app, the admin panel and the API are on three hosts of one registrable domain; CORS allows exactly the two app origins ([best practices §5](security-best-practices.md#5-nginx-and-deployment-assumptions)). No untrusted site runs on a sibling subdomain.
 3. Secrets live in a secret store or protected env files readable only by the service user, and differ per environment.
 4. One API process (in-memory limiters). Running several requires a shared limiter store first.
 5. PostgreSQL is not reachable from the internet; the API uses a DML-only role.

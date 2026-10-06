@@ -1,0 +1,193 @@
+# Garba Partner — Nginx site (HTTPS). Guide: docs/deployment/nginx.md
+#
+# TEMPLATE: rendered by deploy/scripts/render-nginx.sh into
+# /etc/nginx/conf.d/garba-partner.conf. Edit the template, never the rendered file.
+# Placeholders (${WEB_DOMAIN}, ...) come from /etc/garba-partner/production.env.
+#
+#   ${WEB_DOMAIN}    member web app (static files)
+#   ${ADMIN_DOMAIN}  admin panel (static files)
+#   ${API_DOMAIN}    REST API + Socket.IO (proxied to the Node process on loopback)
+
+# Coarse per-IP limit in front of the API. The fine-grained limits live in the API.
+limit_req_zone $binary_remote_addr zone=gp_api:10m rate=20r/s;
+limit_req_status 429;
+
+map $http_upgrade $gp_connection_upgrade {
+  default upgrade;
+  ''      close;
+}
+
+# Access log WITHOUT query strings or referrers: admin searches carry phone numbers in
+# the query (?q=98...), and they must never reach a log file.
+log_format gp_main '$remote_addr [$time_iso8601] "$request_method $uri $server_protocol" '
+                   '$status $body_bytes_sent rt=$request_time urt=$upstream_response_time '
+                   'rid=$sent_http_x_request_id "$http_user_agent"';
+
+upstream gp_api {
+  server 127.0.0.1:${API_PORT};
+  keepalive 32;
+}
+
+# ---- HTTP: ACME challenges, everything else to HTTPS ---------------------------------
+server {
+  listen 80;
+  listen [::]:80;
+  server_name ${WEB_DOMAIN} ${ADMIN_DOMAIN} ${API_DOMAIN};
+
+  access_log /var/log/nginx/gp-http.access.log gp_main;
+
+  location ^~ /.well-known/acme-challenge/ {
+    root ${ACME_ROOT};
+    default_type text/plain;
+  }
+  location / {
+    return 301 https://$host$request_uri;
+  }
+}
+
+# ---- Web app (members) -----------------------------------------------------------------
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name ${WEB_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${CERT_NAME}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${CERT_NAME}/privkey.pem;
+  include snippets/gp-tls.conf;
+
+  access_log /var/log/nginx/gp-web.access.log gp_main;
+  error_log  /var/log/nginx/gp-web.error.log warn;
+
+  root ${WEB_ROOT};
+  index index.html;
+
+  # Nginx drops inherited add_header lines in any block that adds its own, so every
+  # location that sets a header includes the same snippet again.
+  include snippets/gp-web-headers.conf;
+
+  # Hashed build output: cache for a year.
+  location /assets/ {
+    include snippets/gp-web-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    access_log off;
+    try_files $uri =404;
+  }
+  # The entry page must always be revalidated so a new release is picked up.
+  location = /index.html {
+    include snippets/gp-web-headers.conf;
+    add_header Cache-Control "no-cache" always;
+  }
+  # Single-page app: unknown paths render the app, which shows its own 404.
+  location / {
+    try_files $uri /index.html;
+  }
+  location ~ /\. {
+    return 404;
+  }
+}
+
+# ---- Admin panel ---------------------------------------------------------------------------
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name ${ADMIN_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${CERT_NAME}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${CERT_NAME}/privkey.pem;
+  include snippets/gp-tls.conf;
+
+  access_log /var/log/nginx/gp-admin.access.log gp_main;
+  error_log  /var/log/nginx/gp-admin.error.log warn;
+
+  # Optional IP allow-list (office/VPN): create /etc/nginx/garba-partner/admin-allow.conf
+  # with "allow <ip>;" lines and a final "deny all;". No file = open to the internet.
+  include /etc/nginx/garba-partner/admin-allow*.conf;
+
+  root ${ADMIN_ROOT};
+  index index.html;
+  include snippets/gp-admin-headers.conf;
+
+  location /assets/ {
+    include snippets/gp-admin-headers.conf;
+    add_header Cache-Control "public, max-age=31536000, immutable" always;
+    access_log off;
+    try_files $uri =404;
+  }
+  location = /index.html {
+    include snippets/gp-admin-headers.conf;
+    add_header Cache-Control "no-store" always;
+  }
+  location / {
+    try_files $uri /index.html;
+  }
+  location ~ /\. {
+    return 404;
+  }
+}
+
+# ---- API (REST + Socket.IO) ------------------------------------------------------------------
+server {
+  listen 443 ssl http2;
+  listen [::]:443 ssl http2;
+  server_name ${API_DOMAIN};
+
+  ssl_certificate     /etc/letsencrypt/live/${CERT_NAME}/fullchain.pem;
+  ssl_certificate_key /etc/letsencrypt/live/${CERT_NAME}/privkey.pem;
+  include snippets/gp-tls.conf;
+
+  access_log /var/log/nginx/gp-api.access.log gp_main;
+  error_log  /var/log/nginx/gp-api.error.log warn;
+
+  # Images are at most 5 MB (the API enforces it); allow multipart overhead, nothing more.
+  client_max_body_size 6m;
+
+  # The API sets its own security headers (helmet). HSTS is added here instead (and hidden
+  # from the upstream response in gp-proxy.conf) so Nginx's own error pages carry it too.
+  add_header Strict-Transport-Security "max-age=31536000" always;
+  add_header X-Robots-Tag "noindex, nofollow" always;
+  add_header X-Content-Type-Options "nosniff" always;
+
+  # Uptime monitors: no rate limit, not logged.
+  location = /api/v1/health {
+    access_log off;
+    include snippets/gp-proxy.conf;
+  }
+
+  # Razorpay retries must always reach the (signature-verified) webhook.
+  location = /api/v1/webhooks/razorpay {
+    include snippets/gp-proxy.conf;
+  }
+
+  # Admin API: same optional allow-list as the admin panel.
+  location /api/v1/admin/ {
+    include /etc/nginx/garba-partner/admin-allow*.conf;
+    limit_req zone=gp_api burst=40 nodelay;
+    include snippets/gp-proxy.conf;
+  }
+
+  location /api/ {
+    limit_req zone=gp_api burst=40 nodelay;
+    include snippets/gp-proxy.conf;
+  }
+
+  # Chat and live notifications (WebSocket, with long-polling fallback).
+  location /socket.io/ {
+    proxy_pass http://gp_api;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $gp_connection_upgrade;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_hide_header Strict-Transport-Security;
+    proxy_buffering off;
+    # Longer than the Socket.IO ping interval (25 s) plus timeout (20 s).
+    proxy_read_timeout 75s;
+    proxy_send_timeout 75s;
+  }
+
+  location / {
+    return 404;
+  }
+}

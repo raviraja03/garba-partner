@@ -94,124 +94,28 @@ Rules:
 
 ## 5. Nginx and deployment assumptions
 
-The API trusts `X-Forwarded-For` **only from loopback** (`trust proxy = loopback`) and listens on `127.0.0.1` by default (`API_HOST`). This is safe only if Nginx on the same host is the sole public entry point. The API does **not** check the `Host` header, so Nginx must keep the admin API off the public web host.
+The Nginx configuration lives in [`deploy/nginx/`](../../deploy/nginx/) as templates rendered with the domains from the server's env file. It is explained in [docs/deployment/nginx.md](../deployment/nginx.md); the whole procedure is in [production setup](../deployment/production-setup.md). Change the templates, never the files on the server.
 
-Example configuration (adapt names, paths and certificates; test with `nginx -t`):
+The API trusts `X-Forwarded-For` **only from loopback** (`trust proxy = loopback`) and listens on `127.0.0.1` by default (`API_HOST`). This is safe only if Nginx on the same host is the sole public entry point.
 
-```nginx
-# /etc/nginx/conf.d/garba-partner.conf
-
-limit_req_zone $binary_remote_addr zone=gp_api:10m rate=20r/s;
-
-map $http_upgrade $connection_upgrade { default upgrade; '' close; }
-
-upstream gp_api { server 127.0.0.1:4000; keepalive 32; }
-
-# Shared TLS settings
-ssl_protocols TLSv1.2 TLSv1.3;
-ssl_prefer_server_ciphers off;
-ssl_session_cache shared:SSL:10m;
-server_tokens off;
-
-# HTTP → HTTPS
-server {
-  listen 80;
-  server_name garbapartner.example admin.garbapartner.example;
-  return 301 https://$host$request_uri;
-}
-
-# ---- Web app (members) ----
-server {
-  listen 443 ssl http2;
-  server_name garbapartner.example;
-  ssl_certificate     /etc/letsencrypt/live/garbapartner.example/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/garbapartner.example/privkey.pem;
-
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-  add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' wss://garbapartner.example https://api.razorpay.com https://lumberjack.razorpay.com; script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  add_header Permissions-Policy "geolocation=(), microphone=(), camera=(self), payment=(self \"https://api.razorpay.com\")" always;
-  add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;
-
-  root /srv/garba-partner/web;          # apps/web/dist
-  location / { try_files $uri /index.html; }
-  location /assets/ { expires 1y; add_header Cache-Control "public, immutable" always; }
-
-  # The admin API is never served on the public web host.
-  location /api/v1/admin/ { return 404; }
-
-  location /api/ {
-    limit_req zone=gp_api burst=40 nodelay;
-    client_max_body_size 6m;            # profile/event images (5 MB) + multipart overhead
-    proxy_pass http://gp_api;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_hide_header X-Powered-By;
-  }
-
-  location /socket.io/ {
-    proxy_pass http://gp_api;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection $connection_upgrade;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_read_timeout 75s;
-  }
-}
-
-# ---- Admin panel ----
-server {
-  listen 443 ssl http2;
-  server_name admin.garbapartner.example;
-  ssl_certificate     /etc/letsencrypt/live/admin.garbapartner.example/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/admin.garbapartner.example/privkey.pem;
-
-  # Optional but recommended: office/VPN allow-list.
-  # allow 203.0.113.0/24; deny all;
-
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-  add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Referrer-Policy "no-referrer" always;
-  add_header X-Robots-Tag "noindex, nofollow" always;
-
-  root /srv/garba-partner/admin;        # apps/admin/dist
-  location / { try_files $uri /index.html; }
-
-  # Only what the admin panel calls.
-  location ~ ^/api/v1/(admin/|cities|health) {
-    limit_req zone=gp_api burst=40 nodelay;
-    client_max_body_size 6m;
-    proxy_pass http://gp_api;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-  location /api/ { return 404; }
-}
-```
-
-Assumptions and checks:
+Topology: three domains under one registrable domain: the web app, the admin panel and the API. The browser apps call the API domain directly (cross-origin, same-site), so **CORS and the CSRF checks are production controls**. The API does **not** check the `Host` header: the admin API is reachable on the API domain and is protected by admin authentication, permissions and (optionally) an Nginx IP allow-list.
 
 | Assumption | Why | Check |
 |---|---|---|
-| The API listens on `127.0.0.1` only; the firewall exposes 80/443 only | `trust proxy = loopback` would otherwise let clients spoof their IP and bypass limits | `ss -ltnp` shows `127.0.0.1:4000` |
-| `X-Forwarded-For` is **appended** (`$proxy_add_x_forwarded_for`) | The API takes the address added by the trusted proxy | Rate-limit smoke test from two IPs |
-| `/api/v1/admin/` returns `404` on the web host | The API does not enforce the host itself | `curl -i https://garbapartner.example/api/v1/admin/auth/me` → 404 |
-| `WEB_ORIGIN` / `ADMIN_ORIGIN` are the exact `https://` origins | CORS and CSRF compare them exactly | Boot refuses `http://` in production |
-| The Razorpay webhook reaches `/api/v1/webhooks/razorpay` on the web host | Payments are confirmed by webhook | Razorpay dashboard shows `2xx` |
-| `client_max_body_size` ≥ the API's upload limit, but not much larger | Avoid buffering large bodies | Upload a 5 MB image |
-| PostgreSQL listens on a private interface; API uses a DML-only role over TLS | Limits the blast radius of an API compromise | `DATABASE_SSL=true`, role grants reviewed |
-| Only one API process runs | In-memory limiters | Before scaling out, move limiters to Redis |
+| The API listens on `127.0.0.1` only; the firewall exposes 80/443 (and SSH) only | `trust proxy = loopback` would otherwise let clients spoof their IP and bypass limits | `ss -ltnp` shows `127.0.0.1:4000`; `preflight.sh` checks `API_HOST` |
+| Nginx **replaces** `X-Forwarded-For` with `$remote_addr` | The API uses it for rate limits and audit hashes; a client-supplied value must never get through | [`gp-proxy.conf`](../../deploy/nginx/snippets/gp-proxy.conf) |
+| `WEB_ORIGIN` / `ADMIN_ORIGIN` are the exact `https://` origins of the two apps | CORS and CSRF compare them exactly | Boot refuses `http://` in production; `preflight.sh` compares them with the domains; `healthcheck.sh` tests CORS for both origins and a foreign one |
+| The three hosts share one registrable domain | `SameSite=Strict` refresh cookies are only sent on same-site requests | Sign-in survives a page reload |
+| No other site on a sibling subdomain is untrusted | A sibling subdomain is "same-site"; the CSRF header and `Origin` check are the remaining defence there | Review DNS records of the domain |
+| The admin panel and admin API are restricted to known addresses where possible | Admins sign in with a password only | [nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel) |
+| Nginx access logs have no query strings | Admin searches carry phone numbers | `log_format gp_main` |
+| PostgreSQL listens on `localhost`; the API uses a DML-only role | Limits the blast radius of an API compromise | [production setup §5](../deployment/production-setup.md#5-postgresql) |
+| PostgreSQL does not log statements | Values are inside the SQL text | [`garba-partner.conf`](../../deploy/postgres/garba-partner.conf) |
+| The Razorpay webhook reaches `https://<API_DOMAIN>/api/v1/webhooks/razorpay` | Payments are confirmed by webhook | Razorpay dashboard shows `2xx` |
+| Only one API process runs | In-memory limiters, in-process jobs | [pm2.md §3](../deployment/pm2.md#3-why-exactly-one-instance) |
+| Backups are encrypted and the private key is off the server | A server compromise must not expose old data | [database backup](../deployment/database-backup.md) |
 
-If the admin panel starts calling another public route, add it to the admin host's `location` regex.
+Any new origin the apps load from or connect to needs a CSP change in the header templates.
 
 ## 6. Admin operations
 

@@ -61,7 +61,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | CSRF on cookie endpoints: `X-Requested-With: gp-web`/`gp-admin` **and** a matching `Origin` | ✅ | `middlewares/csrf.ts` | `security.int.test.ts` |
 | helmet defaults + HSTS 1 year with sub-domains + `Referrer-Policy: no-referrer`; no `X-Powered-By` | ✅ (tightened) | `app.ts` | `security.int.test.ts` |
 | **`Cache-Control: no-store` on every API response** unless a public, non-personal route opts into caching (events, cities) | ✅ (new) | `app.ts` | `security.int.test.ts` "never lets browsers or proxies cache personal responses" |
-| CSP, Permissions-Policy and COOP for the web and admin apps | 🟡 | Nginx ([best practices §5](security-best-practices.md#5-nginx-and-deployment-assumptions)) | release checklist |
+| CSP, Permissions-Policy and COOP for the web and admin apps | 🟡 | Nginx header templates ([nginx.md §5](../deployment/nginx.md#5-security-settings); not deployed yet) | `healthcheck.sh` on the server |
 
 ### 2.5 Rate limiting
 
@@ -72,7 +72,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Refresh 60 / 15 min; admin login 10 / 15 min (per IP) | ✅ | `middlewares/rate-limit.ts` | auth suites |
 | Per-member limits (interests/day, reports/day, messages, uploads) keyed by user ID | ✅ | module services | module suites |
 | `trust proxy` = loopback only, so a remote client can't spoof `X-Forwarded-For` | ✅ | `app.ts` | review |
-| Nginx `limit_req` as the outer tier | 🟡 | Nginx | release checklist |
+| Nginx `limit_req` as the outer tier | 🟡 | [`deploy/nginx/`](../../deploy/nginx/) (not deployed yet) | deployment checklist |
 
 ### 2.6 Input validation and API responses
 
@@ -102,7 +102,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Every schema change is a migration (up and down) | ✅ | `apps/api/src/migrations/` | migration round trip |
 | Phone numbers stored as HMAC + AES-256-GCM ciphertext only | ✅ | `users` | `crypto.test.ts` |
 | Sequelize query logging off; TLS option (`DATABASE_SSL`) | ✅ | `config/database.ts` | — |
-| Least-privilege roles: DML-only API role, owner role for migrations (`DATABASE_MIGRATION_URL`) | 🟡 | deployment | release checklist |
+| Least-privilege roles: DML-only API role, owner role for migrations (`DATABASE_MIGRATION_URL`) | 🟡 | [`deploy/postgres/setup-roles.sql`](../../deploy/postgres/setup-roles.sql) (tested locally; not deployed yet) | `preflight.sh` |
 | Append-only audit log (trigger rejects `UPDATE`/`DELETE`) | ✅ | `admin_audit_logs` | `admin-users.int.test.ts` |
 | Destructive DB CLI commands only in development | ✅ | `scripts/db.ts` | review |
 
@@ -160,7 +160,7 @@ No critical issues were found. All high issues were fixed and covered by tests. 
 
 - [ ] 🔴 **Decide on an admin second factor** (HARD-01). Authenticator (TOTP) sign-in was removed on request; without a second factor a leaked or guessed admin password gives full access to member data. At minimum: strong unique passwords, the Nginx admin-host restriction (ideally an IP allow-list) and regular audit-log review.
 - [ ] ⏳ Forced password change on an admin's first sign-in (accounts from `admin:create` keep the printed password until an admin-management screen exists). Until then: deliver passwords over a secure channel and treat the printed password as a one-time secret.
-- [ ] 🟡 Nginx deployed as in [best practices §5](security-best-practices.md#5-nginx-and-deployment-assumptions): TLS, HSTS, CSP, admin API only on the admin host, `limit_req`, API bound to `127.0.0.1`.
+- [ ] 🟡 Server deployed and verified as in [production setup §11](../deployment/production-setup.md#11-deployment-checklist): TLS, HSTS, CSP, `limit_req`, API bound to `127.0.0.1`, admin IP allow-list (or a recorded decision not to), encrypted off-site backups, restore drill.
 - [ ] 🟡 Separate, CSPRNG-generated production secrets in a secret store (`JWT_*`, `PHONE_*`, `OTP_HMAC_SECRET`, Cloudinary, SMS, Razorpay).
 - [ ] 🟡 Database roles: DML-only API role; migrations with the owner role; TLS to the database.
 - [ ] ⏳ Real SMS provider (the dev provider is refused outside development).

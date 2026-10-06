@@ -100,7 +100,7 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 | Access token | JWT HS256, 15 min, `aud=app`, secret `JWT_ACCESS_SECRET` | JWT HS256, 15 min, `aud=admin`, secret `JWT_ADMIN_ACCESS_SECRET` |
 | Claims | `sub`, `sid`, `aud`, `iss`, `iat`, `exp`. **No PII, no role for members** | `sub`, `sid`, `aud`, `iss`, `iat`, `exp` (role is loaded from the DB per request, not trusted from the token) |
 | Refresh token | 256-bit random, SHA-256 hashed in `user_sessions`. Rotated each use. 30-day absolute expiry | Same in `admin_sessions`. 12 h absolute, 30 min idle |
-| Cookie | `gp_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | `gp_admin_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin/auth` on the admin host |
+| Cookie | `gp_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | `gp_admin_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin/auth` (both host-only on the API domain) |
 | Client storage | Access token in memory only | Same |
 | Per-request check | Session not revoked + user status (DB) | Session not revoked, not idle, admin `active` (DB) |
 | Revocation | Logout, logout-all, sanction, deletion, reuse detection | Logout, disable admin, role change |
@@ -289,21 +289,11 @@ API: `helmet()` defaults, plus `Cache-Control: no-store` on all authenticated re
 
 The Razorpay entries (Checkout script, its iframe, and `same-origin-allow-popups` for UPI/bank redirects) are required for [event pass payments](../payments/razorpay.md); the web app loads `checkout.js` only when a member starts a payment.
 
-Web/admin (Nginx):
-
-```text
-Content-Security-Policy: default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' wss://garbapartner.example https://api.razorpay.com https://lumberjack.razorpay.com; script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
-X-Content-Type-Options: nosniff
-Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: geolocation=(), microphone=(), camera=(self), payment=(self "https://api.razorpay.com")
-Cross-Origin-Opener-Policy: same-origin-allow-popups
-```
-
-(`style-src 'unsafe-inline'` only if needed by tooling. Try to remove it. Admin CSP `connect-src` has no `wss:`. Add Razorpay domains only when payments ship.)
+Web/admin (Nginx): the headers are defined in [`deploy/nginx/snippets/gp-web-headers.conf.template`](../../deploy/nginx/snippets/gp-web-headers.conf.template) and [`gp-admin-headers.conf.template`](../../deploy/nginx/snippets/gp-admin-headers.conf.template), and explained in [nginx.md §5](../deployment/nginx.md#5-security-settings). In short: `default-src 'self'`; images from Cloudinary; connections only to the API domain (plus Razorpay on the web app); no framing; camera only on the web app; the admin panel is never indexed and sends no referrer.
 
 ### 8.3 CORS and CSRF
 
-- Production is same-origin, so CORS is effectively closed: the allow-list is `WEB_ORIGIN` and `ADMIN_ORIGIN` only, with `credentials: true`. Dev adds `localhost` origins through env.
+- Production serves the apps and the API on different hosts of one registrable domain ([system architecture §4.1](system-architecture.md#41-domains-and-routing)), so CORS is a production control: the allow-list is exactly `WEB_ORIGIN` and `ADMIN_ORIGIN`, with `credentials: true` and fixed methods and headers. Dev uses `localhost` origins through env.
 - Access tokens travel in the `Authorization` header, which is not automatically attached by browsers, so it's not CSRF-able.
 - Refresh cookies: `SameSite=Strict` + path-scoped + the refresh endpoint requires the header `X-Requested-With: gp-web` / `gp-admin` **and** an `Origin` header matching the expected origin. Otherwise `403`.
 

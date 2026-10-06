@@ -1,0 +1,20 @@
+# Garba Partner — log rotation for the API (PM2) logs. Guide: docs/deployment/pm2.md
+#
+# Install as /etc/logrotate.d/garba-partner (owner root, mode 644). Test with:
+#   sudo logrotate --debug /etc/logrotate.d/garba-partner
+# Change "garba" if the deploy user has another name. Nginx logs are rotated by the
+# distribution's own /etc/logrotate.d/nginx (14 days by default).
+
+/var/log/garba-partner/*.log {
+    daily
+    rotate 14
+    maxsize 100M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    dateext
+    # PM2 keeps the files open: truncate in place instead of moving them.
+    copytruncate
+    su garba garba
+}
