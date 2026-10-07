@@ -3,6 +3,8 @@ import { Link } from 'react-router';
 import { LIMITS, REPORT_REASONS, type ReportReason } from '@garba-partner/shared';
 import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
+import { CARD_CLASS } from '../../../components/ui/Card';
+import { Choice, Textarea } from '../../../components/ui/Input';
 import { REPORT_REASON_LABELS } from '../../../lib/labels';
 import { useReportMember } from '../hooks';
 
@@ -18,6 +20,7 @@ export function ReportForm({
   onDone,
   onCancel,
   initialReason,
+  plain = false,
 }: {
   userId: string;
   name: string;
@@ -27,6 +30,8 @@ export function ReportForm({
   onCancel: () => void;
   /** Pre-selected reason (e.g. from a scam warning). */
   initialReason?: ReportReason;
+  /** No card around the form (when it is shown inside a dialog). */
+  plain?: boolean;
 }) {
   const id = useId();
   const report = useReportMember();
@@ -59,70 +64,71 @@ export function ReportForm({
   return (
     <form
       onSubmit={(event) => void handleSubmit(event)}
-      className="space-y-3 rounded-card bg-white p-4 shadow-sm ring-1 ring-black/5"
+      className={plain ? 'space-y-4 pt-2' : `${CARD_CLASS} space-y-4 p-5`}
     >
-      <h2 className="font-semibold">{messageId ? 'Report this message' : `Report ${name}`}</h2>
+      <h2 className="text-h3">{messageId ? 'Report this message' : `Report ${name}`}</h2>
       {messagePreview && (
-        <blockquote className="rounded-xl bg-black/5 px-3 py-2 text-sm whitespace-pre-wrap">
+        <blockquote className="rounded-control bg-brand-900/5 px-3 py-2 text-small whitespace-pre-wrap">
           {messagePreview}
         </blockquote>
       )}
-      <fieldset className="space-y-1">
-        <legend className="text-sm font-semibold">
-          What happened?{' '}
-          <Link to="/guidelines" className="font-normal text-brand-700 underline">
-            Community guidelines
-          </Link>
-        </legend>
-        {REPORT_REASONS.map((value) => (
-          <label key={value} className="flex items-center gap-2 text-sm">
-            <input
+      <fieldset>
+        <legend className="text-label">What happened?</legend>
+        <div className="mt-1">
+          {REPORT_REASONS.map((value) => (
+            <Choice
+              key={value}
               type="radio"
               name={`${id}-reason`}
               value={value}
+              label={REPORT_REASON_LABELS[value]}
               checked={reason === value}
               onChange={() => {
                 setReason(value);
               }}
             />
-            {REPORT_REASON_LABELS[value]}
-          </label>
-        ))}
+          ))}
+        </div>
+        <p className="mt-1 text-caption text-muted">
+          See the{' '}
+          <Link to="/guidelines" className="font-semibold text-brand-700 underline">
+            community guidelines
+          </Link>
+          .
+        </p>
       </fieldset>
-      <label htmlFor={`${id}-details`} className="block text-sm font-semibold">
-        Details <span className="font-normal text-muted">(optional)</span>
-      </label>
-      <textarea
-        id={`${id}-details`}
-        rows={3}
-        maxLength={LIMITS.REPORT_DETAILS_MAX_LENGTH}
-        value={details}
-        onChange={(e) => {
-          setDetails(e.target.value);
-        }}
-        className="w-full rounded-xl bg-white px-3 py-2 text-sm ring-1 ring-black/10"
-      />
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={alsoBlock}
+      <div>
+        <label htmlFor={`${id}-details`} className="block text-label">
+          Details <span className="font-normal text-muted">(optional)</span>
+        </label>
+        <Textarea
+          id={`${id}-details`}
+          rows={3}
+          maxLength={LIMITS.REPORT_DETAILS_MAX_LENGTH}
+          value={details}
           onChange={(e) => {
-            setAlsoBlock(e.target.checked);
+            setDetails(e.target.value);
           }}
         />
-        Also block {name}
-      </label>
-      <p className="text-xs text-muted">
+      </div>
+      <Choice
+        label={`Also block ${name}`}
+        checked={alsoBlock}
+        onChange={(e) => {
+          setAlsoBlock(e.target.checked);
+        }}
+      />
+      <p className="text-caption text-muted">
         Reporting ends this chat. If you are in danger right now, call 112 (India emergency
         services).
       </p>
       {error && <Alert tone="error">{error}</Alert>}
-      <div className="flex gap-3">
-        <Button type="submit" className="w-auto! px-5" loading={report.isPending}>
-          Send report
-        </Button>
-        <Button variant="link" onClick={onCancel}>
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+        <Button variant="secondary" className="sm:w-auto" onClick={onCancel}>
           Cancel
+        </Button>
+        <Button type="submit" variant="danger" className="sm:w-auto" loading={report.isPending}>
+          Send report
         </Button>
       </div>
     </form>

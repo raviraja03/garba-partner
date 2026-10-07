@@ -1,45 +1,52 @@
 import { Link } from 'react-router';
 import { APP_NAME, COMMUNITY_GUIDELINES, GUIDELINES_VERSION } from '@garba-partner/shared';
+import { PageHeader } from '../components/PageHeader';
+import { Card } from '../components/ui/Card';
+import { TEXT_LINK } from '../components/ui/link-styles';
 
 /** Public: the rules every member agrees to follow, and what happens when they are broken. */
 export function CommunityGuidelinesPage() {
   return (
     <article className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold">Community guidelines</h1>
-        <p className="text-muted">
-          {APP_NAME} is for adults (18+) looking for a Garba partner. These rules keep it safe and
-          friendly for everyone. Updated {GUIDELINES_VERSION}.
-        </p>
-      </header>
+      <PageHeader
+        title="Community guidelines"
+        description={`${APP_NAME} is for adults (18+) looking for a Garba partner. These rules keep it safe and friendly for everyone. Updated ${GUIDELINES_VERSION}.`}
+      />
 
-      <ol className="space-y-4">
+      <ol className="space-y-3">
         {COMMUNITY_GUIDELINES.map((guideline, index) => (
-          <li
-            key={guideline.id}
-            id={guideline.id}
-            className="rounded-card bg-white p-4 shadow-sm ring-1 ring-black/5"
-          >
-            <h2 className="font-semibold">
-              {index + 1}. {guideline.title}
-            </h2>
-            <p className="mt-1 text-sm">{guideline.summary}</p>
-            {guideline.examples.length > 0 && (
-              <>
-                <p className="mt-2 text-xs font-semibold text-muted uppercase">Not allowed</p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-sm">
-                  {guideline.examples.map((example) => (
-                    <li key={example}>{example}</li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </li>
+          <Card as="li" key={guideline.id} id={guideline.id} className="flex gap-4">
+            <span
+              aria-hidden="true"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-small font-bold text-white"
+            >
+              {index + 1}
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-h3">
+                <span className="sr-only">{index + 1}. </span>
+                {guideline.title}
+              </h2>
+              <p className="mt-1">{guideline.summary}</p>
+              {guideline.examples.length > 0 && (
+                <>
+                  <p className="mt-3 text-caption font-bold tracking-wide text-danger uppercase">
+                    Not allowed
+                  </p>
+                  <ul className="mt-1 list-disc space-y-1 pl-5 text-small">
+                    {guideline.examples.map((example) => (
+                      <li key={example}>{example}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          </Card>
         ))}
       </ol>
 
-      <section className="space-y-2 text-sm">
-        <h2 className="text-lg font-semibold">What happens if someone breaks them</h2>
+      <section className="space-y-2 rounded-card bg-brand-50 p-5 ring-1 ring-brand-200">
+        <h2 className="text-h3">What happens if someone breaks them</h2>
         <p>
           Reports are reviewed by our moderators. Depending on what happened, a moderator can
           dismiss the report, send a <strong>warning</strong>, <strong>restrict messaging</strong>,{' '}
@@ -50,7 +57,7 @@ export function CommunityGuidelinesPage() {
         <p>
           Verification badges confirm specific checks only (like a phone number or a selfie). They
           do not guarantee who someone is or that they are safe, so always follow our{' '}
-          <Link to="/safety" className="font-semibold text-brand-700 underline">
+          <Link to="/safety" className={TEXT_LINK}>
             safety tips
           </Link>
           .

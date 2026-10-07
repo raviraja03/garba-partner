@@ -4,6 +4,7 @@ import { LIMITS, maskPhone, type SendOtpResultDto } from '@garba-partner/shared'
 import { AuthLayout } from '../components/AuthLayout';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
+import { INPUT_CLASS } from '../components/ui/field-utils';
 import { sendOtp, verifyOtp } from '../features/auth/auth-api';
 import { useAuth } from '../features/auth/auth-context';
 import { ApiClientError } from '../lib/api-client';
@@ -100,17 +101,17 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
       }
     >
       {devOtp && (
-        <div className="mb-4">
-          <Alert tone="info">
+        <div className="mb-5">
+          <Alert tone="warning">
             <strong>Development only:</strong> no SMS is sent locally. Your code is{' '}
             <code className="font-mono font-bold tracking-widest">{devOtp}</code>
           </Alert>
         </div>
       )}
 
-      <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-4">
+      <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-5">
         <div>
-          <label htmlFor="otp" className="block text-sm font-semibold">
+          <label htmlFor="otp" className="block text-label">
             Verification code
           </label>
           <input
@@ -126,24 +127,25 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
             }}
             aria-invalid={error !== null}
             aria-describedby={error ? 'otp-error' : undefined}
-            className="mt-1 w-full rounded-xl bg-white px-4 py-3 text-center font-mono text-2xl tracking-[0.5em] ring-1 ring-black/10 outline-none focus:ring-2 focus:ring-brand-600"
+            placeholder={'•'.repeat(LIMITS.OTP_LENGTH)}
+            className={`${INPUT_CLASS} min-h-16 text-center text-[1.75rem] font-bold tracking-[0.45em] placeholder:font-normal placeholder:text-brand-200`}
             required
           />
+          {error && (
+            <p id="otp-error" role="alert" className="mt-1.5 text-small font-medium text-danger">
+              {error}
+            </p>
+          )}
         </div>
 
-        {error && (
-          <div id="otp-error">
-            <Alert tone="error">{error}</Alert>
-          </div>
-        )}
-        {info && <Alert tone="info">{info}</Alert>}
+        {info && <Alert tone="success">{info}</Alert>}
 
-        <Button type="submit" loading={submitting}>
+        <Button type="submit" size="lg" loading={submitting}>
           Verify and continue
         </Button>
       </form>
 
-      <div className="mt-6 flex items-center justify-between text-sm">
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4">
         <Button
           variant="link"
           onClick={() => {

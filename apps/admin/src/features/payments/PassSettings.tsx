@@ -59,7 +59,7 @@ export function PassSettings({
     <div className="space-y-3 text-sm">
       <p>
         {pass.pricePaise === null
-          ? 'Passes are not sold on Garba Partner for this event.'
+          ? 'Passes are not sold on GarbaMates for this event.'
           : `${formatPaise(pass.pricePaise)} per pass · ${String(pass.sold)} sold · ${String(
               pass.reserved,
             )} held in checkout · capacity ${pass.capacity === null ? 'unlimited' : String(pass.capacity)}`}

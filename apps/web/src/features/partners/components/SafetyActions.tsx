@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
+import { Modal } from '../../../components/ui/Dialog';
+import { Icon } from '../../../components/ui/Icon';
 import { useBlockMember } from '../hooks';
 import { ReportForm } from './ReportForm';
 
@@ -19,12 +21,11 @@ export function SafetyActions({
 }) {
   const block = useBlockMember();
   const [reporting, setReporting] = useState(false);
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleBlock() {
-    if (!window.confirm(`Block ${name}? You won't see each other anywhere on Garba Partner.`)) {
-      return;
-    }
+    setConfirmingBlock(false);
     setError(null);
     try {
       await block.mutateAsync(userId);
@@ -46,21 +47,57 @@ export function SafetyActions({
           }}
         />
       ) : (
-        <div className="flex gap-4">
-          <Button variant="link" loading={block.isPending} onClick={() => void handleBlock()}>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
+            loading={block.isPending}
+            onClick={() => {
+              setConfirmingBlock(true);
+            }}
+          >
+            <Icon name="shield" className="size-4.5" />
             Block
           </Button>
           <Button
-            variant="link"
-            className="text-danger!"
+            variant="ghost"
+            size="sm"
+            fullWidth={false}
+            className="text-danger! hover:bg-danger-soft!"
             onClick={() => {
               setReporting(true);
             }}
           >
+            <Icon name="alert" className="size-4.5" />
             Report
           </Button>
         </div>
       )}
+      <Modal
+        open={confirmingBlock}
+        onClose={() => {
+          setConfirmingBlock(false);
+        }}
+        title={`Block ${name}?`}
+        description={`You won't see each other anywhere on GarbaMates, and any match and chat between you ends. ${name} won't be told.`}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              className="sm:w-auto"
+              onClick={() => {
+                setConfirmingBlock(false);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="danger" className="sm:w-auto" onClick={() => void handleBlock()}>
+              Block
+            </Button>
+          </>
+        }
+      />
       {error && <Alert tone="error">{error}</Alert>}
     </section>
   );

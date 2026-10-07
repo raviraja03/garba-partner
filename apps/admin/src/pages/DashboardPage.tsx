@@ -368,7 +368,7 @@ export function DashboardPage() {
                 title="New matches"
                 labels={t.labels}
                 values={t.series.matches}
-                color="#7c3aed"
+                color="#E91E63"
               />
             )}
             {t.series.reports && (
@@ -376,7 +376,7 @@ export function DashboardPage() {
                 title="Reports opened (moderation load)"
                 labels={t.labels}
                 values={t.series.reports}
-                color="#dc2626"
+                color="#B42318"
               />
             )}
             {t.series.bookings && (
@@ -384,7 +384,7 @@ export function DashboardPage() {
                 title="Pass bookings"
                 labels={t.labels}
                 values={t.series.bookings}
-                color="#0f766e"
+                color="#FF8A00"
               />
             )}
             {t.series.revenuePaise && (
@@ -393,7 +393,7 @@ export function DashboardPage() {
                 labels={t.labels}
                 values={t.series.revenuePaise}
                 format={formatPaise}
-                color="#15803d"
+                color="#FFC107"
               />
             )}
           </div>

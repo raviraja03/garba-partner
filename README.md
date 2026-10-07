@@ -237,6 +237,12 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Threat model](docs/security/threat-model.md) | Assets, actors, trust boundaries, entry points, STRIDE threats with mitigations, product abuse cases, assumptions |
 | [Security best practices](docs/security/security-best-practices.md) | Rules for API and frontend code, secrets and key rotation, **Nginx configuration and deployment assumptions**, admin operations, PR checklist |
 
+### Design
+
+| Document | Contents |
+|---|---|
+| [Design system](docs/design/design-system.md) | GarbaMates brand colours and contrast rules, typography, spacing and shape tokens, logo usage, the reusable components (buttons, inputs, cards, badges, avatars, dialogs, navigation, footer), loading / empty / error states, accessibility checklist |
+
 ### Deployment
 
 **Not deployed yet.** These documents prepare the production deployment; see the status and blockers in the first one.

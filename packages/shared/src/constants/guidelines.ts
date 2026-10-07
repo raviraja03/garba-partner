@@ -22,7 +22,7 @@ export const COMMUNITY_GUIDELINES: readonly CommunityGuideline[] = [
   {
     id: 'adults_only',
     title: 'Adults only (18+)',
-    summary: 'Garba Partner is only for people aged 18 or over.',
+    summary: 'GarbaMates is only for people aged 18 or over.',
     examples: ['Creating an account if you are under 18', 'Using a photo of someone under 18'],
     reasons: ['underage'],
   },
@@ -58,7 +58,7 @@ export const COMMUNITY_GUIDELINES: readonly CommunityGuideline[] = [
     examples: [
       'Fake or misleading profiles',
       "Using someone else's photos",
-      'Pretending to be an organizer, celebrity or Garba Partner staff',
+      'Pretending to be an organizer, celebrity or GarbaMates staff',
     ],
     reasons: ['fake_profile', 'impersonation'],
   },

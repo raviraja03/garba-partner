@@ -2,6 +2,7 @@ import { useEffect, useId, useState, type ChangeEvent } from 'react';
 import { LIMITS, PROFILE_IMAGE_MIME_TYPES, type ProfileImageDto } from '@garba-partner/shared';
 import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
+import { buttonClass } from '../../../components/ui/button-styles';
 import { useDeleteProfileImage, useUploadProfileImage } from '../hooks';
 
 const ACCEPT: readonly string[] = PROFILE_IMAGE_MIME_TYPES;
@@ -89,7 +90,7 @@ export function ImageUpload({
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-5">
-        <div className="flex h-40 w-30 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-brand-50 ring-1 ring-black/5">
+        <div className="flex aspect-[4/5] w-28 shrink-0 items-center justify-center overflow-hidden rounded-card bg-brand-100 ring-1 ring-brand-200 sm:w-36">
           {shown ? (
             <img
               src={shown}
@@ -97,10 +98,10 @@ export function ImageUpload({
               className="size-full object-cover"
             />
           ) : (
-            <span className="px-2 text-center text-xs text-muted">No photo yet</span>
+            <span className="px-2 text-center text-caption text-muted">No photo yet</span>
           )}
         </div>
-        <div className="space-y-2 text-sm text-muted">
+        <div className="space-y-2 text-small text-muted">
           <p>A clear, recent photo of your face. JPEG, PNG or WebP, up to {MAX_MB} MB.</p>
           <p>We remove location and camera data (EXIF) from every photo before storing it.</p>
         </div>
@@ -109,7 +110,11 @@ export function ImageUpload({
       <div className="flex flex-wrap items-center gap-3">
         <label
           htmlFor={inputId}
-          className="cursor-pointer rounded-xl bg-white px-4 py-3 font-semibold ring-1 ring-black/10 hover:bg-brand-50 focus-within:ring-2 focus-within:ring-brand-600"
+          className={buttonClass({
+            variant: 'secondary',
+            className:
+              'cursor-pointer has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-500',
+          })}
         >
           {image || file ? 'Choose another photo' : 'Choose a photo'}
           <input
@@ -121,11 +126,7 @@ export function ImageUpload({
           />
         </label>
         {file && (
-          <Button
-            className="w-auto! px-6"
-            loading={upload.isPending}
-            onClick={() => void handleUpload()}
-          >
+          <Button fullWidth={false} loading={upload.isPending} onClick={() => void handleUpload()}>
             Upload photo
           </Button>
         )}

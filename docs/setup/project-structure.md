@@ -47,10 +47,9 @@ garba-partner/
 │   │   │   ├── main.tsx             React root
 │   │   │   ├── App.tsx              router (public-only login routes, protected routes)
 │   │   │   ├── pages/               Login, VerifyOtp, Onboarding, Home, Profile, EditProfile, Preferences, NotFound
-│   │   │   ├── components/          AuthLayout, ApiStatus, FullPageSpinner, ui/ (Button, Alert)
+│   │   │   ├── components/          AppShell, Navbar, Footer, AuthLayout, FullPageSpinner, ui/ (design-system components)
 │   │   │   ├── features/auth/       AuthProvider, auth context, guards, auth API calls
 │   │   │   ├── features/profile/    profile API + TanStack Query hooks, ProfileForm, ImageUpload, PreferencesForm, ProfileCard
-│   │   │   ├── features/system/     useApiHealth hook
 │   │   │   ├── lib/                 env (validated VITE_* vars), api-client (in-memory token, silent refresh)
 │   │   │   └── styles/index.css     Tailwind + shared theme tokens
 │   │   ├── tsconfig.json            references tsconfig.app.json (browser) + tsconfig.node.json (vite.config)

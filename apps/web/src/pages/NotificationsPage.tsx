@@ -1,9 +1,16 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { CONFIGURABLE_NOTIFICATION_TYPES, type NotificationDto } from '@garba-partner/shared';
+import { PageHeader } from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
-import { Button } from '../components/ui/Button';
-import { FullPageSpinner } from '../components/FullPageSpinner';
+import { Avatar } from '../components/ui/Avatar';
+import { Button, LinkButton } from '../components/ui/Button';
+import { Card, CARD_CLASS } from '../components/ui/Card';
+import { cx } from '../components/ui/cx';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Icon } from '../components/ui/Icon';
+import { Choice } from '../components/ui/Input';
+import { LoadingRegion, SkeletonRow } from '../components/ui/Skeleton';
 import {
   useMarkAllNotificationsRead,
   useMarkNotificationRead,
@@ -28,32 +35,33 @@ function Preferences() {
   if (!preferences.data) return null;
   const values = preferences.data;
   return (
-    <section
-      aria-labelledby="notification-settings"
-      className="space-y-2 rounded-card bg-white p-4 shadow-sm ring-1 ring-black/5"
-    >
-      <h2 id="notification-settings" className="font-semibold">
+    <Card as="section" aria-labelledby="notification-settings" className="animate-fade-in">
+      <h2 id="notification-settings" className="text-h3">
         Notify me when…
       </h2>
-      {CONFIGURABLE_NOTIFICATION_TYPES.map((type) => (
-        <label key={type} className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
+      <div className="mt-1">
+        {CONFIGURABLE_NOTIFICATION_TYPES.map((type) => (
+          <Choice
+            key={type}
+            label={PREFERENCE_LABELS[type]}
             checked={values[type]}
             disabled={update.isPending}
             onChange={(e) => {
               update.mutate({ [type]: e.target.checked });
             }}
           />
-          {PREFERENCE_LABELS[type]}
-        </label>
-      ))}
-      <p className="text-xs text-muted">
+        ))}
+      </div>
+      <p className="mt-2 text-caption text-muted">
         Safety notices about your account are always shown. Notifications never include message text
         or anyone&apos;s contact details.
       </p>
-      {update.isError && <Alert tone="error">{update.error.message}</Alert>}
-    </section>
+      {update.isError && (
+        <Alert tone="error" className="mt-3">
+          {update.error.message}
+        </Alert>
+      )}
+    </Card>
   );
 }
 
@@ -66,6 +74,7 @@ export function NotificationsPage() {
   const markAll = useMarkAllNotificationsRead();
   const navigate = useNavigate();
   const items = list.data?.pages.flatMap((page) => page.items) ?? [];
+  const hasUnread = items.some((n) => !n.readAt);
 
   async function open(n: NotificationDto) {
     if (!n.readAt) await markRead.mutateAsync(n.id).catch(() => undefined);
@@ -73,91 +82,153 @@ export function NotificationsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Notifications</h1>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <Button
-            variant="link"
-            onClick={() => {
-              setUnreadOnly((value) => !value);
-            }}
-          >
-            {unreadOnly ? 'Show all' : 'Unread only'}
-          </Button>
-          <Button
-            variant="link"
-            loading={markAll.isPending}
-            onClick={() => {
-              markAll.mutate();
-            }}
-          >
-            Mark all as read
-          </Button>
-          <Button
-            variant="link"
-            onClick={() => {
-              setShowSettings((value) => !value);
-            }}
-          >
-            Settings
-          </Button>
-        </div>
-      </header>
+    <div className="space-y-5">
+      <PageHeader title="Notifications" />
 
-      {showSettings && <Preferences />}
-      {list.isPending && <FullPageSpinner />}
-      {list.isError && <Alert tone="error">{list.error.message}</Alert>}
-      {!list.isPending && items.length === 0 && (
-        <Alert tone="info">
-          {unreadOnly ? 'You’re all caught up.' : 'No notifications yet.'}{' '}
-          <Link to="/discover" className="font-semibold underline">
-            Find a partner
-          </Link>
-        </Alert>
-      )}
-
-      <ul className="space-y-2">
-        {items.map((n) => (
-          <li key={n.id}>
-            <button
-              type="button"
-              onClick={() => void open(n)}
-              className={`flex w-full items-center gap-3 rounded-card p-3 text-left shadow-sm ring-1 ring-black/5 ${
-                n.readAt ? 'bg-white' : 'bg-brand-50'
-              }`}
-            >
-              {n.actor?.thumbnailUrl ? (
-                <img
-                  src={n.actor.thumbnailUrl}
-                  alt=""
-                  className="size-10 rounded-full object-cover"
-                />
-              ) : (
-                <span className="size-10 shrink-0 rounded-full bg-brand-100" aria-hidden="true" />
-              )}
-              <span className="flex-1">
-                <span className={`block text-sm ${n.readAt ? '' : 'font-semibold'}`}>
-                  {notificationText(n)}
-                </span>
-                <time dateTime={n.occurredAt} className="text-xs text-muted">
-                  {when(n.occurredAt)}
-                </time>
-              </span>
-              {!n.readAt && <span className="sr-only">Unread</span>}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {list.hasNextPage && (
+      <div className="flex flex-wrap items-center gap-2">
+        <Button
+          variant={unreadOnly ? 'primary' : 'secondary'}
+          size="sm"
+          fullWidth={false}
+          aria-pressed={unreadOnly}
+          onClick={() => {
+            setUnreadOnly((value) => !value);
+          }}
+        >
+          Unread only
+        </Button>
         <Button
           variant="secondary"
-          className="w-auto! px-6"
-          loading={list.isFetchingNextPage}
-          onClick={() => void list.fetchNextPage()}
+          size="sm"
+          fullWidth={false}
+          aria-expanded={showSettings}
+          onClick={() => {
+            setShowSettings((value) => !value);
+          }}
         >
-          Load more
+          <Icon name="bell" className="size-4" />
+          Settings
         </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          fullWidth={false}
+          className="ml-auto"
+          disabled={!hasUnread}
+          loading={markAll.isPending}
+          onClick={() => {
+            markAll.mutate();
+          }}
+        >
+          <Icon name="check" className="size-4" />
+          Mark all as read
+        </Button>
+      </div>
+
+      {showSettings && <Preferences />}
+
+      {list.isPending && (
+        <LoadingRegion label="Loading notifications…" className="space-y-2">
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </LoadingRegion>
+      )}
+      {list.isError && (
+        <EmptyState
+          tone="error"
+          title="We couldn't load your notifications"
+          action={
+            <Button variant="secondary" fullWidth={false} onClick={() => void list.refetch()}>
+              Try again
+            </Button>
+          }
+        >
+          {list.error.message}
+        </EmptyState>
+      )}
+      {list.isSuccess && items.length === 0 && (
+        <EmptyState
+          icon="bell"
+          title={unreadOnly ? 'You’re all caught up' : 'No notifications yet'}
+          action={
+            unreadOnly ? (
+              <Button
+                variant="secondary"
+                fullWidth={false}
+                onClick={() => {
+                  setUnreadOnly(false);
+                }}
+              >
+                Show all notifications
+              </Button>
+            ) : (
+              <LinkButton to="/discover">Find a partner</LinkButton>
+            )
+          }
+        >
+          {unreadOnly
+            ? 'There is nothing new to read.'
+            : 'Interests, matches and messages will show up here.'}
+        </EmptyState>
+      )}
+
+      {items.length > 0 && (
+        <ul className="space-y-2">
+          {items.map((n) => (
+            <li key={n.id}>
+              <button
+                type="button"
+                onClick={() => void open(n)}
+                className={cx(
+                  CARD_CLASS,
+                  'flex min-h-16 w-full items-center gap-3 p-3 text-left transition-shadow duration-200 ease-soft hover:shadow-raised',
+                  !n.readAt && 'bg-brand-50 ring-brand-200',
+                )}
+              >
+                {n.actor ? (
+                  <Avatar name={n.actor.name} src={n.actor.thumbnailUrl} />
+                ) : (
+                  <span
+                    aria-hidden="true"
+                    className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-600"
+                  >
+                    <Icon name="bell" />
+                  </span>
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className={cx('block text-small text-ink', !n.readAt && 'font-semibold')}>
+                    {notificationText(n)}
+                  </span>
+                  <time dateTime={n.occurredAt} className="text-caption text-muted">
+                    {when(n.occurredAt)}
+                  </time>
+                </span>
+                {!n.readAt && (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="size-2.5 shrink-0 rounded-full bg-accent-500"
+                    />
+                    <span className="sr-only">Unread</span>
+                  </>
+                )}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {list.hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            variant="secondary"
+            fullWidth={false}
+            loading={list.isFetchingNextPage}
+            onClick={() => void list.fetchNextPage()}
+          >
+            Load more
+          </Button>
+        </div>
       )}
     </div>
   );

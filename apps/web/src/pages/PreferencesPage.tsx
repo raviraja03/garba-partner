@@ -1,6 +1,6 @@
-import { Link } from 'react-router';
-import { Alert } from '../components/ui/Alert';
 import { FullPageSpinner } from '../components/FullPageSpinner';
+import { PageHeader } from '../components/PageHeader';
+import { EmptyState } from '../components/ui/EmptyState';
 import { PreferencesForm } from '../features/profile/components/PreferencesForm';
 import { useMyProfile } from '../features/profile/hooks';
 
@@ -9,17 +9,20 @@ export function PreferencesPage() {
 
   if (myProfile.isPending) return <FullPageSpinner />;
   if (myProfile.isError || !myProfile.data.preferences) {
-    return <Alert tone="error">We couldn't load your preferences.</Alert>;
+    return (
+      <EmptyState tone="error" title="We couldn't load your preferences">
+        Check your connection and refresh the page.
+      </EmptyState>
+    );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight">Preferences</h1>
-        <Link to="/profile" className="text-sm font-semibold text-brand-700 hover:underline">
-          Back to profile
-        </Link>
-      </div>
+      <PageHeader
+        title="Preferences"
+        description="Who you'd like to dance with, and how visible you are."
+        back={{ to: '/profile', label: 'My profile' }}
+      />
       <PreferencesForm initial={myProfile.data.preferences} submitLabel="Save preferences" />
     </div>
   );

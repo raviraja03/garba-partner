@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { PageHeader } from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
+import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
-import { FullPageSpinner } from '../components/FullPageSpinner';
+import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingRegion, SkeletonRow } from '../components/ui/Skeleton';
 import { useBlockedMembers, useUnblockMember } from '../features/safety/hooks';
 
 const date = (iso: string) =>
@@ -17,8 +20,6 @@ export function BlockedMembersPage() {
   const [confirming, setConfirming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (blocked.isPending) return <FullPageSpinner />;
-
   async function handleUnblock(userId: string) {
     setError(null);
     try {
@@ -30,79 +31,87 @@ export function BlockedMembersPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <header className="space-y-1">
-        <Link to="/profile" className="text-sm font-semibold text-brand-700">
-          ← My profile
-        </Link>
-        <h1 className="text-2xl font-bold">Blocked members</h1>
-        <p className="text-sm text-muted">
-          Blocked members can&apos;t see you or contact you, and you won&apos;t see them. They are
-          never told.
-        </p>
-      </header>
-      {blocked.error && <Alert tone="error">Could not load blocked members.</Alert>}
+    <div className="space-y-6">
+      <PageHeader
+        title="Blocked members"
+        description="Blocked members can't see you or contact you, and you won't see them. They are never told."
+        back={{ to: '/profile', label: 'My profile' }}
+      />
+
+      {blocked.isPending && (
+        <LoadingRegion label="Loading blocked members…" className="space-y-3">
+          <SkeletonRow />
+          <SkeletonRow />
+        </LoadingRegion>
+      )}
+      {blocked.isError && (
+        <EmptyState tone="error" title="We couldn't load your blocked members">
+          Check your connection and refresh the page.
+        </EmptyState>
+      )}
       {error && <Alert tone="error">{error}</Alert>}
-      {blocked.data?.length === 0 && <Alert tone="info">You haven&apos;t blocked anyone.</Alert>}
-      <ul className="space-y-2">
-        {blocked.data?.map((member) => {
-          const name = member.name ?? 'Former member';
-          return (
-            <li
-              key={member.userId}
-              className="flex flex-wrap items-center gap-3 rounded-card bg-white p-3 shadow-sm ring-1 ring-black/5"
-            >
-              {member.thumbnailUrl ? (
-                <img
-                  src={member.thumbnailUrl}
-                  alt=""
-                  className="size-10 rounded-full object-cover"
-                />
-              ) : (
-                <span className="size-10 rounded-full bg-brand-50" aria-hidden="true" />
-              )}
-              <div className="flex-1">
-                <p className="font-semibold">{name}</p>
-                <p className="text-xs text-muted">Blocked {date(member.blockedAt)}</p>
-              </div>
-              {confirming === member.userId ? (
-                <div className="w-full space-y-2 text-sm">
-                  <p>
-                    Unblock {name}? You may see each other again in Discover. Your earlier match and
-                    chat stay closed.
-                  </p>
-                  <div className="flex gap-3">
+      {blocked.data?.length === 0 && (
+        <EmptyState icon="shield" title="You haven't blocked anyone">
+          If someone makes you uncomfortable, you can block them from their profile or your chat.
+        </EmptyState>
+      )}
+
+      {blocked.data && blocked.data.length > 0 && (
+        <ul className="space-y-3">
+          {blocked.data.map((member) => {
+            const name = member.name ?? 'Former member';
+            return (
+              <Card as="li" key={member.userId} padding="sm">
+                <div className="flex items-center gap-3">
+                  <Avatar name={name} src={member.thumbnailUrl} size="lg" />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-ink">{name}</p>
+                    <p className="text-caption text-muted">Blocked {date(member.blockedAt)}</p>
+                  </div>
+                  {confirming !== member.userId && (
                     <Button
-                      className="w-auto! px-4"
-                      loading={unblock.isPending}
-                      onClick={() => void handleUnblock(member.userId)}
+                      variant="secondary"
+                      size="sm"
+                      fullWidth={false}
+                      onClick={() => {
+                        setConfirming(member.userId);
+                      }}
                     >
                       Unblock
                     </Button>
-                    <Button
-                      variant="link"
-                      onClick={() => {
-                        setConfirming(null);
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
+                  )}
                 </div>
-              ) : (
-                <Button
-                  variant="link"
-                  onClick={() => {
-                    setConfirming(member.userId);
-                  }}
-                >
-                  Unblock
-                </Button>
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                {confirming === member.userId && (
+                  <div className="mt-3 space-y-3 border-t border-line pt-3">
+                    <p className="text-small">
+                      Unblock {name}? You may see each other again in Discover. Your earlier match
+                      and chat stay closed.
+                    </p>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                      <Button
+                        variant="secondary"
+                        className="sm:w-auto"
+                        onClick={() => {
+                          setConfirming(null);
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        className="sm:w-auto"
+                        loading={unblock.isPending}
+                        onClick={() => void handleUnblock(member.userId)}
+                      >
+                        Unblock
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </Card>
+            );
+          })}
+        </ul>
+      )}
     </div>
   );
 }

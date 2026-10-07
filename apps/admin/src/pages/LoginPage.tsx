@@ -38,7 +38,13 @@ export function LoginPage() {
   return (
     <div className="flex min-h-dvh items-center justify-center bg-surface px-4">
       <main className="w-full max-w-sm rounded-card bg-white p-8 shadow-sm ring-1 ring-black/5">
-        <p className="font-bold text-brand-700">{APP_NAME}</p>
+        <img
+          src="/brand/logo.webp"
+          width={723}
+          height={192}
+          alt={APP_NAME}
+          className="mb-4 h-12 w-auto"
+        />
         <h1 className="mt-1 text-2xl font-extrabold">Admin sign in</h1>
         <p className="mt-1 text-sm text-muted">Authorised staff only. All actions are logged.</p>
 

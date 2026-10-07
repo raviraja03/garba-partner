@@ -36,7 +36,7 @@ export const ERROR_CODES = {
   ACCOUNT_PENDING_DELETION: { httpStatus: 403, message: 'This account is scheduled for deletion.' },
 
   // Profiles (docs/users/user-profile.md)
-  UNDERAGE: { httpStatus: 403, message: 'Garba Partner is only for adults (18+).' },
+  UNDERAGE: { httpStatus: 403, message: 'GarbaMates is only for adults (18+).' },
   ONBOARDING_REQUIRED: { httpStatus: 403, message: 'Please complete your profile first.' },
   PROFILE_NOT_STARTED: { httpStatus: 409, message: 'Please create your profile first.' },
   VERIFICATION_UNAVAILABLE: {

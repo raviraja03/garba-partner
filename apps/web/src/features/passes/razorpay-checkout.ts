@@ -98,7 +98,7 @@ export async function openCheckout(checkout: CreatedOrderDto['checkout']): Promi
           resolve(failure ? { kind: 'failed', message: failure } : { kind: 'dismissed' });
         },
       },
-      theme: { color: '#b4371a' },
+      theme: { color: '#2D1B69' },
     });
     // Checkout stays open after a failed attempt so the member can retry there; remember the
     // reason in case they close it.
