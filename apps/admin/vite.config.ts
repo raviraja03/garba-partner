@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, ['API_', 'ADMIN_ORIGIN']);
   const apiTarget = `http://${env.API_HOST ?? '127.0.0.1'}:${env.API_PORT ?? '4000'}`;
   // The dev server must run on the origin the API trusts (CORS, CSRF), so take the port from it.
-  const port = Number(new URL(env.ADMIN_ORIGIN ?? 'http://localhost:5174').port) || 5174;
+  const port = Number(new URL(env.ADMIN_ORIGIN ?? 'http://localhost:6174').port) || 6174;
   const proxy = { '/api': { target: apiTarget } };
 
   return {

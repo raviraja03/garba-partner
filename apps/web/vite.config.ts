@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, ['API_', 'WEB_ORIGIN']);
   const apiTarget = `http://${env.API_HOST ?? '127.0.0.1'}:${env.API_PORT ?? '4000'}`;
   // The dev server must run on the origin the API trusts (CORS, CSRF), so take the port from it.
-  const port = Number(new URL(env.WEB_ORIGIN ?? 'http://localhost:5173').port) || 5173;
+  const port = Number(new URL(env.WEB_ORIGIN ?? 'http://localhost:6173').port) || 6173;
   // Socket.IO (chat) shares the API server; `ws` forwards the WebSocket upgrade.
   const proxy = {
     '/api': { target: apiTarget },
