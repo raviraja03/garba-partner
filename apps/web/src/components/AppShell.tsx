@@ -1,113 +1,70 @@
-import { useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import { APP_NAME } from '@garba-partner/shared';
+import { Outlet, useLocation } from 'react-router';
 import { useAuth } from '../features/auth/auth-context';
-import { useUnreadCount } from '../features/chat/hooks';
-import { NotificationBell } from '../features/notifications/NotificationBell';
 import { SafetyNotices } from '../features/safety/components/SafetyNotices';
-import { Button } from './ui/Button';
+import { Footer } from './Footer';
+import { FullPageSpinner } from './FullPageSpinner';
+import { Navbar } from './Navbar';
+import { PageContainer, type PageWidth } from './PageContainer';
 
-const MEMBER_NAV = [
-  { to: '/', label: 'Home', end: true },
-  { to: '/events', label: 'Events', end: false },
-  { to: '/discover', label: 'Discover', end: false },
-  { to: '/interests', label: 'Interests', end: false },
-  { to: '/matches', label: 'Matches', end: false },
-  { to: '/chats', label: 'Chats', end: false },
-  { to: '/profile', label: 'My profile', end: true },
-] as const;
+/**
+ * Pages that are a list or grid use the wide column; everything else (forms, chats,
+ * profiles, reading text) keeps the narrower one. See PageContainer.
+ */
+const WIDE_PAGES = new Set(['/', '/events', '/discover']);
 
-const linkClass = ({ isActive }: { isActive: boolean }) =>
-  isActive ? 'font-semibold text-brand-700' : 'text-muted hover:text-ink';
+/** An event's own page (`/events/<slug>`): content beside a sticky action column on desktop. */
+const EVENT_PAGE = /^\/events\/[^/]+$/;
 
-/** "Chats" with the unread-message badge (active members only; updated live by the socket). */
-function ChatsLink({ enabled }: { enabled: boolean }) {
-  const unread = useUnreadCount(enabled);
-  const count = unread.data ?? 0;
-  return (
-    <NavLink to="/chats" className={linkClass}>
-      Chats
-      {count > 0 && (
-        <span
-          className="ml-1 rounded-full bg-brand-600 px-1.5 py-0.5 text-[11px] font-bold text-white"
-          aria-label={`${String(count)} unread messages`}
-        >
-          {count > 99 ? '99+' : count}
-        </span>
-      )}
-    </NavLink>
-  );
+/**
+ * A conversation is a full-screen task on phones and tablets: the tab bar and footer step aside
+ * so the messages and the keyboard get the room. Its header has the way back.
+ */
+const FOCUSED_PAGE = /^\/chats\/[^/]+$/;
+
+function pageWidth(pathname: string): PageWidth {
+  const path = pathname.replace(/\/+$/, '') || '/';
+  return WIDE_PAGES.has(path) || EVENT_PAGE.test(path) ? 'wide' : 'content';
 }
-
-const VISITOR_NAV = [{ to: '/events', label: 'Events', end: false }] as const;
 
 /** Layout for app pages (mobile-first). Event pages are public, so visitors see it too. */
 export function AppShell() {
-  const { state, signOut } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [signingOut, setSigningOut] = useState(false);
+  const { state } = useAuth();
+  const { pathname } = useLocation();
   const authenticated = state.status === 'authenticated';
-  const nav = authenticated ? MEMBER_NAV : VISITOR_NAV;
+  const width = pageWidth(pathname);
+  const focused = authenticated && FOCUSED_PAGE.test(pathname.replace(/\/+$/, ''));
 
-  async function handleSignOut() {
-    setSigningOut(true);
-    await signOut().catch(() => undefined);
-    await navigate('/login', { replace: true });
-  }
+  // Public pages differ for visitors and members (banner, navigation): wait for the session
+  // check so the page is drawn once, instead of jumping when the answer arrives.
+  if (state.status === 'loading') return <FullPageSpinner />;
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4 py-4 sm:px-6">
-      <header className="flex items-center justify-between gap-4 border-b border-black/5 pb-4">
-        <Link to={authenticated ? '/' : '/events'} className="text-lg font-bold text-brand-700">
-          {APP_NAME}
-        </Link>
-        <nav
-          aria-label="Main"
-          className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 text-sm"
-        >
-          {nav.map((item) =>
-            item.to === '/chats' ? (
-              <ChatsLink
-                key={item.to}
-                enabled={state.status === 'authenticated' && state.user.status === 'active'}
-              />
-            ) : (
-              <NavLink key={item.to} to={item.to} end={item.end} className={linkClass}>
-                {item.label}
-              </NavLink>
-            ),
-          )}
-          {authenticated && <NotificationBell enabled={authenticated} />}
-          {authenticated && (
-            <Button variant="link" loading={signingOut} onClick={() => void handleSignOut()}>
-              Log out
-            </Button>
-          )}
-          {state.status === 'anonymous' && (
-            <Link
-              to="/login"
-              state={{ from: location.pathname }}
-              className="font-semibold text-brand-700 hover:underline"
-            >
-              Log in
-            </Link>
-          )}
-        </nav>
-      </header>
-      <SafetyNotices enabled={authenticated} />
-      <main className="flex-1 py-6">
+    <div className="flex min-h-dvh flex-col">
+      <a
+        href="#main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-control focus:bg-brand-600 focus:px-4 focus:py-3 focus:font-semibold focus:text-white"
+      >
+        Skip to content
+      </a>
+      <Navbar tabBar={!focused} />
+      <PageContainer width={width}>
+        <SafetyNotices enabled={authenticated} />
+      </PageContainer>
+      <PageContainer
+        as="main"
+        id="main"
+        width={width}
+        className="min-h-[calc(100dvh-4rem)] flex-1 py-6 sm:py-8 lg:py-10"
+      >
         <Outlet />
-      </main>
-      <footer className="flex flex-wrap gap-x-4 gap-y-1 border-t border-black/5 pt-4 text-xs text-muted">
-        <Link to="/safety" className="hover:text-ink hover:underline">
-          Safety centre
-        </Link>
-        <Link to="/guidelines" className="hover:text-ink hover:underline">
-          Community guidelines
-        </Link>
-        <span>18+ only</span>
-      </footer>
+      </PageContainer>
+      {/* `main` fills the first screen, so the footer never jumps while a short page loads. */}
+      {/* Signed-in members have the tab bar fixed over the bottom on mobile and tablet. */}
+      <Footer
+        member={authenticated}
+        tabBarOffset={authenticated && !focused}
+        className={focused ? 'hidden lg:block' : ''}
+      />
     </div>
   );
 }

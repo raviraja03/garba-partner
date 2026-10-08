@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import type { PartnerDto } from '@garba-partner/shared';
 import { Alert } from '../../../components/ui/Alert';
-import { Button } from '../../../components/ui/Button';
+import { Button, LinkButton } from '../../../components/ui/Button';
+import { Card } from '../../../components/ui/Card';
+import { Icon } from '../../../components/ui/Icon';
 import {
   useAcceptInterest,
   useRejectInterest,
@@ -46,6 +48,7 @@ export function InterestActions({ partner }: { partner: PartnerDto }) {
       {connection.status === 'none' && (
         <>
           <Button
+            variant="cta"
             loading={send.isPending}
             onClick={() =>
               void run(async () => {
@@ -58,18 +61,22 @@ export function InterestActions({ partner }: { partner: PartnerDto }) {
               })
             }
           >
+            <Icon name="heart" />
             Send interest
           </Button>
-          <p className="text-xs text-muted">
+          <p className="text-center text-caption text-muted">
             {profile.name} can accept or decline. A chat opens only if you both say yes.
           </p>
         </>
       )}
 
       {connection.status === 'interest_sent' && connection.interestId && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card bg-white p-4 shadow-sm ring-1 ring-black/5">
-          <p className="text-sm">
-            <strong>Interest sent.</strong> Waiting for {profile.name} to reply.
+        <Card padding="sm" className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <p className="flex items-center gap-2 text-small">
+            <Icon name="check" className="size-5 text-success" />
+            <span>
+              <strong>Interest sent.</strong> Waiting for {profile.name} to reply.
+            </span>
           </p>
           <Button
             variant="link"
@@ -78,17 +85,17 @@ export function InterestActions({ partner }: { partner: PartnerDto }) {
           >
             Withdraw
           </Button>
-        </div>
+        </Card>
       )}
 
       {connection.status === 'interest_received' && connection.interestId && (
-        <div className="space-y-3 rounded-card bg-brand-50 p-4 ring-1 ring-brand-200">
-          <p className="text-sm font-semibold text-brand-900">
+        <div className="space-y-3 rounded-card bg-accent-50 p-4 ring-1 ring-accent-200">
+          <p className="flex items-center gap-2 font-semibold text-accent-700">
+            <Icon name="heart" />
             {profile.name} is interested in dancing with you.
           </p>
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <Button
-              className="w-auto! px-6"
               loading={accept.isPending}
               onClick={() =>
                 void run(async () => {
@@ -101,7 +108,6 @@ export function InterestActions({ partner }: { partner: PartnerDto }) {
             </Button>
             <Button
               variant="secondary"
-              className="w-auto! px-6"
               loading={reject.isPending}
               onClick={() =>
                 void run(async () => {
@@ -117,12 +123,10 @@ export function InterestActions({ partner }: { partner: PartnerDto }) {
       )}
 
       {connection.status === 'matched' && connection.matchId && (
-        <Link
-          to={`/matches/${connection.matchId}`}
-          className="block rounded-xl bg-brand-600 px-4 py-3 text-center font-semibold text-white hover:bg-brand-700"
-        >
+        <LinkButton to={`/matches/${connection.matchId}`} variant="cta" fullWidth>
+          <Icon name="users" />
           You matched: view match
-        </Link>
+        </LinkButton>
       )}
 
       {error && <Alert tone="error">{error}</Alert>}

@@ -8,6 +8,7 @@ import {
 } from '@garba-partner/shared';
 import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
+import { Card } from '../../../components/ui/Card';
 import { Field } from '../../../components/ui/Field';
 import { INPUT_CLASS } from '../../../components/ui/field-utils';
 import { PREFERRED_GENDER_LABELS } from '../../../lib/labels';
@@ -28,15 +29,16 @@ function Toggle({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 rounded-xl bg-white p-4 ring-1 ring-black/5">
+    <div className="flex items-center justify-between gap-4 py-3">
       <div>
-        <label htmlFor={id} className="block cursor-pointer font-semibold">
+        <label htmlFor={id} className="block cursor-pointer font-semibold text-ink">
           {label}
         </label>
-        <p id={`${id}-description`} className="text-sm text-muted">
+        <p id={`${id}-description`} className="text-small text-muted">
           {description}
         </p>
       </div>
+      {/* A real checkbox drawn as a switch: ::before is the thumb, ::after widens the tap area. */}
       <input
         id={id}
         type="checkbox"
@@ -46,7 +48,7 @@ function Toggle({
         onChange={(event) => {
           onChange(event.target.checked);
         }}
-        className="mt-1 size-5 shrink-0 cursor-pointer accent-brand-600"
+        className="relative h-8 w-14 shrink-0 cursor-pointer appearance-none rounded-full bg-brand-200 transition-colors duration-200 before:absolute before:top-1 before:left-1 before:size-6 before:rounded-full before:bg-white before:shadow-card before:transition-transform before:duration-200 checked:bg-brand-600 checked:before:translate-x-6 after:absolute after:-inset-2"
       />
     </div>
   );
@@ -89,87 +91,102 @@ export function PreferencesForm({
   }
 
   return (
-    <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-5">
-      <Field id="preferredGender" label="I'd like to dance with">
-        <select
-          id="preferredGender"
-          value={values.preferredGender}
-          onChange={(event) => {
-            set('preferredGender', event.target.value as PartnerGenderPreference);
+    <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-6">
+      <Card as="section" aria-labelledby="pr-who" className="space-y-5">
+        <h2 id="pr-who" className="text-h3">
+          Who you'd like to meet
+        </h2>
+        <Field id="preferredGender" label="I'd like to dance with">
+          <select
+            id="preferredGender"
+            value={values.preferredGender}
+            onChange={(event) => {
+              set('preferredGender', event.target.value as PartnerGenderPreference);
+            }}
+            className={INPUT_CLASS}
+          >
+            {PARTNER_GENDER_PREFERENCES.map((option) => (
+              <option key={option} value={option}>
+                {PREFERRED_GENDER_LABELS[option]}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Field id="minAge" label="Minimum age" error={errors.minAge}>
+            <input
+              id="minAge"
+              type="number"
+              min={LIMITS.PREF_AGE_MIN}
+              max={LIMITS.PREF_AGE_MAX}
+              value={values.minAge}
+              onChange={(event) => {
+                set('minAge', Number(event.target.value));
+              }}
+              inputMode="numeric"
+              aria-invalid={Boolean(errors.minAge)}
+              className={INPUT_CLASS}
+            />
+          </Field>
+          <Field id="maxAge" label="Maximum age" error={errors.maxAge}>
+            <input
+              id="maxAge"
+              type="number"
+              min={LIMITS.PREF_AGE_MIN}
+              max={LIMITS.PREF_AGE_MAX}
+              value={values.maxAge}
+              onChange={(event) => {
+                set('maxAge', Number(event.target.value));
+              }}
+              inputMode="numeric"
+              aria-invalid={Boolean(errors.maxAge)}
+              className={INPUT_CLASS}
+            />
+          </Field>
+        </div>
+
+        <Toggle
+          id="verifiedOnly"
+          label="Photo-verified members only"
+          description="Only suggest members whose selfie was checked by our team."
+          checked={values.verifiedOnly}
+          onChange={(checked) => {
+            set('verifiedOnly', checked);
           }}
-          className={INPUT_CLASS}
-        >
-          {PARTNER_GENDER_PREFERENCES.map((option) => (
-            <option key={option} value={option}>
-              {PREFERRED_GENDER_LABELS[option]}
-            </option>
-          ))}
-        </select>
-      </Field>
+        />
+      </Card>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field id="minAge" label="Minimum age" error={errors.minAge}>
-          <input
-            id="minAge"
-            type="number"
-            min={LIMITS.PREF_AGE_MIN}
-            max={LIMITS.PREF_AGE_MAX}
-            value={values.minAge}
-            onChange={(event) => {
-              set('minAge', Number(event.target.value));
+      <Card as="section" aria-labelledby="pr-visible">
+        <h2 id="pr-visible" className="text-h3">
+          Your visibility
+        </h2>
+        <div className="mt-2 divide-y divide-line">
+          <Toggle
+            id="discoveryEnabled"
+            label="Show me in partner discovery"
+            description="Other adult members in your city can find your profile. You can pause this any time."
+            checked={values.discoveryEnabled}
+            onChange={(checked) => {
+              set('discoveryEnabled', checked);
             }}
-            aria-invalid={Boolean(errors.minAge)}
-            className={INPUT_CLASS}
           />
-        </Field>
-        <Field id="maxAge" label="Maximum age" error={errors.maxAge}>
-          <input
-            id="maxAge"
-            type="number"
-            min={LIMITS.PREF_AGE_MIN}
-            max={LIMITS.PREF_AGE_MAX}
-            value={values.maxAge}
-            onChange={(event) => {
-              set('maxAge', Number(event.target.value));
+          <Toggle
+            id="showArea"
+            label="Show my area on my profile"
+            description="Your city is always shown. Your neighbourhood is only shown if you turn this on."
+            checked={values.showArea}
+            onChange={(checked) => {
+              set('showArea', checked);
             }}
-            aria-invalid={Boolean(errors.maxAge)}
-            className={INPUT_CLASS}
           />
-        </Field>
-      </div>
-
-      <Toggle
-        id="verifiedOnly"
-        label="Photo-verified members only"
-        description="Only suggest members whose selfie was checked by our team."
-        checked={values.verifiedOnly}
-        onChange={(checked) => {
-          set('verifiedOnly', checked);
-        }}
-      />
-      <Toggle
-        id="discoveryEnabled"
-        label="Show me in partner discovery"
-        description="Other adult members in your city can find your profile. You can pause this any time."
-        checked={values.discoveryEnabled}
-        onChange={(checked) => {
-          set('discoveryEnabled', checked);
-        }}
-      />
-      <Toggle
-        id="showArea"
-        label="Show my area on my profile"
-        description="Your city is always shown. Your neighbourhood is only shown if you turn this on."
-        checked={values.showArea}
-        onChange={(checked) => {
-          set('showArea', checked);
-        }}
-      />
+        </div>
+      </Card>
 
       {errors.form && <Alert tone="error">{errors.form}</Alert>}
-      {saved && <Alert tone="info">Preferences saved.</Alert>}
+      {saved && <Alert tone="success">Preferences saved.</Alert>}
 
-      <Button type="submit" loading={mutation.isPending}>
+      <Button type="submit" size="lg" loading={mutation.isPending}>
         {submitLabel}
       </Button>
     </form>

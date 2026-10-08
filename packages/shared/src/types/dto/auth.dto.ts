@@ -36,24 +36,6 @@ export interface AdminMeDto {
   permissions: readonly AdminPermission[];
 }
 
-/**
- * `POST /api/v1/admin/auth/login` after a correct password: a second step is always required.
- * `setup` = first sign-in, enrol an authenticator app; `totp` = enter the current code.
- */
-export interface AdminLoginChallengeDto {
-  challengeToken: string;
-  method: 'setup' | 'totp';
-  expiresAt: string;
-}
-
-/** `POST /api/v1/admin/auth/login/totp-setup`: shown once, for the authenticator app. */
-export interface AdminTotpSetupDto {
-  /** Base32 secret for manual entry. */
-  secret: string;
-  /** `otpauth://totp/…` URI (opens authenticator apps on mobile). */
-  otpauthUri: string;
-}
-
 export interface AdminSessionDto {
   accessToken: string;
   accessTokenExpiresAt: string;

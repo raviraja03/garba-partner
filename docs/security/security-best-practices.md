@@ -32,20 +32,21 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 - User values only through `replacements` / bind parameters. Interpolate **only** server constants (column names from an allow-list, fixed SQL fragments).
 - Wrap multi-step changes in a transaction; lock rows (`FOR UPDATE`) that decide money, counters or one-time tokens.
 - Store secrets and one-time tokens **hashed** (SHA-256 for random tokens, HMAC for low-entropy values like OTPs and phone numbers) and personal data that must be read back **encrypted** (AES-256-GCM, `lib/crypto.ts`). One key per purpose.
-- Sensitive columns are excluded from the default model scope (`passwordHash`, `totpSecretEncrypted`); use an explicit scope to read them.
+- Sensitive columns are excluded from the default model scope (`passwordHash`); use an explicit scope to read them.
 - Never modify production data with ad-hoc scripts. Destructive CLI commands are development-only.
 
 ### 2.4 Logging
 
-- Log events, not data: IDs and codes, never phone numbers, OTPs, tokens, passwords, TOTP secrets, message text or search terms.
+- Log events, not data: IDs and codes, never phone numbers, OTPs, tokens, passwords, message text or search terms. The request log (`[API]` lines, `api_logs`) holds the path, status and timing only: no bodies, headers, cookies or query strings ([logging](../development/logging.md)).
+- **One deliberate exception:** `LOG_OTP=true` prints login codes to the server log for debugging. It is off by default, warns at start-up, and `preflight.sh` warns about it. Leave it off in production.
 - The logger redacts known keys (`lib/logger.ts`) and query parameters (`redactUrl`). When you add a sensitive field or query parameter, **add it to the redaction list** in the same PR.
 - Database errors are logged without SQL text, bind values or constraint details. Don't log a Sequelize error's `sql` yourself.
-- Client IPs are stored only as HMACs (audit log, OTP limits).
+- Client IPs are stored as HMACs in the audit log and for OTP limits. The exception is `api_logs.ip_address`, which holds the real address for debugging and is deleted after `API_LOG_RETENTION_DAYS`.
 
 ### 2.5 Audit
 
 - Every admin write calls `recordAdminAction(…)` **inside the same transaction** as the change, with a `reason` where the action affects a member.
-- Authentication events for admins (sign-in, enrolment, lockout, logout, 2FA reset) are audited. Keep it that way for any new admin auth flow.
+- Authentication events for admins (sign-in, lockout, logout) are audited. Keep it that way for any new admin auth flow.
 - The audit log is append-only; never add an update or delete path.
 
 ### 2.6 Files and media
@@ -71,7 +72,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 - `VITE_*` variables are public: never put secrets in them.
 - Client-side guards (`RequireAuth`, `RequireAdmin`) are UX. The API decides.
 - Don't load third-party scripts except Razorpay Checkout (loaded only when a member starts a payment). Any new origin needs a CSP change (§5).
-- Admin sign-in is always two-step (password, then authenticator code). Don't add a "remember this device" that skips the code.
+- Admin sign-in is email + password only. Use strong, unique passwords (a password manager) for every admin account.
 
 ## 4. Secrets and keys
 
@@ -80,8 +81,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 | `JWT_ACCESS_SECRET` | Member access tokens | `JWT_ADMIN_ACCESS_SECRET` | Rotating invalidates current access tokens at once; clients get new ones through refresh |
 | `JWT_ADMIN_ACCESS_SECRET` | Admin access tokens | `JWT_ACCESS_SECRET` | Same |
 | `PHONE_HASH_SECRET` | Phone lookups (HMAC) | — | Needs a re-hash migration |
-| `PHONE_ENCRYPTION_KEY` (+ `_VERSION`) | Phone ciphertext | `TOTP_ENCRYPTION_KEY` | Versioned: re-encrypt in the background |
-| `TOTP_ENCRYPTION_KEY` | Admin authenticator secrets | `PHONE_ENCRYPTION_KEY` | Changing it invalidates every enrolment: reset each admin's 2FA and re-enrol |
+| `PHONE_ENCRYPTION_KEY` (+ `_VERSION`) | Phone ciphertext | — | Versioned: re-encrypt in the background |
 | `OTP_HMAC_SECRET` | OTP hashes, IP HMACs, audit IP hashes | — | Invalidates pending OTPs (5 min) |
 | `CLOUDINARY_API_SECRET`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Providers | Webhook ≠ key secret | Rotate in the provider dashboard first |
 
@@ -95,136 +95,40 @@ Rules:
 
 ## 5. Nginx and deployment assumptions
 
-The API trusts `X-Forwarded-For` **only from loopback** (`trust proxy = loopback`) and listens on `127.0.0.1` by default (`API_HOST`). This is safe only if Nginx on the same host is the sole public entry point. The API does **not** check the `Host` header, so Nginx must keep the admin API off the public web host.
+The Nginx configuration lives in [`deploy/nginx/`](../../deploy/nginx/) as templates rendered with the domains from the server's env file. It is explained in [docs/deployment/nginx.md](../deployment/nginx.md); the whole procedure is in [production setup](../deployment/production-setup.md). Change the templates, never the files on the server.
 
-Example configuration (adapt names, paths and certificates; test with `nginx -t`):
+The API trusts `X-Forwarded-For` **only from loopback** (`trust proxy = loopback`) and listens on `127.0.0.1` by default (`API_HOST`). This is safe only if Nginx on the same host is the sole public entry point.
 
-```nginx
-# /etc/nginx/conf.d/garba-partner.conf
-
-limit_req_zone $binary_remote_addr zone=gp_api:10m rate=20r/s;
-
-map $http_upgrade $connection_upgrade { default upgrade; '' close; }
-
-upstream gp_api { server 127.0.0.1:4000; keepalive 32; }
-
-# Shared TLS settings
-ssl_protocols TLSv1.2 TLSv1.3;
-ssl_prefer_server_ciphers off;
-ssl_session_cache shared:SSL:10m;
-server_tokens off;
-
-# HTTP → HTTPS
-server {
-  listen 80;
-  server_name garbapartner.example admin.garbapartner.example;
-  return 301 https://$host$request_uri;
-}
-
-# ---- Web app (members) ----
-server {
-  listen 443 ssl http2;
-  server_name garbapartner.example;
-  ssl_certificate     /etc/letsencrypt/live/garbapartner.example/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/garbapartner.example/privkey.pem;
-
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-  add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' wss://garbapartner.example https://api.razorpay.com https://lumberjack.razorpay.com; script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-  add_header Permissions-Policy "geolocation=(), microphone=(), camera=(self), payment=(self \"https://api.razorpay.com\")" always;
-  add_header Cross-Origin-Opener-Policy "same-origin-allow-popups" always;
-
-  root /srv/garba-partner/web;          # apps/web/dist
-  location / { try_files $uri /index.html; }
-  location /assets/ { expires 1y; add_header Cache-Control "public, immutable" always; }
-
-  # The admin API is never served on the public web host.
-  location /api/v1/admin/ { return 404; }
-
-  location /api/ {
-    limit_req zone=gp_api burst=40 nodelay;
-    client_max_body_size 6m;            # profile/event images (5 MB) + multipart overhead
-    proxy_pass http://gp_api;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_hide_header X-Powered-By;
-  }
-
-  location /socket.io/ {
-    proxy_pass http://gp_api;
-    proxy_http_version 1.1;
-    proxy_set_header Upgrade $http_upgrade;
-    proxy_set_header Connection $connection_upgrade;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_read_timeout 75s;
-  }
-}
-
-# ---- Admin panel ----
-server {
-  listen 443 ssl http2;
-  server_name admin.garbapartner.example;
-  ssl_certificate     /etc/letsencrypt/live/admin.garbapartner.example/fullchain.pem;
-  ssl_certificate_key /etc/letsencrypt/live/admin.garbapartner.example/privkey.pem;
-
-  # Optional but recommended: office/VPN allow-list.
-  # allow 203.0.113.0/24; deny all;
-
-  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-  add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
-  add_header X-Content-Type-Options "nosniff" always;
-  add_header Referrer-Policy "no-referrer" always;
-  add_header X-Robots-Tag "noindex, nofollow" always;
-
-  root /srv/garba-partner/admin;        # apps/admin/dist
-  location / { try_files $uri /index.html; }
-
-  # Only what the admin panel calls.
-  location ~ ^/api/v1/(admin/|cities|health) {
-    limit_req zone=gp_api burst=40 nodelay;
-    client_max_body_size 6m;
-    proxy_pass http://gp_api;
-    proxy_http_version 1.1;
-    proxy_set_header Connection "";
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
-  }
-  location /api/ { return 404; }
-}
-```
-
-Assumptions and checks:
+Topology: three domains under one registrable domain: the web app, the admin panel and the API. The browser apps call the API domain directly (cross-origin, same-site), so **CORS and the CSRF checks are production controls**. The API does **not** check the `Host` header: the admin API is reachable on the API domain and is protected by admin authentication, permissions and (optionally) an Nginx IP allow-list.
 
 | Assumption | Why | Check |
 |---|---|---|
-| The API listens on `127.0.0.1` only; the firewall exposes 80/443 only | `trust proxy = loopback` would otherwise let clients spoof their IP and bypass limits | `ss -ltnp` shows `127.0.0.1:4000` |
-| `X-Forwarded-For` is **appended** (`$proxy_add_x_forwarded_for`) | The API takes the address added by the trusted proxy | Rate-limit smoke test from two IPs |
-| `/api/v1/admin/` returns `404` on the web host | The API does not enforce the host itself | `curl -i https://garbapartner.example/api/v1/admin/auth/me` → 404 |
-| `WEB_ORIGIN` / `ADMIN_ORIGIN` are the exact `https://` origins | CORS and CSRF compare them exactly | Boot refuses `http://` in production |
-| The Razorpay webhook reaches `/api/v1/webhooks/razorpay` on the web host | Payments are confirmed by webhook | Razorpay dashboard shows `2xx` |
-| `client_max_body_size` ≥ the API's upload limit, but not much larger | Avoid buffering large bodies | Upload a 5 MB image |
-| PostgreSQL listens on a private interface; API uses a DML-only role over TLS | Limits the blast radius of an API compromise | `DATABASE_SSL=true`, role grants reviewed |
-| Only one API process runs | In-memory limiters | Before scaling out, move limiters to Redis |
+| The API listens on `127.0.0.1` only; the firewall exposes 80/443 (and SSH) only | `trust proxy = loopback` would otherwise let clients spoof their IP and bypass limits | `ss -ltnp` shows `127.0.0.1:4000`; `preflight.sh` checks `API_HOST` |
+| Nginx **replaces** `X-Forwarded-For` with `$remote_addr` | The API uses it for rate limits and audit hashes; a client-supplied value must never get through | [`gp-proxy.conf`](../../deploy/nginx/snippets/gp-proxy.conf) |
+| `WEB_ORIGIN` / `ADMIN_ORIGIN` are the exact `https://` origins of the two apps | CORS and CSRF compare them exactly | Boot refuses `http://` in production; `preflight.sh` compares them with the domains; `healthcheck.sh` tests CORS for both origins and a foreign one |
+| The three hosts share one registrable domain | `SameSite=Strict` refresh cookies are only sent on same-site requests | Sign-in survives a page reload |
+| No other site on a sibling subdomain is untrusted | A sibling subdomain is "same-site"; the CSRF header and `Origin` check are the remaining defence there | Review DNS records of the domain |
+| The admin panel and admin API are restricted to known addresses where possible | Admins sign in with a password only | [nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel) |
+| Nginx access logs have no query strings | Admin searches carry phone numbers | `log_format gp_main` |
+| PostgreSQL listens on `localhost`; the API uses a DML-only role | Limits the blast radius of an API compromise | [production setup §5](../deployment/production-setup.md#5-postgresql) |
+| PostgreSQL does not log statements | Values are inside the SQL text | [`garba-partner.conf`](../../deploy/postgres/garba-partner.conf) |
+| The Razorpay webhook reaches `https://<API_DOMAIN>/api/v1/webhooks/razorpay` | Payments are confirmed by webhook | Razorpay dashboard shows `2xx` |
+| Only one API process runs | In-memory limiters, in-process jobs | [pm2.md §3](../deployment/pm2.md#3-why-exactly-one-instance) |
+| Backups are encrypted and the private key is off the server | A server compromise must not expose old data | [database backup](../deployment/database-backup.md) |
 
-If the admin panel starts calling another public route, add it to the admin host's `location` regex.
+Any new origin the apps load from or connect to needs a CSP change in the header templates.
 
 ## 6. Admin operations
 
-- **Creating admins:** `npm run admin:create -- --email … --name … --role …` prints a random password once. Give it to the person over a secure channel. On first sign-in they must enrol an authenticator app before getting a session.
-- **Lost phone:** another super admin resets their two-factor sign-in (`POST /api/v1/admin/admins/:adminId/reset-two-factor` with a reason). This ends all their sessions and is audited. Verify the request out of band (call the person) before resetting.
-- **At least two super admins**, so a reset is always possible; super admins limited to named people.
+- **Creating admins:** `npm run admin:create -- --email … --name … --role …` prints a random password once. Give it to the person over a secure channel.
+- **Compromised password:** disable the account immediately (all sessions end), then create a new one with `admin:create` and review the audit log for that admin.
+- **At least two super admins**, so one can always disable another's account; super admins limited to named people.
 - **Review the audit log** regularly for `admin.lockout`, unusual `admin.login` IP patterns, phone reveals and refunds.
 - **Leaving staff:** disable the account (sessions end immediately); never delete it (audit references stay valid).
 
 ## 7. Dependencies
 
-- Don't add a dependency for something small we can write and test (e.g. TOTP is ~100 lines in `lib/totp.ts`, tested against the RFC vectors).
+- Don't add a dependency for something small we can write and test .
 - Run `npm audit --omit=dev` before every release; review moderate issues against the [accepted risks](../testing/security-testing.md#5-accepted-risks-and-follow-ups).
 - Keep the lockfile committed; update dependencies deliberately, one area at a time, with the full check.
 

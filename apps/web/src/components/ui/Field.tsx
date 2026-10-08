@@ -18,18 +18,18 @@ export function Field({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-semibold">
+      <label htmlFor={id} className="block text-label text-ink">
         {label}
         {optional && <span className="ml-1 font-normal text-muted">(optional)</span>}
       </label>
       {children}
       {hint && !error && (
-        <p id={`${id}-hint`} className="mt-1 text-xs text-muted">
+        <p id={`${id}-hint`} className="mt-1.5 text-caption text-muted">
           {hint}
         </p>
       )}
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1 text-sm text-danger">
+        <p id={`${id}-error`} role="alert" className="mt-1.5 text-small font-medium text-danger">
           {error}
         </p>
       )}

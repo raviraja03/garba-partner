@@ -7,6 +7,7 @@ import type {
   NotificationDto,
 } from '@garba-partner/shared';
 import { ApiClientError, getAccessToken, refreshSession } from '../../lib/api-client';
+import { env } from '../../lib/env';
 import { markReadRest, sendMessageRest } from './chat-api';
 
 type ChatSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
@@ -53,14 +54,16 @@ export function isChatConnected(): boolean {
 export function startChatSocket(handlers: ChatSocketHandlers): () => void {
   let sessionEnded = false;
   let refreshing = false;
-  const client: ChatSocket = io({
+  const options = {
     path: '/socket.io',
     // Function form: every (re)connection uses the latest access token.
-    auth: (cb) => {
+    auth: (cb: (data: { token: string }) => void) => {
       cb({ token: getAccessToken() ?? '' });
     },
     reconnectionDelayMax: 10_000,
-  });
+  };
+  // Socket.IO lives on the API server: its own host in production, this origin behind the dev proxy.
+  const client: ChatSocket = env.apiOrigin ? io(env.apiOrigin, options) : io(options);
 
   const refreshAndReconnect = () => {
     if (refreshing || sessionEnded) return;

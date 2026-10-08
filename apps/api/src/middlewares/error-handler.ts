@@ -1,6 +1,8 @@
 import type { ErrorRequestHandler } from 'express';
 import type { ApiErrorBody } from '@garba-partner/shared';
 import { AppError } from '../lib/app-error.js';
+import { sanitizeLogText } from '../lib/log-sanitize.js';
+import type { ApiErrorInfo } from './api-logger.js';
 
 interface HttpErrorLike {
   status: number;
@@ -37,6 +39,18 @@ export const errorHandler: ErrorRequestHandler = (err: unknown, req, res, next) 
   if (appError.httpStatus >= 500) {
     req.log.error({ err }, 'Unhandled error');
   }
+
+  // For the request log (`[API ERROR] … | error=…` and `api_logs.error_message`). A 4xx shows
+  // the same message the client gets. A 5xx shows the real cause, cleaned of digits and email
+  // addresses: it stays on the server, the client only ever sees the generic message.
+  const info: ApiErrorInfo = {
+    code: appError.code,
+    message:
+      appError.httpStatus >= 500 && err instanceof Error && !(err instanceof AppError)
+        ? sanitizeLogText(`${err.name}: ${err.message}`)
+        : sanitizeLogText(appError.message),
+  };
+  (res.locals as { apiError?: ApiErrorInfo }).apiError = info;
 
   if (res.headersSent) {
     next(err);

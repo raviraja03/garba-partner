@@ -70,7 +70,6 @@ describe('payment environment rules', () => {
     DATABASE_URL: 'postgres://u:p@localhost:5432/app',
     PHONE_HASH_SECRET: 'x'.repeat(40),
     PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
-    TOTP_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
     OTP_HMAC_SECRET: 'y'.repeat(40),
     JWT_ACCESS_SECRET: 'm'.repeat(40),
     JWT_ADMIN_ACCESS_SECRET: 'a'.repeat(40),

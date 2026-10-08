@@ -4,6 +4,31 @@
 @layer base {
   html {
     color-scheme: light;
+    /* Phones: keep our type sizes when the device rotates, and no grey flash on tap. */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Tailwind leaves buttons with the default arrow: anything clickable gets the hand. */
+  button:not(:disabled),
+  [role='tab'],
+  [role='menuitem'],
+  select:not(:disabled),
+  summary,
+  label:has(input:not(:disabled)) {
+    cursor: pointer;
+  }
+
+  /* No double-tap-to-zoom delay on controls. */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary {
+    touch-action: manipulation;
   }
 
   body {

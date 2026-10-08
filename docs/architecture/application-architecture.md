@@ -293,7 +293,7 @@ Defined in `packages/shared/src/errors/error-codes.ts`.
 | `PHOTO_LIMIT_REACHED` | 409 | More than 6 photos |
 | `LAST_PHOTO` | 409 | Deleting the only photo while discovery is enabled |
 | `INVALID_IMAGE` | 400 | Not a decodable JPEG/PNG/WebP, too small or too large |
-| `MFA_CODE_INVALID` / `MFA_CHALLENGE_INVALID` / `ACCOUNT_LOCKED` | 401/401/423 | Admin sign-in second step ([authentication §3.1](../auth/authentication.md#31-admin-sign-in-password--mandatory-two-factor)) |
+| `ACCOUNT_LOCKED` | 423 | Admin sign-in after 5 wrong passwords ([authentication §3.1](../auth/authentication.md#31-post-apiv1adminauthlogin)) |
 | `INTERNAL_ERROR` | 500 | Anything unexpected |
 
 ### 4.6 Validation
@@ -490,9 +490,7 @@ Example: `PublicProfileDto` (what other members receive):
 
 | Method | Path | Permission |
 |---|---|---|
-| POST | `/admin/auth/login` ✅ | P (rate limited, lockout) → `AdminLoginChallengeDto { challengeToken, method: 'totp'\|'setup', expiresAt }`. Never a session |
-| POST | `/admin/auth/login/totp-setup` ✅ | P, `setup` challenge → `{ secret, otpauthUri }` (first sign-in) |
-| POST | `/admin/auth/login/verify` ✅ | P, challenge + 6-digit code → `AdminSessionDto` + admin refresh cookie |
+| POST | `/admin/auth/login` ✅ | P (rate limited, lockout) → `AdminSessionDto` + admin refresh cookie. Email + password only (no second factor) |
 | POST | `/admin/auth/refresh` ✅, `/admin/auth/logout` ✅ | cookie (+ `X-Requested-With: gp-admin`) / any admin |
 | GET | `/admin/auth/me` ✅ | any admin → `AdminMeDto` (incl. permissions) |
 | GET | `/admin/dashboard/summary`, `/trends`, `/events`, `/events/export` | ✅ `dashboard:view` + per-section permissions ([dashboard](../admin/dashboard.md)) |
@@ -518,7 +516,6 @@ Example: `PublicProfileDto` (what other members receive):
 | GET/POST/PATCH | `/admin/cities`, `/admin/cities/:id`, `/admin/cities/:id/areas`, `/admin/areas/:id` | `locations:manage` |
 | GET | `/admin/audit-logs` | `audit:view` |
 | GET/POST/PATCH | `/admin/admins`, `/admin/admins/:id` | `admins:manage` |
-| POST | `/admin/admins/:id/reset-two-factor` ✅ | `admins:manage` — `{ reason }`, never one's own; ends the admin's sessions |
 
 Every admin write handler calls `auditService.log({ adminId, action, targetType, targetId, metadata, ip })` **inside the same transaction** as the change.
 
@@ -576,14 +573,14 @@ The MVP runs a single API process. For multiple processes, add `@socket.io/redis
 ### 7.1 Admin app (`apps/admin`)
 
 - Same stack and conventions as the web app (§8), desktop-first layout (sidebar + content). Tables use server-side cursor pagination.
-- Routes: `/login`, `/login/totp`, `/setup`, `/dashboard`, `/reports`, `/reports/:id`, `/verifications`, `/verifications/:id`, `/photos`, `/users`, `/users/:id`, `/events`, `/events/new`, `/events/:id`, `/cities`, `/audit-logs`, `/admins`.
+- Routes: `/login`, `/setup`, `/dashboard`, `/reports`, `/reports/:id`, `/verifications`, `/verifications/:id`, `/photos`, `/users`, `/users/:id`, `/events`, `/events/new`, `/events/:id`, `/cities`, `/audit-logs`, `/admins`.
 - The navigation shows only the items the admin's role permits (`ROLE_PERMISSIONS` from shared). This is **UX only**. The server enforces permissions.
 - Sensitive views: the selfie viewer loads signed URLs on demand (never cached, no download button). Phone reveal is a modal that requires a reason and shows the number once. It isn't kept in any query cache.
 - The session idle timeout of 30 min is enforced server-side (the refresh is rejected if the session `last_used_at` is more than 30 min ago), and the client shows a warning at 25 min.
 
 ### 7.2 Admin API
 
-- Mounted at `/api/v1/admin`, and accepted only on the admin host (`host-guard`).
+- Mounted at `/api/v1/admin` on the API domain. There is no host check in the application (`host-guard` was not built); Nginx can restrict the prefix by IP ([nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel)).
 - `requireAdmin(permission)`: verifies the JWT with `JWT_ADMIN_ACCESS_SECRET` and `aud = 'admin'`, loads `admin_users` + `admin_sessions`, checks the admin is `active`, then checks `ROLE_PERMISSIONS[role].includes(permission)`.
 - Admin refresh cookie: `gp_admin_rt`, `Path=/api/v1/admin/auth`, 12 h absolute, rotating.
 - Member tokens can never authorise admin routes (different secret and audience), and the reverse holds too.

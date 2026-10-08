@@ -6,7 +6,7 @@
 
 | Setting | Value |
 |---|---|
-| URL | Same origin as the web app; path **`/socket.io`** |
+| URL | The API server: the origin of `VITE_API_BASE_URL` in production (`https://<API_DOMAIN>`), the web app's own origin behind the Vite proxy in development; path **`/socket.io`** |
 | Transports | WebSocket, with long-polling fallback |
 | CORS | `WEB_ORIGIN` only, credentials allowed |
 | Max payload | 16 KB (`LIMITS.SOCKET_MAX_PAYLOAD_BYTES`) |

@@ -62,7 +62,8 @@ async function send<TData>(path: string, options: RequestOptions): Promise<TData
     response = await fetch(`${env.apiBaseUrl}${path}`, {
       method: options.method ?? 'GET',
       headers,
-      credentials: 'same-origin',
+      // The API may be on its own host (api.<domain>): the refresh cookie must still be sent.
+      credentials: 'include',
       ...(options.body !== undefined ? { body: JSON.stringify(options.body) } : {}),
       ...(options.formData ? { body: options.formData } : {}),
       ...(options.signal ? { signal: options.signal } : {}),
@@ -150,7 +151,8 @@ export async function apiDownload(path: string): Promise<{ blob: Blob; filename:
     try {
       return await fetch(`${env.apiBaseUrl}${path}`, {
         headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-        credentials: 'same-origin',
+        // The API may be on its own host (api.<domain>): the refresh cookie must still be sent.
+        credentials: 'include',
       });
     } catch {
       throw new ApiClientError('Unable to reach the server.', 'NETWORK_ERROR', 0);

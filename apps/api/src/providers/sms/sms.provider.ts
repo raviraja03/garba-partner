@@ -1,6 +1,6 @@
 /**
  * Sends one-time codes. Implementations must never log the code or the phone number.
- * Production providers (e.g. MSG91 with DLT-approved templates) are added before launch.
+ * `dev` is for local development; `msg91` sends real SMS (docs/notifications/msg91.md).
  */
 export interface SmsProvider {
   readonly name: string;

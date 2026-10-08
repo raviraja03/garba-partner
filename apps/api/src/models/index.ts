@@ -1,5 +1,4 @@
 import { AdminAuditLog } from './admin-audit-log.model.js';
-import { AdminLoginChallenge } from './admin-login-challenge.model.js';
 import { AdminSession } from './admin-session.model.js';
 import { AdminUser } from './admin-user.model.js';
 import { Area } from './area.model.js';
@@ -11,6 +10,8 @@ import { EventOrganizer } from './event-organizer.model.js';
 import { Event } from './event.model.js';
 import { Match } from './match.model.js';
 import { Message } from './message.model.js';
+import { ApiLog } from './api-log.model.js';
+import { NotificationDelivery } from './notification-delivery.model.js';
 import { NotificationPreference } from './notification-preference.model.js';
 import { Notification } from './notification.model.js';
 import { Order } from './order.model.js';
@@ -32,7 +33,6 @@ export {
   AUDIT_TARGET_TYPES,
   type AuditTargetType,
 } from './admin-audit-log.model.js';
-export { AdminLoginChallenge } from './admin-login-challenge.model.js';
 export { AdminSession } from './admin-session.model.js';
 export { AdminUser } from './admin-user.model.js';
 export { Area } from './area.model.js';
@@ -44,6 +44,14 @@ export { EventOrganizer, ORGANIZER_PUBLIC_ATTRIBUTES } from './event-organizer.m
 export { Event } from './event.model.js';
 export { canonicalPair, Match } from './match.model.js';
 export { Message } from './message.model.js';
+export { ApiLog } from './api-log.model.js';
+export {
+  DELIVERY_STATUSES,
+  NOTIFICATION_CHANNELS,
+  NotificationDelivery,
+  type DeliveryStatus,
+  type NotificationChannel,
+} from './notification-delivery.model.js';
 export { NotificationPreference } from './notification-preference.model.js';
 export { Notification, type NotificationData } from './notification.model.js';
 export { Order } from './order.model.js';
@@ -85,9 +93,10 @@ export const MODELS = [
   UserSanction,
   Notification,
   NotificationPreference,
+  NotificationDelivery,
+  ApiLog,
   Order,
   Payment,
   EventBooking,
   PaymentWebhookEvent,
-  AdminLoginChallenge,
 ];

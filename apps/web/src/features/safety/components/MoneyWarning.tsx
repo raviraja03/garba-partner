@@ -9,7 +9,7 @@ export function MoneyWarning({ onReport }: { onReport: () => void }) {
   return (
     <div
       role="note"
-      className="mt-1 max-w-[80%] rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-900 ring-1 ring-amber-200"
+      className="mt-1.5 max-w-[82%] rounded-control bg-accent-yellow-soft px-3 py-2 text-caption text-primary ring-1 ring-accent-yellow/60 sm:max-w-[70%]"
     >
       <strong>Be careful:</strong> never send money, gift cards, UPI payments, OTPs or bank details
       to someone you met here, whatever the reason. Buy passes only through the official event link.{' '}

@@ -69,7 +69,7 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 | T9 | Malicious file upload (polyglot, huge image, metadata leak) | sharp decode + re-encode, size/dimension limits, private storage for selfies (§7) |
 | T10 | XSS / injection | React escaping, no `dangerouslySetInnerHTML`, CSP, parameterised SQL, strict Zod schemas (§6, §8) |
 | T11 | CSRF on cookie-authenticated refresh | SameSite=Strict, path-scoped cookie, custom header + Origin check (§8.3) |
-| T12 | Admin compromise or insider misuse | Separate admin identity, Argon2id + TOTP, lockout, idle timeout, least-privilege roles, audited phone reveal, append-only audit log (§3.2, §11) |
+| T12 | Admin compromise or insider misuse | Separate admin identity, Argon2id, lockout, idle timeout, least-privilege roles, audited phone reveal, append-only audit log (§3.2, §11) |
 | T13 | Secret/PII leakage in logs or errors | Log redaction, no stack traces in prod, OTPs never logged (§11) |
 | T14 | Scraping of profiles | Auth-only profiles, rate-limited discovery, cursor pagination, no public profile URLs (§8.4) |
 | T15 | Payment fraud (post-MVP) | Server-side signature + webhook verification, idempotency (§14) |
@@ -100,10 +100,10 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 | Access token | JWT HS256, 15 min, `aud=app`, secret `JWT_ACCESS_SECRET` | JWT HS256, 15 min, `aud=admin`, secret `JWT_ADMIN_ACCESS_SECRET` |
 | Claims | `sub`, `sid`, `aud`, `iss`, `iat`, `exp`. **No PII, no role for members** | `sub`, `sid`, `aud`, `iss`, `iat`, `exp` (role is loaded from the DB per request, not trusted from the token) |
 | Refresh token | 256-bit random, SHA-256 hashed in `user_sessions`. Rotated each use. 30-day absolute expiry | Same in `admin_sessions`. 12 h absolute, 30 min idle |
-| Cookie | `gp_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | `gp_admin_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin/auth` on the admin host |
+| Cookie | `gp_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` | `gp_admin_rt`: `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/admin/auth` (both host-only on the API domain) |
 | Client storage | Access token in memory only | Same |
 | Per-request check | Session not revoked + user status (DB) | Session not revoked, not idle, admin `active` (DB) |
-| Revocation | Logout, logout-all, sanction, deletion, reuse detection | Logout, disable admin, role change, TOTP reset |
+| Revocation | Logout, logout-all, sanction, deletion, reuse detection | Logout, disable admin, role change |
 
 JWT verification pins the algorithm (`algorithms: ['HS256']`) and validates `aud`/`iss`. Tokens from one audience are rejected by the other.
 
@@ -111,9 +111,8 @@ JWT verification pins the algorithm (`algorithms: ['HS256']`) and validates `aud
 
 - Accounts are created only by a super admin (no self sign-up). The first super admin comes from the one-time `bootstrap-admin` seeder.
 - **Password:** ≥ 12 characters and checked against a common-password list. Hashed with **Argon2id** (memory ≥ 19 MiB, iterations ≥ 2, parallelism 1, per OWASP guidance).
-- **TOTP mandatory** (RFC 6238, ±1 step window). The secret is encrypted at rest. Enrolment happens on first login. Codes can't be replayed (the last used time-step is stored per admin).
-- **Lockout:** 5 failed password/TOTP attempts → locked 15 min. The event is audit-logged.
-- Login challenges expire in 5 min and allow 5 attempts.
+- **No second factor:** admin TOTP was implemented and then removed on request; admins sign in with email + password ([authentication §3.1](../auth/authentication.md#31-post-apiv1adminauthlogin)).
+- **Lockout:** 5 failed passwords → locked 15 min. The event is audit-logged.
 - Role changes and disabling an admin revoke all of that admin's sessions immediately.
 - Optional extra layer: Nginx IP allow-list for the admin host.
 
@@ -290,21 +289,11 @@ API: `helmet()` defaults, plus `Cache-Control: no-store` on all authenticated re
 
 The Razorpay entries (Checkout script, its iframe, and `same-origin-allow-popups` for UPI/bank redirects) are required for [event pass payments](../payments/razorpay.md); the web app loads `checkout.js` only when a member starts a payment.
 
-Web/admin (Nginx):
-
-```text
-Content-Security-Policy: default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' wss://garbapartner.example https://api.razorpay.com https://lumberjack.razorpay.com; script-src 'self' https://checkout.razorpay.com; frame-src https://api.razorpay.com https://checkout.razorpay.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
-X-Content-Type-Options: nosniff
-Referrer-Policy: strict-origin-when-cross-origin
-Permissions-Policy: geolocation=(), microphone=(), camera=(self), payment=(self "https://api.razorpay.com")
-Cross-Origin-Opener-Policy: same-origin-allow-popups
-```
-
-(`style-src 'unsafe-inline'` only if needed by tooling. Try to remove it. Admin CSP `connect-src` has no `wss:`. Add Razorpay domains only when payments ship.)
+Web/admin (Nginx): the headers are defined in [`deploy/nginx/snippets/gp-web-headers.conf.template`](../../deploy/nginx/snippets/gp-web-headers.conf.template) and [`gp-admin-headers.conf.template`](../../deploy/nginx/snippets/gp-admin-headers.conf.template), and explained in [nginx.md §5](../deployment/nginx.md#5-security-settings). In short: `default-src 'self'`; images from Cloudinary; connections only to the API domain (plus Razorpay on the web app); no framing; camera only on the web app; the admin panel is never indexed and sends no referrer.
 
 ### 8.3 CORS and CSRF
 
-- Production is same-origin, so CORS is effectively closed: the allow-list is `WEB_ORIGIN` and `ADMIN_ORIGIN` only, with `credentials: true`. Dev adds `localhost` origins through env.
+- Production serves the apps and the API on different hosts of one registrable domain ([system architecture §4.1](system-architecture.md#41-domains-and-routing)), so CORS is a production control: the allow-list is exactly `WEB_ORIGIN` and `ADMIN_ORIGIN`, with `credentials: true` and fixed methods and headers. Dev uses `localhost` origins through env.
 - Access tokens travel in the `Authorization` header, which is not automatically attached by browsers, so it's not CSRF-able.
 - Refresh cookies: `SameSite=Strict` + path-scoped + the refresh endpoint requires the header `X-Requested-With: gp-web` / `gp-admin` **and** an `Origin` header matching the expected origin. Otherwise `403`.
 
@@ -382,7 +371,6 @@ No advertising or third-party analytics SDKs in the MVP.
 | `OTP_HMAC_SECRET` | OTP hashing | Rotate any time (only affects in-flight OTPs) |
 | `PHONE_HASH_SECRET` | Phone lookup hash | **Rotation requires a re-hash migration** (decrypt `phone_encrypted` → re-hash). Treat as long-lived |
 | `PHONE_ENCRYPTION_KEY` (+ version) | AES-256-GCM phone ciphertext | Versioned. New writes use the new key, and a background re-encrypt job migrates old rows |
-| `TOTP_ENCRYPTION_KEY` | Admin TOTP secrets | Versioned as above |
 | DB passwords, SMS/Cloudinary keys | Integrations | Rotate on staff change or suspected exposure |
 
 Rules:
@@ -424,7 +412,7 @@ Authentication & sessions
 - [ ] Test OTP mode impossible in production (boot fails).
 - [ ] Access token in memory only. Refresh cookie `HttpOnly; Secure; SameSite=Strict`, path-scoped. Rotation + reuse detection tested.
 - [ ] Member and admin tokens use different secrets and audiences. Cross-use rejected (test).
-- [ ] Admin: Argon2id, mandatory TOTP, lockout, idle timeout, forced first-login setup. *(All implemented except the forced password change: see [security checklist](../security/security-checklist.md).)*
+- [ ] Admin: Argon2id, lockout, idle timeout, forced first-login setup. *(All implemented except the forced password change. Admin TOTP was removed: see [security checklist](../security/security-checklist.md).)*
 
 Authorization & safety
 - [ ] Every social endpoint uses `authenticateMember` + `requireActiveMember`. Every admin endpoint uses `authenticateAdmin` + `requirePermission(permission)`.

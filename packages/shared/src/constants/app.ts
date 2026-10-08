@@ -1,4 +1,7 @@
-export const APP_NAME = 'Garba Partner';
+export const APP_NAME = 'GarbaMates';
+
+/** The brand line. Use sparingly: the footer and the sign-in screens. */
+export const APP_TAGLINE = 'Find Your People. Find Your Vibe.';
 
 /** Current REST API version. Breaking changes ship as a new version side by side. */
 export const API_VERSION = 'v1';

@@ -55,7 +55,7 @@ Each item has acceptance criteria (AC). An item is done only when every AC passe
 
 | Item | Acceptance criteria |
 |---|---|
-| **Admin auth** | Email + password (Argon2id) + mandatory TOTP. Forced password change and TOTP enrolment on first login. Lockout after 5 failures |
+| **Admin auth** | Email + password (Argon2id). Forced password change on first login. Lockout after 5 failures. (TOTP was built, then removed from scope on request) |
 | **Roles** | `super_admin`, `moderator`, `event_manager`, enforced server-side per route ([matrix](../architecture/application-architecture.md#73-admin-role-permission-matrix)) |
 | **Dashboard** | Counts listed in [user flows §12.10](user-flows.md#1210-dashboard) |
 | **User management** | Search (ID, name, phone-by-hash), detail, sanction, revoke sanction, super-admin phone reveal with reason |
@@ -65,7 +65,7 @@ Each item has acceptance criteria (AC). An item is done only when every AC passe
 | **Events** | CRUD, draft/publish/cancel, cover upload, attendee notifications on material change or cancellation |
 | **Cities/areas** | CRUD and activate/deactivate |
 | **Audit log** | Every admin write action is logged and viewable by super admins (filter by admin, action, target) |
-| **Admin account management** | Super admin creates, deactivates and changes roles for admins, and resets TOTP |
+| **Admin account management** | Super admin creates, deactivates and changes roles for admins |
 
 ### 2.4 Non-functional
 
@@ -107,7 +107,7 @@ The order is chosen so that **no social surface ships without block and report**
 |---|---|---|---|
 | **0** | Foundation | Monorepo scaffolding, config/shared packages, lint/format/test tooling, CI, API skeleton (health check, error handler, response envelope, logging with redaction), web/admin shells with Tailwind (routing added with the first real pages) | All root scripts pass. `GET /api/v1/health` works |
 | **1** | Member auth & profile | DB connection + migration runner (moved from Phase 0), OTP (provider + dev test numbers), sessions, onboarding, 18+ gate, profile, photo upload/EXIF stripping, cities/areas seed, settings, account deletion (deactivation part) | A migration runs up and down. Member can sign up, onboard, edit profile, log out, delete |
-| **2** | Admin foundation & events | Admin auth + TOTP, roles, audit log, admin account management, cities/areas CRUD, events CRUD/publish/cancel, member event list/detail/attendance, in-app notifications | Event manager publishes an event. Members mark attendance |
+| **2** | Admin foundation & events | Admin auth, roles, audit log, admin account management, cities/areas CRUD, events CRUD/publish/cancel, member event list/detail/attendance, in-app notifications | Event manager publishes an event. Members mark attendance |
 | **3** | Discovery, interests, matches & safety core | Eligibility query, event and city modes, interests, matches, unmatch, **block**, **report user**, auto-hide, admin reports queue + sanctions + user management | Two members can match. Block/report work at every entry point. Moderator can suspend/ban with immediate effect |
 | **4** | Chat | Socket.IO server with auth, message send/history/read, REST fallback, message reports with snapshots, contact nudge, sanction/block enforcement in sockets | Matched members chat in realtime. Block/unmatch/sanction cut chat off immediately |
 | **5** | Verification & moderation | Photo verification flow, verification queue, photo review queue, selfie retention job, badge + explanation, safety centre content | Verification end-to-end. Retention job tested |

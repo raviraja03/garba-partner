@@ -52,7 +52,7 @@ This page records the security QA of the monorepo (web, admin, api): what was te
 
 No critical findings. All high findings are fixed and covered by regression tests.
 
-The later **security hardening** phase found and fixed four more high issues (no admin 2FA, no global rate limit, cacheable personal responses, admin sign-in missing from the audit log) and three medium/low ones. They are listed in [security checklist §4](../security/security-checklist.md#4-hardening-findings-this-phase), with the tests in the `security hardening` block of `security.int.test.ts` and in `env-rules.test.ts`.
+The later **security hardening** phase found and fixed four more high issues (no admin 2FA, which was later removed again on request; no global rate limit; cacheable personal responses, admin sign-in missing from the audit log) and three medium/low ones. They are listed in [security checklist §4](../security/security-checklist.md#4-hardening-findings-this-phase), with the tests in the `security hardening` block of `security.int.test.ts` and in `env-rules.test.ts`.
 
 ## 5. Accepted risks and follow-ups
 
@@ -65,7 +65,7 @@ The later **security hardening** phase found and fixed four more high issues (no
 | Photo/identity verification review not implemented | Gap | Only phone OTP verification exists; verified flags are set by trusted code paths only (tested) |
 | No automated browser tests | Gap | See [testing strategy §8](testing-strategy.md#8-known-gaps) |
 | Production CSP/HSTS at Nginx not yet deployed | Deployment | [Release checklist](release-checklist.md) item; configuration in [security best practices §5](../security/security-best-practices.md#5-nginx-and-deployment-assumptions) |
-| Forced admin password change on first sign-in not implemented | Medium | Mandatory TOTP limits the impact of a leaked initial password ([security checklist §5](../security/security-checklist.md#5-before-launch-open-items)) |
+| Forced admin password change on first sign-in not implemented | Medium | There is no second factor, so deliver initial passwords over a secure channel ([security checklist §5](../security/security-checklist.md#5-before-launch-open-items)) |
 
 ## 6. How to re-run
 

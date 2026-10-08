@@ -91,7 +91,7 @@ Personas are fictional composites. They keep design decisions tied to real needs
 - Founder/tech lead. Manages admin accounts and handles legal requests.
 
 **Product implications:**
-- Admin account management with roles and mandatory TOTP.
+- Admin account management with roles.
 - Audit log of every admin action.
 - Revealing a phone number requires a written reason and is audit-logged.
 
@@ -109,4 +109,4 @@ Anti-personas drive the safety requirements. Each maps to a specific control in 
 | **The harasser** | Sends abusive messages, then makes new accounts after being blocked | Block and report, message snapshots for evidence, ban on phone hash, OTP rate limits |
 | **The minor** | Under 18, lies about age | DOB gate, a locked DOB after underage rejection, P0 "underage" reports with immediate auto-hide, future ID-based age check |
 | **The scraper** | Automates profile harvesting | Auth required for every profile, cursor-paginated and rate-limited discovery, no public profile URLs, no sequential IDs |
-| **The malicious insider** | Admin misuses access | Least-privilege roles, phone numbers hidden by default, audited phone reveal, audit log, TOTP |
+| **The malicious insider** | Admin misuses access | Least-privilege roles, phone numbers hidden by default, audited phone reveal, audit log |

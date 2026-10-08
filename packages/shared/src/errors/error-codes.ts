@@ -23,13 +23,6 @@ export const ERROR_CODES = {
   },
   REFRESH_INVALID: { httpStatus: 401, message: 'Your session has ended. Please log in again.' },
   INVALID_CREDENTIALS: { httpStatus: 401, message: 'Incorrect email or password.' },
-  /** Admin two-factor sign-in: wrong authenticator code. */
-  MFA_CODE_INVALID: { httpStatus: 401, message: 'That code is not correct. Try the current code.' },
-  /** Admin two-factor sign-in: the challenge expired, was used, or ran out of attempts. */
-  MFA_CHALLENGE_INVALID: {
-    httpStatus: 401,
-    message: 'This sign-in has expired. Please enter your email and password again.',
-  },
   ACCOUNT_LOCKED: {
     httpStatus: 423,
     message: 'Too many failed attempts. Please try again later.',
@@ -43,7 +36,7 @@ export const ERROR_CODES = {
   ACCOUNT_PENDING_DELETION: { httpStatus: 403, message: 'This account is scheduled for deletion.' },
 
   // Profiles (docs/users/user-profile.md)
-  UNDERAGE: { httpStatus: 403, message: 'Garba Partner is only for adults (18+).' },
+  UNDERAGE: { httpStatus: 403, message: 'GarbaMates is only for adults (18+).' },
   ONBOARDING_REQUIRED: { httpStatus: 403, message: 'Please complete your profile first.' },
   PROFILE_NOT_STARTED: { httpStatus: 409, message: 'Please create your profile first.' },
   VERIFICATION_UNAVAILABLE: {

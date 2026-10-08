@@ -28,7 +28,7 @@ export function AvailableDatesInput({
 
   return (
     <div>
-      <div className="flex gap-2">
+      <div className="flex items-end gap-2">
         <input
           id={id}
           type="date"
@@ -46,7 +46,7 @@ export function AvailableDatesInput({
           type="button"
           onClick={add}
           disabled={!draft || full}
-          className="mt-1 rounded-xl bg-brand-100 px-4 font-semibold text-brand-900 hover:bg-brand-200 disabled:opacity-50"
+          className="min-h-12 shrink-0 rounded-control bg-brand-100 px-5 font-semibold text-brand-800 transition-colors hover:bg-brand-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Add
         </button>
@@ -56,7 +56,7 @@ export function AvailableDatesInput({
           {value.map((date) => (
             <li
               key={date}
-              className="flex items-center gap-1 rounded-full bg-white px-3 py-1 text-sm ring-1 ring-black/10"
+              className="flex min-h-10 items-center rounded-full bg-brand-50 pl-3.5 text-small font-semibold text-brand-700 ring-1 ring-brand-200"
             >
               {formatShortDate(date)}
               <button
@@ -64,7 +64,7 @@ export function AvailableDatesInput({
                 onClick={() => {
                   onChange(value.filter((d) => d !== date));
                 }}
-                className="ml-1 text-muted hover:text-danger"
+                className="flex size-10 items-center justify-center rounded-full text-lg leading-none text-muted transition-colors hover:text-danger"
                 aria-label={`Remove ${formatShortDate(date)}`}
               >
                 ×

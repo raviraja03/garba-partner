@@ -12,7 +12,7 @@ const SAFETY_TEXT: Record<SafetyNotificationKind, string> = {
     'A moderator restricted messaging on your account. You can still read your chats.',
   account_suspended: 'Your account has been suspended. You can still block and report members.',
   restriction_lifted: 'A restriction on your account has been lifted.',
-  report_reviewed: "We've reviewed your report. Thank you for helping keep Garba Partner safe.",
+  report_reviewed: "We've reviewed your report. Thank you for helping keep GarbaMates safe.",
 };
 
 const BOOKING_TEXT: Record<BookingNotificationKind, string> = {

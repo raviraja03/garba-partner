@@ -3,11 +3,9 @@ import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
 import type { Logger } from 'pino';
-import { pinoHttp } from 'pino-http';
 import type { ServerEnv } from '@garba-partner/config/server';
 import { API_PREFIX, CSRF_HEADER, REQUEST_ID_HEADER } from '@garba-partner/shared';
-import { redactUrl } from './lib/logger.js';
-import { resolveRequestId } from './lib/request-id.js';
+import { createApiLogger } from './middlewares/api-logger.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFound } from './middlewares/not-found.js';
 import { RAZORPAY_WEBHOOK_PATH } from './modules/payments/payments.routes.js';
@@ -21,7 +19,6 @@ export interface CreateAppOptions {
   dependencies: ApiDependencies;
 }
 
-const HEALTH_PATH = `${API_PREFIX}/health`;
 const WEBHOOK_PATH = `${API_PREFIX}${RAZORPAY_WEBHOOK_PATH}`;
 
 /** Builds the Express application. Kept free of side effects so tests can create instances. */
@@ -32,22 +29,8 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
   // Nginx runs on the same host; trust X-Forwarded-* only from loopback.
   app.set('trust proxy', 'loopback');
 
-  app.use(
-    pinoHttp({
-      logger,
-      genReqId: resolveRequestId,
-      // Query strings can carry phone numbers (admin search): never log them in the URL.
-      serializers: {
-        req: (req: { url?: string }) => ({ ...req, url: redactUrl(req.url) }),
-      },
-      autoLogging: { ignore: (req) => req.url === HEALTH_PATH },
-      customLogLevel: (_req, res, err) => {
-        if (err || res.statusCode >= 500) return 'error';
-        if (res.statusCode >= 400) return 'warn';
-        return 'info';
-      },
-    }),
-  );
+  // Request ID, per-request logger, the `[API]` log line and the `api_logs` table.
+  app.use(createApiLogger({ env, logger, sink: dependencies.apiLogs }));
   app.use(
     helmet({
       // 1 year; Nginx sends the same header in production (docs/security/security-best-practices.md).
@@ -68,7 +51,9 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
         'Idempotency-Key',
         REQUEST_ID_HEADER,
       ],
-      exposedHeaders: [REQUEST_ID_HEADER, 'Retry-After'],
+      // Content-Disposition: the admin panel reads the CSV export's file name from it, and the
+      // panel is on another origin than the API in production.
+      exposedHeaders: [REQUEST_ID_HEADER, 'Retry-After', 'Content-Disposition'],
       maxAge: 600,
     }),
   );

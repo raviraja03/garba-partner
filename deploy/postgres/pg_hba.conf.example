@@ -1,0 +1,21 @@
+# Garba Partner — pg_hba.conf rules (PostgreSQL 16). Guide: docs/deployment/production-setup.md §5
+#
+# Put these lines in /etc/postgresql/16/main/pg_hba.conf ABOVE any broader "host all all"
+# rule, then: sudo systemctl reload postgresql
+# Adjust the database and role names if you changed them in setup-roles.sql.
+
+# TYPE  DATABASE        USER                ADDRESS         METHOD
+
+# Administration from the server itself (sudo -u postgres psql).
+local   all             postgres                            peer
+
+# The application: loopback only, password (SCRAM) only, these two roles only.
+host    garba_partner   gp_app,gp_owner     127.0.0.1/32    scram-sha-256
+host    garba_partner   gp_app,gp_owner     ::1/128         scram-sha-256
+
+# Restore drills use a separate database owned by gp_owner (docs/deployment/database-backup.md).
+host    garba_partner_restore  gp_owner     127.0.0.1/32    scram-sha-256
+
+# Nothing else may reach these databases.
+host    garba_partner   all                 0.0.0.0/0       reject
+host    garba_partner   all                 ::/0            reject

@@ -12,3 +12,9 @@ export function resolveRequestId(req: IncomingMessage, res: ServerResponse): str
   res.setHeader(REQUEST_ID_HEADER, id);
   return id;
 }
+
+/** The ID given to a request by `resolveRequestId` (pino-http keeps it on `req.id`). */
+export function requestIdOf(req: IncomingMessage): string {
+  const id: unknown = req.id;
+  return typeof id === 'string' ? id : typeof id === 'number' ? String(id) : '-';
+}

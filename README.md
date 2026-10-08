@@ -93,10 +93,9 @@ Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-
 ## Logging in locally
 
 - **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
-- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. Admin sign-in always needs a **6-digit code from an authenticator app**: on the first sign-in the page shows a key to add to any TOTP app (Google Authenticator, Microsoft Authenticator, 1Password…). The event manager (`events@…`) manages events and organizers; moderators can view them only.
+- **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. The event manager (`events@…`) manages events and organizers; moderators can view them only.
 - **Events** (http://localhost:5173/events): public, no login needed. The seed adds three published events and one draft.
-- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password. The admin enrols an authenticator app at their first sign-in.
-- **`.env`:** `TOTP_ENCRYPTION_KEY` is required (32 random bytes, base64, different from `PHONE_ENCRYPTION_KEY`). Add it to an existing `.env` or the API refuses to start.
+- **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password.
 
 Details: [docs/auth/authentication.md](docs/auth/authentication.md).
 
@@ -120,6 +119,7 @@ Run from the repository root:
 | `npm run db:reset` | Rebuild the development database (undo all → migrate → seed) |
 | `npm run admin:create -- --email … --name … --role …` | Create an admin account (prints a one-time password) |
 | `npm run start:api` | Run the built API (`apps/api/dist`) |
+| `npm run env:check -w @garba-partner/api` | Validate the environment exactly as the API does at startup and print the non-secret settings |
 | `npm run preview:web` / `preview:admin` | Serve the built web/admin apps |
 
 Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/setup/local-development.md).
@@ -132,7 +132,7 @@ Step-by-step guide and troubleshooting: [docs/setup/local-development.md](docs/s
 | **Web** | `@garba-partner/web` | http://localhost:5173 | Member-facing app (mobile-first). Currently: login/OTP, onboarding, profile, photo upload, preferences, public events list and detail, event attendance ("looking for a partner"), **Discover** (filters, verified only, partner profile), **Interests** (received/sent: accept, decline, withdraw), **Matches** (match screen, unmatch, block, report), **Chats** (live messages, unread badge, read receipts, report message, block) |
 | **Admin** | `@garba-partner/admin` | http://localhost:5174 | Admin & moderation panel. Currently: admin login, role-based navigation, users (with match history, close match, interaction restriction), **events** (create/edit/publish/verify/archive, image upload) and **organizers**, **reports queue** (evidence, audited conversation review, resolve: dismiss/warn/suspend/ban) |
 
-Both Vite dev servers proxy `/api` to the API, so the apps use same-origin requests, as they will in production behind Nginx.
+Both Vite dev servers proxy `/api` to the API, so locally the apps use same-origin requests. In production the apps call the API on its own domain (`https://<API_DOMAIN>`, set by `VITE_API_BASE_URL`): see [production setup](docs/deployment/production-setup.md).
 
 ```bash
 curl http://127.0.0.1:4000/api/v1/health
@@ -150,7 +150,9 @@ garba-partner/
 ├── packages/
 │   ├── config/       # @garba-partner/config — env validation, tsconfig/ESLint/Prettier/Tailwind presets
 │   └── shared/       # @garba-partner/shared — shared types, constants, error codes, API contracts
+├── deploy/           # production deployment: Nginx templates, PostgreSQL setup, scripts, env template
 ├── docs/             # product, architecture, development and setup documentation
+├── ecosystem.config.cjs  # PM2 process file (production)
 ├── .env.example      # environment template (committed)
 ├── .env              # local environment (git-ignored)
 ├── eslint.config.js
@@ -235,6 +237,25 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 | [Threat model](docs/security/threat-model.md) | Assets, actors, trust boundaries, entry points, STRIDE threats with mitigations, product abuse cases, assumptions |
 | [Security best practices](docs/security/security-best-practices.md) | Rules for API and frontend code, secrets and key rotation, **Nginx configuration and deployment assumptions**, admin operations, PR checklist |
 
+### Design
+
+| Document | Contents |
+|---|---|
+| [Design system](docs/design/design-system.md) | GarbaMates brand colours and contrast rules, typography, spacing and shape tokens, logo usage, the reusable components (buttons, inputs, cards, badges, avatars, dialogs, navigation, footer), loading / empty / error states, accessibility checklist |
+
+### Deployment
+
+**Not deployed yet.** These documents prepare the production deployment; see the status and blockers in the first one.
+
+| Document | Contents |
+|---|---|
+| [Production setup](docs/deployment/production-setup.md) | Status and blockers, architecture and domains, server preparation, env file, PostgreSQL roles, first and routine deploys, health checks, logging, **complete deployment checklist**, what was and was not tested |
+| [Nginx](docs/deployment/nginx.md) | Templates and rendering, what each server block does, security headers and CSP, admin IP allow-list, troubleshooting |
+| [PM2](docs/deployment/pm2.md) | Process file, why exactly one instance, commands, start on boot, logs |
+| [SSL](docs/deployment/ssl.md) | First certificate, automatic renewal, changing domains, TLS decisions |
+| [Database backup](docs/deployment/database-backup.md) | Strategy, encryption and off-site copy, restore drill, disaster recovery |
+| [Rollback](docs/deployment/rollback.md) | Code rollback, migrations and what cannot be undone, rehearsal, decision guide |
+
 ### Admin
 
 | Document | Contents |
@@ -254,6 +275,9 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 
 | Document | Contents |
 |---|---|
+| [Logging](docs/development/logging.md) | Request logging (`[API]` lines, `api_logs` table), what is never logged, the `LOG_OTP` debugging switch, how to read the logs |
+| [MSG91 setup](docs/notifications/msg91.md) | What to create in MSG91 (auth key, DLT templates, WhatsApp templates), the env variables, the login-code and notification flows, the first-send check, troubleshooting |
+| [Notification channels](docs/notifications/notification-channels.md) | SMS and WhatsApp delivery pipeline, the `notification_deliveries` history table, failure handling, duplicate prevention, how to add a real provider |
 | [Notifications](docs/notifications/notifications.md) | Types and triggers, privacy rules, **API reference** (list, unread count, mark read, preferences), realtime event, jobs (event reminders, retention), admin monitoring, database, tests |
 
 ### Safety & moderation
@@ -322,8 +346,9 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **5c** | Event pass payments | ✅ Razorpay orders with server-computed amounts, idempotency keys, capacity holds, checkout signature + API verification, signed webhooks with de-duplication, reconciliation job, bookings with codes, automatic refunds (sold out, duplicates, unavailable events), admin refunds, pass settings, payments back office, booking notifications. ⏳ QR check-in, partial refunds, invoices | ✅ Done |
 | **5d** | Admin dashboard | ✅ Aggregate metrics (members, active, verified, suspended, events, matches, pending reports, bookings, revenue), date and city filters, role-scoped sections, daily/weekly trend charts, paginated per-event table, audited per-event sales CSV | ✅ Done |
 | **5e** | QA | ✅ Security QA (unauthorized access, JWT forgery, privilege escalation, IDOR, injection, XSS, uploads, CSRF, rate limits, logging), security test suite, 3 findings fixed (public profile visibility, phone numbers in logs, destructive DB commands on staging), test strategy, test cases, release checklist | ✅ Done |
-| **5f** | Security hardening | ✅ **Mandatory admin two-factor sign-in** (TOTP, encrypted secrets, single-use challenges, replay protection, lockout across both factors, super-admin reset), admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change | ✅ Done |
-| **6** | Hardening & launch | Load test, Nginx/PM2/VPS (config in [security best practices §5](docs/security/security-best-practices.md#5-nginx-and-deployment-assumptions)), TLS, backups & restore drill, legal pages, SMS DLT, Redis-backed rate limits, runbooks | Planned |
+| **5f** | Security hardening | ✅ Admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change. Admin two-factor (authenticator) sign-in was built and then removed on request (migration `20261004100000-remove-admin-two-factor`) | ✅ Done |
+| **5g** | Deployment preparation | ✅ Three configurable domains (web, admin, API) with the apps calling the API cross-origin, PM2 process file, Nginx templates rendered from env, least-privilege PostgreSQL roles and server settings, deploy / rollback / preflight / health-check / backup / restore scripts, log rotation, [deployment docs](docs/deployment/production-setup.md) with checklist. ⏳ **Not run on a server yet** | 🟡 Prepared, not deployed |
+| **6** | Launch | **Configure MSG91 and confirm a real login code arrives (production cannot start without it)**, run the [deployment checklist](docs/deployment/production-setup.md#11-deployment-checklist) on the VPS, load test, restore drill and rollback rehearsal, admin second factor or IP allow-list, legal pages, Redis-backed rate limits, CI/CD | Planned |
 
 ### Post-MVP (indicative)
 

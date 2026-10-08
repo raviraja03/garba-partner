@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { Link } from 'react-router';
-import { Alert } from '../components/ui/Alert';
 import { FullPageSpinner } from '../components/FullPageSpinner';
+import { PageHeader } from '../components/PageHeader';
+import { Alert } from '../components/ui/Alert';
+import { Card } from '../components/ui/Card';
+import { EmptyState } from '../components/ui/EmptyState';
 import { ImageUpload } from '../features/profile/components/ImageUpload';
 import { ProfileForm } from '../features/profile/components/ProfileForm';
 import { useMyProfile, useUpdateProfile } from '../features/profile/hooks';
@@ -13,31 +15,29 @@ export function EditProfilePage() {
 
   if (myProfile.isPending) return <FullPageSpinner />;
   if (myProfile.isError || !myProfile.data.profile) {
-    return <Alert tone="error">We couldn't load your profile.</Alert>;
+    return (
+      <EmptyState tone="error" title="We couldn't load your profile">
+        Check your connection and refresh the page.
+      </EmptyState>
+    );
   }
   const profile = myProfile.data.profile;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight">Edit profile</h1>
-        <Link to="/profile" className="text-sm font-semibold text-brand-700 hover:underline">
-          Done
-        </Link>
-      </div>
+    <div className="space-y-6">
+      <PageHeader title="Edit profile" back={{ to: '/profile', label: 'My profile' }} />
 
-      <section id="photo" aria-labelledby="photo-title" className="space-y-3">
-        <h2 id="photo-title" className="font-semibold">
+      <Card as="section" id="photo" aria-labelledby="photo-title" className="space-y-4">
+        <h2 id="photo-title" className="text-h3">
           Profile photo
         </h2>
         <ImageUpload image={profile.image} />
-      </section>
+      </Card>
 
-      <section aria-labelledby="details-title" className="space-y-3">
-        <h2 id="details-title" className="font-semibold">
+      <section aria-labelledby="details-title" className="space-y-4">
+        <h2 id="details-title" className="sr-only">
           Details
         </h2>
-        {saved && <Alert tone="info">Your profile was saved.</Alert>}
         <ProfileForm
           key={profile.updatedAt}
           mode="edit"
@@ -49,6 +49,7 @@ export function EditProfilePage() {
             setSaved(true);
           }}
         />
+        {saved && <Alert tone="success">Your profile was saved.</Alert>}
       </section>
     </div>
   );

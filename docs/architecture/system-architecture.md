@@ -50,7 +50,7 @@ flowchart TB
 | **Web app** (`apps/web`) | React + Vite + TS + Tailwind | Member UI: onboarding, events, discovery, interests, chat, settings, safety centre | Static files served by Nginx |
 | **Admin app** (`apps/admin`) | React + Vite + TS + Tailwind | Moderation, verification, events, users, audit | Static files served by Nginx on the admin subdomain |
 | **API** (`apps/api`, `src/server.ts`) | Node.js LTS + Express 5 + TS + Sequelize + Socket.IO | REST API (`/api/v1`), admin API (`/api/v1/admin`), realtime chat/notifications | PM2 process `gp-api` (fork mode, 1 instance in the MVP) |
-| **Worker** (`apps/api`, `src/worker.ts`) | Same codebase, `node-cron` | Scheduled jobs (§6) | PM2 process `gp-worker` (1 instance) |
+| **Scheduled jobs** (`apps/api`) | In the API process (timers) | Sanction expiry, event reminders, notification retention, payment reconciliation (§6) | Part of `gp-api`: exactly one instance ([PM2](../deployment/pm2.md)) |
 | **Database** | PostgreSQL 16+ | System of record | systemd service, bound to `127.0.0.1` |
 | **Shared package** (`packages/shared`) | TS | Types, enums, constants, Zod schemas, error codes, socket event contracts | Build-time dependency |
 | **Config package** (`packages/config`) | TS | Env schema/loader, tsconfig/ESLint/Prettier/Tailwind presets | Build-time dependency |
@@ -59,23 +59,23 @@ flowchart TB
 
 ## 4. Deployment topology (VPS)
 
+The deployment is implemented in [`deploy/`](../../deploy/) and documented in [docs/deployment/](../deployment/production-setup.md). This section is the summary.
+
 ```mermaid
 flowchart LR
     internet((Internet)) -->|443| nginx
     subgraph VPS[Ubuntu LTS VPS]
         nginx[Nginx<br/>TLS termination]
-        webstatic[/var/www/gp-web<br/>static build/]
-        admstatic[/var/www/gp-admin<br/>static build/]
+        webstatic[/current/apps/web/dist<br/>static build/]
+        admstatic[/current/apps/admin/dist<br/>static build/]
         subgraph PM2
-            apip[gp-api :4000<br/>127.0.0.1 only]
-            wrk[gp-worker]
+            apip[gp-api :4000<br/>127.0.0.1 only<br/>REST + Socket.IO + jobs]
         end
         pg[(PostgreSQL :5432<br/>127.0.0.1 only)]
-        nginx --> webstatic
-        nginx --> admstatic
-        nginx -->|/api, /socket.io| apip
+        nginx -->|WEB_DOMAIN| webstatic
+        nginx -->|ADMIN_DOMAIN| admstatic
+        nginx -->|API_DOMAIN: /api, /socket.io| apip
         apip --> pg
-        wrk --> pg
     end
     backup[(Off-site encrypted<br/>backup storage)]
     pg -.->|nightly pg_dump| backup
@@ -83,42 +83,45 @@ flowchart LR
 
 ### 4.1 Domains and routing
 
-Domain placeholder: `garbapartner.example`. Replace it when decided.
+Three domains under one registrable domain, set in the server's env file (never in code). Example: `garbamates.in`.
 
-| Host | Path | Target |
+| Variable | Example | Target |
 |---|---|---|
-| `garbapartner.example` (+ `www` → 301) | `/` | Web SPA (`try_files $uri /index.html`) |
-| | `/api/` | `http://127.0.0.1:4000` |
-| | `/socket.io/` | `http://127.0.0.1:4000` with WebSocket upgrade headers |
-| `admin.garbapartner.example` | `/` | Admin SPA |
-| | `/api/v1/admin/`, `/api/v1/health` | `http://127.0.0.1:4000` (**only** the admin API prefix and the health check are proxied on this host) |
+| `WEB_DOMAIN` | `garbamates.in` | Web SPA: static files, `try_files $uri /index.html` |
+| `ADMIN_DOMAIN` | `admin.garbamates.in` | Admin SPA: static files, optional IP allow-list |
+| `API_DOMAIN` | `api.garbamates.in` | `/api/` and `/socket.io/` → `http://127.0.0.1:4000`; everything else `404` |
 
-**Why same-origin API?** The web app and API share an origin, and so do the admin app and the admin API. Refresh-token cookies can then be host-only with `SameSite=Strict`, CORS is not needed in production, and CSRF exposure is minimal. The API still has a strict CORS allow-list for local development.
+**The API has its own domain** (this replaced the earlier same-origin plan, where each app's host proxied `/api`). The browser apps call the API domain directly:
 
-The API also rejects admin routes that arrive on the member host, and member routes that arrive on the admin host (a `Host` header check in middleware), as defence in depth.
+- Cross-origin but **same-site**: the refresh cookies stay host-only on the API domain with `HttpOnly; Secure; SameSite=Strict`, and are sent because all three hosts share one registrable domain. An API on an unrelated domain would break sessions.
+- The API's CORS allow-list is exactly `WEB_ORIGIN` and `ADMIN_ORIGIN`, with fixed methods and headers; cookie endpoints also require the CSRF header and a matching `Origin`. This is now a production control, not only a development one.
+- The admin API (`/api/v1/admin/`) is reachable on the API domain. It is protected by admin authentication and permissions; Nginx can additionally restrict it, together with the admin panel, to an IP allow-list ([nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel)). The API does not check the `Host` header.
+
+In local development the Vite dev servers proxy `/api` and `/socket.io`, so the apps use a same-origin path there.
 
 ### 4.2 Nginx responsibilities
 
+Details: [nginx.md](../deployment/nginx.md).
+
 - TLS 1.2+ with Let's Encrypt (certbot auto-renew), HTTP → HTTPS redirect, HSTS.
-- Security headers for static apps: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera allowed only for self, for the verification selfie; geolocation denied), `frame-ancestors 'none'`.
-- Long cache headers for hashed Vite assets (`/assets/*`: `Cache-Control: public, max-age=31536000, immutable`). `index.html` is `no-cache`.
-- `client_max_body_size 6m` (photo uploads ≤ 5 MB plus multipart overhead).
-- A coarse per-IP rate limit (`limit_req`) on `/api/` as the first line of defence. The fine-grained limits live in the API.
-- `proxy_set_header X-Forwarded-For / X-Forwarded-Proto / Host`. Express `trust proxy` is set to `loopback`.
-- Optional: IP allow-list or basic auth in front of the admin host as an extra layer (not a replacement for admin auth).
-- Gzip/Brotli for text assets.
+- Security headers for the static apps: `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` (camera only for the web app, geolocation denied), no framing.
+- Long cache headers for hashed Vite assets (`/assets/*`); `index.html` is revalidated.
+- `client_max_body_size 6m` on the API domain (photo uploads ≤ 5 MB plus multipart overhead).
+- A coarse per-IP rate limit (`limit_req`) on `/api/`. The fine-grained limits live in the API.
+- `X-Forwarded-For` is replaced with the address Nginx saw. Express `trust proxy` is `loopback`.
+- Access logs without query strings (admin searches carry phone numbers).
+- Optional IP allow-list for the admin panel and the admin API.
 
 ### 4.3 PM2
 
-`ecosystem.config.cjs` at the repo root (created in Phase 6):
+[`ecosystem.config.cjs`](../../ecosystem.config.cjs) at the repo root. Details: [pm2.md](../deployment/pm2.md).
 
 | App | Script | Mode | Instances | Notes |
 |---|---|---|---|---|
-| `gp-api` | `apps/api/dist/server.js` | fork | 1 | `max_memory_restart: 512M`, graceful shutdown (`kill_timeout: 10000`), listens on `127.0.0.1:4000` |
-| `gp-worker` | `apps/api/dist/worker.js` | fork | 1 | Must always be exactly 1 instance |
+| `gp-api` | `apps/api/dist/server.js` | fork | **1** | `wait_ready`, `max_memory_restart: 512M`, graceful shutdown (`kill_timeout: 12000`), listens on `127.0.0.1:4000`. Runs the scheduled jobs too, so it must stay one instance |
 
-- `pm2 startup` + `pm2 save` so processes survive reboots. `pm2-logrotate` for log rotation.
-- The API handles `SIGTERM`/`SIGINT`: it stops accepting connections, closes Socket.IO, drains in-flight requests and closes the DB pool.
+- `pm2 startup` + `pm2 save` so the process survives reboots. Logs are rotated by `logrotate`.
+- The API handles `SIGTERM`/`SIGINT`: it stops the jobs, closes Socket.IO, drains in-flight requests and closes the DB pool.
 
 ### 4.4 Server hardening (VPS)
 
@@ -128,17 +131,14 @@ The API also rejects admin routes that arrive on the member host, and member rou
 - PostgreSQL and the API bind to `127.0.0.1`. Nothing else is exposed.
 - The app runs as a dedicated unprivileged user (`gp`). `.env` is owned by `gp` with mode `600`.
 
-### 4.5 Deployment process (MVP)
+### 4.5 Deployment process
 
-1. CI passes on `main`, and a release tag `vX.Y.Z` is created (see [git workflow](../development/git-workflow.md)).
-2. On the server, in a new release directory: `git fetch --tags && git checkout vX.Y.Z` → `npm ci` → `npm run build`.
-3. **Back up the database** → run migrations (`npm run db:migrate -w apps/api`).
-4. Switch the symlink `/srv/garba-partner/current` → the new release. `pm2 reload ecosystem.config.cjs`.
-5. Copy the web/admin `dist` folders to the Nginx roots (or point Nginx at `current/apps/*/dist`).
-6. Smoke test: `GET /api/v1/health`, log in with a test account, open a chat.
-7. Rollback: point the symlink back and `pm2 reload`. Migrations must be backward compatible for one release (expand → migrate → contract), so the previous release keeps working. A destructive down-migration is a manual, approved step.
+Scripted in [`deploy/scripts/deploy.sh`](../../deploy/scripts/deploy.sh); the full procedure and checklist are in [production setup](../deployment/production-setup.md).
 
-A scripted deploy (shell script or GitHub Actions over SSH) can be added once the manual steps are stable.
+1. `npm run check` passes on the commit; a release tag `vX.Y.Z` is created (see [git workflow](../development/git-workflow.md)).
+2. On the server, `deploy.sh vX.Y.Z`: new release directory → `npm ci` → build → preflight → **encrypted database backup** → migrations → switch the `current` symlink → restart the API → health check.
+3. An unhealthy release is rolled back automatically (code only). Migrations must be backward compatible for one release (expand → migrate → contract): see [rollback](../deployment/rollback.md).
+4. `healthcheck.sh` verifies the public side (TLS, headers, CORS, Socket.IO). A deployment is complete only when it passes.
 
 ## 5. Environments
 
@@ -159,8 +159,8 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `APP_ENV` | api | `development` \| `staging` \| `production` (controls feature guards such as test OTP) |
 | `API_PORT` | api | `4000` |
 | `API_HOST` | api | `127.0.0.1` |
-| `WEB_ORIGIN` | api | `https://garbapartner.example`. Used for CORS/Origin checks and Host routing |
-| `ADMIN_ORIGIN` | api | `https://admin.garbapartner.example` |
+| `WEB_ORIGIN` | api | `https://<WEB_DOMAIN>`. Used for CORS and CSRF `Origin` checks |
+| `ADMIN_ORIGIN` | api | `https://<ADMIN_DOMAIN>` |
 | `DATABASE_URL` | api | `postgres://gp_app:***@127.0.0.1:5432/garba_partner` |
 | `DATABASE_SSL` | api | `false` locally, `true` for managed DBs |
 | `DATABASE_POOL_MAX` | api | `10` |
@@ -173,18 +173,16 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `PHONE_HASH_SECRET` | api | ≥ 32 random bytes. **Never rotate without a re-hash migration** |
 | `PHONE_ENCRYPTION_KEY` | api | 32-byte key, base64 (AES-256-GCM) |
 | `PHONE_ENCRYPTION_KEY_VERSION` | api | `1` |
-| `TOTP_ENCRYPTION_KEY` | api | 32-byte key, base64 (encrypts admin TOTP secrets) |
 | `SMS_PROVIDER` | api | `dev` today (no SMS; code returned in the response, **only accepted when `APP_ENV=development`**). A real provider (e.g. `msg91`) is added before launch |
-| `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` | api | Provider credentials / DLT IDs |
+| `SMS_PROVIDER`, `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID` | api | SMS provider, its credential and the DLT-approved login-code template ([MSG91 setup](../notifications/msg91.md)) |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | api | Cloudinary credentials |
 | `CLOUDINARY_FOLDER_PREFIX` | api | `garba-partner/production` |
 | `LOG_LEVEL` | api | `info` in production |
-| `VITE_API_BASE_URL` | web, admin | `/api/v1` (same origin). `http://localhost:4000/api/v1` in dev if not proxied |
-| `VITE_SOCKET_URL` | web | `/` (same origin) |
+| `VITE_API_BASE_URL` | web, admin | `/api/v1` in development (Vite proxy). `https://<API_DOMAIN>/api/v1` in production. Socket.IO connects to the same origin as this URL |
 | `VITE_CLOUDINARY_CLOUD_NAME` | web, admin | Public cloud name, used only to build delivery URLs |
 | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | api | **Post-MVP.** Not present in MVP `.env.example` |
 
-In local dev, Vite's dev server proxies `/api` and `/socket.io` to `localhost:4000`, so the same-origin cookie setup works just as it does in production.
+In local dev, Vite's dev server proxies `/api` and `/socket.io` to `localhost:4000` (same-origin). In production the apps call the API domain; the deployment variables (`WEB_DOMAIN`, `ADMIN_DOMAIN`, `API_DOMAIN`, backups) are in [environment variables §6](../setup/environment-variables.md#6-production).
 
 ## 6. Scheduled jobs (worker)
 
@@ -209,7 +207,7 @@ A `job_runs` table isn't needed for the MVP. Jobs log start/end/count to the str
 
 | Concern | MVP approach |
 |---|---|
-| **Logging** | `pino` JSON logs to stdout → PM2 log files → `pm2-logrotate` (keep 14 days locally). **Redaction** of `authorization`, `cookie`, `set-cookie`, `phone`, `otp`, `code`, `password`, `token`, `body.message` (chat) paths. Every log line carries a request ID (`X-Request-Id`, generated if missing) |
+| **Logging** | `pino` JSON logs to stdout → PM2 log files → `logrotate` (keep 14 days locally; [production setup §10](../deployment/production-setup.md#10-logging)). **Redaction** of `authorization`, `cookie`, `set-cookie`, `phone`, `otp`, `code`, `password`, `token`, `body.message` (chat) paths. Every log line carries a request ID (`X-Request-Id`, generated if missing) |
 | **Error tracking** | Optional: Sentry (or similar) with PII scrubbing and `sendDefaultPii: false`. Must be disclosed in the privacy policy if used |
 | **Uptime** | External uptime check on `/api/v1/health` (returns `{status, db: 'ok'}` only) |
 | **Metrics** | MVP: admin dashboard counts plus server metrics (CPU, RAM, disk) from the VPS provider. Alerts on disk > 80%, API down, 5xx error rate spike |

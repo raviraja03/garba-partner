@@ -1,6 +1,12 @@
 import { Link } from 'react-router';
-import { Alert } from '../components/ui/Alert';
-import { Button } from '../components/ui/Button';
+import { PageHeader } from '../components/PageHeader';
+import { Avatar } from '../components/ui/Avatar';
+import { CountBadge } from '../components/ui/Badge';
+import { Button, LinkButton } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { cx } from '../components/ui/cx';
+import { EmptyState } from '../components/ui/EmptyState';
+import { LoadingRegion, SkeletonRow } from '../components/ui/Skeleton';
 import { useAuth } from '../features/auth/auth-context';
 import { useChats } from '../features/chat/hooks';
 import { formatTimestampDay } from '../lib/format';
@@ -13,81 +19,107 @@ export function ChatsPage() {
   const chats = list.data?.pages.flatMap((page) => page.items) ?? [];
 
   return (
-    <div className="space-y-5">
-      <h1 className="text-3xl font-extrabold tracking-tight">Chats</h1>
-      {list.isError && <Alert tone="error">{list.error.message}</Alert>}
-      {list.isPending && (
-        <p role="status" className="text-sm text-muted">
-          Loading…
-        </p>
-      )}
-      {!list.isPending && chats.length === 0 && (
-        <section className="rounded-card bg-white p-6 text-center shadow-sm ring-1 ring-black/5">
-          <p className="text-sm text-muted">
-            No chats yet. A chat opens when you and another member both say yes.
-          </p>
-          <Link to="/discover" className="mt-3 inline-block font-semibold text-brand-700">
-            Discover partners
-          </Link>
-        </section>
-      )}
-      <ul className="divide-y divide-black/5 overflow-hidden rounded-card bg-white shadow-sm ring-1 ring-black/5">
-        {chats.map((chat) => (
-          <li key={chat.matchId}>
-            <Link
-              to={`/chats/${chat.matchId}`}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-brand-50/50"
-            >
-              {chat.partner.image ? (
-                <img
-                  src={chat.partner.image.thumbnailUrl}
-                  alt=""
-                  className="size-12 shrink-0 rounded-full object-cover"
-                />
-              ) : (
-                <span className="size-12 shrink-0 rounded-full bg-brand-50" aria-hidden="true" />
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline justify-between gap-2">
-                  <span
-                    className={`truncate ${chat.unreadCount > 0 ? 'font-bold' : 'font-semibold'}`}
-                  >
-                    {chat.partner.name}
-                  </span>
-                  <span className="shrink-0 text-xs text-muted">
-                    {formatTimestampDay(chat.lastActivityAt)}
-                  </span>
-                </span>
-                <span className="flex items-center justify-between gap-2">
-                  <span
-                    className={`truncate text-sm ${chat.unreadCount > 0 ? 'text-ink' : 'text-muted'}`}
-                  >
-                    {chat.lastMessage
-                      ? `${chat.lastMessage.senderId === myId ? 'You: ' : ''}${chat.lastMessage.body}`
-                      : 'Say hello 👋'}
-                  </span>
-                  {chat.unreadCount > 0 && (
-                    <span
-                      className="shrink-0 rounded-full bg-brand-600 px-2 py-0.5 text-xs font-bold text-white"
-                      aria-label={`${String(chat.unreadCount)} unread`}
-                    >
-                      {chat.unreadCount}
-                    </span>
-                  )}
-                </span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      {list.hasNextPage && (
-        <Button
-          variant="secondary"
-          loading={list.isFetchingNextPage}
-          onClick={() => void list.fetchNextPage()}
+    <div className="space-y-6">
+      <PageHeader title="Chats" description="Conversations with your matches." />
+      {list.isError && (
+        <EmptyState
+          tone="error"
+          title="We couldn't load your chats"
+          action={
+            <Button variant="secondary" fullWidth={false} onClick={() => void list.refetch()}>
+              Try again
+            </Button>
+          }
         >
-          Show more
-        </Button>
+          {list.error.message}
+        </EmptyState>
+      )}
+      {list.isPending && (
+        <LoadingRegion label="Loading chats…" className="space-y-3">
+          <SkeletonRow />
+          <SkeletonRow />
+          <SkeletonRow />
+        </LoadingRegion>
+      )}
+      {list.isSuccess && chats.length === 0 && (
+        <EmptyState
+          icon="chat"
+          title="No chats yet"
+          action={<LinkButton to="/discover">Discover partners</LinkButton>}
+        >
+          A chat opens when you and another member both say yes.
+        </EmptyState>
+      )}
+      {chats.length > 0 && (
+        <Card padding="none">
+          <ul className="divide-y divide-line">
+            {chats.map((chat) => {
+              const unread = chat.unreadCount > 0;
+              return (
+                <li key={chat.matchId}>
+                  <Link
+                    to={`/chats/${chat.matchId}`}
+                    className="flex min-h-18 items-center gap-3 px-4 py-3 transition-colors hover:bg-brand-50"
+                  >
+                    <Avatar
+                      name={chat.partner.name}
+                      src={chat.partner.image?.thumbnailUrl}
+                      size="lg"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span
+                          className={cx(
+                            'truncate text-ink',
+                            unread ? 'font-bold' : 'font-semibold',
+                          )}
+                        >
+                          {chat.partner.name}
+                        </span>
+                        <span
+                          className={cx(
+                            'shrink-0 text-caption',
+                            unread ? 'font-semibold text-accent-700' : 'text-muted',
+                          )}
+                        >
+                          {formatTimestampDay(chat.lastActivityAt)}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 flex items-center justify-between gap-2">
+                        <span
+                          className={cx(
+                            'truncate text-small',
+                            unread ? 'font-medium text-ink' : 'text-muted',
+                          )}
+                        >
+                          {chat.lastMessage
+                            ? `${chat.lastMessage.senderId === myId ? 'You: ' : ''}${chat.lastMessage.body}`
+                            : 'Say hello 👋'}
+                        </span>
+                        <CountBadge
+                          count={chat.unreadCount}
+                          label={`${String(chat.unreadCount)} unread`}
+                        />
+                      </span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
+      {list.hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            variant="secondary"
+            fullWidth={false}
+            loading={list.isFetchingNextPage}
+            onClick={() => void list.fetchNextPage()}
+          >
+            Show more
+          </Button>
+        </div>
       )}
     </div>
   );

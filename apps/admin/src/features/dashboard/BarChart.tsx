@@ -10,7 +10,7 @@ export function BarChart({
   labels,
   values,
   format = (value) => String(value),
-  color = '#b4371a',
+  color = '#2D1B69',
 }: {
   title: string;
   labels: string[];

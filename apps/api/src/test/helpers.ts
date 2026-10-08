@@ -12,14 +12,15 @@ import type { AdminRole } from '@garba-partner/shared';
 import { createApp } from '../app.js';
 import { createSequelize } from '../config/database.js';
 import { hashPassword } from '../lib/passwords.js';
-import { totpCode, totpStep } from '../lib/totp.js';
 import { AdminUser } from '../models/index.js';
 import { createTokenService } from '../modules/auth/token.service.js';
 import { createChatService } from '../modules/chat/chat.service.js';
 import { createNotifier } from '../modules/notifications/notifications.service.js';
 import { createSafetyLogger } from '../modules/safety/safety-log.service.js';
 import { createSuspiciousActivityDetector } from '../modules/safety/suspicious-activity.service.js';
+import type { ApiLogSink } from '../modules/api-logs/api-log.store.js';
 import type { MediaStorage } from '../providers/media/index.js';
+import type { MessageProviders } from '../providers/messaging/index.js';
 import type { PaymentGateway } from '../providers/payments/index.js';
 import { createRealtimeHub, type RealtimeHub } from '../realtime/hub.js';
 import { attachSocketServer } from '../realtime/socket-server.js';
@@ -40,7 +41,6 @@ export function createTestEnv(overrides: Record<string, string> = {}): ServerEnv
       DATABASE_URL: TEST_DATABASE_URL || 'postgres://unused@127.0.0.1:5432/unused',
       PHONE_HASH_SECRET: 'test-phone-hash-secret-000000000000000000',
       PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
-      TOTP_ENCRYPTION_KEY: Buffer.alloc(32, 8).toString('base64'),
       OTP_HMAC_SECRET: 'test-otp-hmac-secret-0000000000000000000000',
       JWT_ACCESS_SECRET: 'test-member-jwt-secret-000000000000000000000',
       JWT_ADMIN_ACCESS_SECRET: 'test-admin-jwt-secret-0000000000000000000000',
@@ -91,6 +91,10 @@ export function createTestApp(options: {
   realtime?: RealtimeHub;
   /** Razorpay gateway (tests pass the mocked one from `razorpay-mock.ts`). Default: disabled. */
   payments?: PaymentGateway | null;
+  /** SMS / WhatsApp notification channels. Default: both off. */
+  messaging?: MessageProviders;
+  /** Sink for the `api_logs` table. Default: nothing is stored. */
+  apiLogs?: ApiLogSink;
   /** Defaults to a silent logger. */
   logger?: Logger;
   pingDatabase?: () => Promise<boolean>;
@@ -101,6 +105,8 @@ export function createTestApp(options: {
     dependencies: {
       sequelize: options.sequelize,
       sms: options.sms ?? devSmsProvider,
+      ...(options.messaging ? { messaging: options.messaging } : {}),
+      ...(options.apiLogs ? { apiLogs: options.apiLogs } : {}),
       media: options.media ?? createFakeMediaStorage(),
       realtime: options.realtime ?? createRealtimeHub(),
       payments: options.payments ?? null,
@@ -171,7 +177,7 @@ export function useTestDatabase(): () => Sequelize {
   beforeEach(async () => {
     // Reference data (cities, areas) is kept; everything user- and admin-generated is emptied.
     await sequelize?.query(
-      'TRUNCATE admin_login_challenges, payment_webhook_events, event_bookings, payments, orders, notifications, notification_preferences, user_sanctions, users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
+      'TRUNCATE payment_webhook_events, event_bookings, payments, orders, notifications, notification_preferences, user_sanctions, users, otp_requests, admin_users, events, event_organizers, event_attendances, partner_interests, matches, messages, reports, safety_logs CASCADE',
     );
   });
 
@@ -239,15 +245,14 @@ export const TEST_ADMIN_PASSWORD = 'test-admin-password-2026';
 let adminHash: Promise<string> | undefined;
 
 /**
- * Creates an admin with the given role and signs in through the real two-step admin API:
- * password → authenticator enrolment (`setup`) → a TOTP code computed from the secret.
- * Returns the authenticator secret too, for tests that sign in again.
+ * Creates an admin with the given role and signs in through the real admin API (email +
+ * password).
  */
 export async function loginAdmin(
   app: Express,
   ip: string,
   role: AdminRole,
-): Promise<{ accessToken: string; adminId: string; email: string; totpSecret: string }> {
+): Promise<{ accessToken: string; adminId: string; email: string }> {
   adminHash ??= hashPassword(TEST_ADMIN_PASSWORD);
   const email = `${role}.${randomUUID().slice(0, 8)}@garbapartner.test`;
   const admin = await AdminUser.create({
@@ -260,21 +265,9 @@ export async function loginAdmin(
     .post('/api/v1/admin/auth/login')
     .set('X-Forwarded-For', ip)
     .send({ email, password: TEST_ADMIN_PASSWORD });
-  const challenge = (login.body as { data?: { challengeToken: string } }).data;
-  if (!challenge) throw new Error(`admin login failed: ${String(login.status)}`);
-  const setup = await request(app)
-    .post('/api/v1/admin/auth/login/totp-setup')
-    .set('X-Forwarded-For', ip)
-    .send({ challengeToken: challenge.challengeToken });
-  const secret = (setup.body as { data?: { secret: string } }).data?.secret;
-  if (!secret) throw new Error(`admin TOTP setup failed: ${String(setup.status)}`);
-  const verified = await request(app)
-    .post('/api/v1/admin/auth/login/verify')
-    .set('X-Forwarded-For', ip)
-    .send({ challengeToken: challenge.challengeToken, code: totpCode(secret, totpStep()) });
-  const data = (verified.body as { data?: { accessToken: string } }).data;
-  if (!data) throw new Error(`admin TOTP verify failed: ${String(verified.status)}`);
-  return { accessToken: data.accessToken, adminId: admin.id, email, totpSecret: secret };
+  const data = (login.body as { data?: { accessToken: string } }).data;
+  if (!data) throw new Error(`admin login failed: ${String(login.status)}`);
+  return { accessToken: data.accessToken, adminId: admin.id, email };
 }
 
 // --- Test images ----------------------------------------------------------------------------

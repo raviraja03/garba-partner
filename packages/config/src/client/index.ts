@@ -4,14 +4,26 @@ import * as z from 'zod/mini';
 /**
  * Browser-safe environment schema for the Vite apps. Only `VITE_*` variables are exposed to
  * the client bundle, so nothing here may ever be a secret.
+ *
+ * `VITE_API_BASE_URL` is either a same-origin path (`/api/v1`, local development behind the
+ * Vite proxy) or an absolute URL on the API domain (`https://api.example.in/api/v1`,
+ * production: docs/deployment/production-setup.md).
  */
 export const clientEnvSchema = z.pipe(
   z.object({
-    VITE_API_BASE_URL: z._default(z.string().check(z.minLength(1)), '/api/v1'),
+    VITE_API_BASE_URL: z._default(
+      z.string().check(z.regex(/^(\/|https?:\/\/[^/\s]+)/, 'Must be a path or an http(s) URL.')),
+      '/api/v1',
+    ),
   }),
-  z.transform((env) => ({
-    apiBaseUrl: env.VITE_API_BASE_URL.replace(/\/+$/, ''),
-  })),
+  z.transform((env) => {
+    const apiBaseUrl = env.VITE_API_BASE_URL.replace(/\/+$/, '');
+    return {
+      apiBaseUrl,
+      /** Origin of the API when it is on another host (Socket.IO connects there), else null. */
+      apiOrigin: apiBaseUrl.startsWith('/') ? null : new URL(apiBaseUrl).origin,
+    };
+  }),
 );
 
 export type ClientEnv = z.output<typeof clientEnvSchema>;

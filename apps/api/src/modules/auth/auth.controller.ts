@@ -7,6 +7,7 @@ import {
   verifyOtpSchema,
 } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
+import { requestIdOf } from '../../lib/request-id.js';
 import { readCookie, refreshCookieOptions } from '../../lib/cookies.js';
 import { ok } from '../../lib/response.js';
 import { parseInput } from '../../lib/validation.js';
@@ -25,7 +26,7 @@ export interface MemberAuthController {
 }
 
 function clientContext(req: Request): ClientContext {
-  return { ip: req.ip ?? 'unknown', userAgent: req.get('User-Agent') };
+  return { ip: req.ip ?? 'unknown', userAgent: req.get('User-Agent'), requestId: requestIdOf(req) };
 }
 
 export function createMemberAuthController(

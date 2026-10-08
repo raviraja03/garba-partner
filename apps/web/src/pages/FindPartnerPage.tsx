@@ -1,8 +1,13 @@
 import { useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import type { AttendanceStatus, EventDetailDto, MyAttendanceDto } from '@garba-partner/shared';
 import { Alert } from '../components/ui/Alert';
-import { Button } from '../components/ui/Button';
+import { Button, LinkButton } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
+import { cx } from '../components/ui/cx';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Icon } from '../components/ui/Icon';
+import { PageHeader } from '../components/PageHeader';
 import { FullPageSpinner } from '../components/FullPageSpinner';
 import { formatEventDate } from '../features/events/event-dates';
 import { useEvent } from '../features/events/hooks';
@@ -47,65 +52,84 @@ function AttendanceForm({
 
   const saved = save.data !== undefined ? save.data : current;
   return (
-    <form
-      onSubmit={(e) => void handleSubmit(e)}
-      className="space-y-4 rounded-card bg-white p-6 shadow-sm ring-1 ring-black/5"
-    >
-      <fieldset className="flex gap-4">
-        <legend className="mb-2 text-sm font-semibold">Are you going?</legend>
-        {(['going', 'interested'] as const).map((value) => (
-          <label key={value} className="flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="attendance-status"
-              checked={status === value}
-              onChange={() => {
-                setStatus(value);
-              }}
-            />
-            {STATUS_LABELS[value]}
-          </label>
-        ))}
-      </fieldset>
-      <div className="flex items-start gap-2 text-sm">
-        <input
-          id="looking-for-partner"
-          type="checkbox"
-          className="mt-1"
-          checked={looking}
-          aria-describedby="looking-for-partner-hint"
-          onChange={(e) => {
-            setLooking(e.target.checked);
-          }}
-        />
-        <div>
-          <label htmlFor="looking-for-partner" className="font-semibold">
-            I&apos;m looking for a partner for this event.
-          </label>
-          <p id="looking-for-partner-hint" className="text-muted">
-            Only members who also turn this on for {event.name} can see that you&apos;re going. Your
-            attendance is never shown on the event page.
-          </p>
+    <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+      <Card className="space-y-5">
+        <fieldset>
+          <legend className="text-label">Are you going?</legend>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {(['going', 'interested'] as const).map((value) => (
+              <label
+                key={value}
+                className={cx(
+                  'flex min-h-12 cursor-pointer items-center justify-center rounded-control px-3 text-center text-small font-semibold ring-1 transition-colors has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-brand-500',
+                  status === value
+                    ? 'bg-brand-600 text-white ring-brand-600'
+                    : 'bg-card text-ink ring-brand-200 hover:bg-brand-50',
+                )}
+              >
+                <input
+                  type="radio"
+                  name="attendance-status"
+                  checked={status === value}
+                  onChange={() => {
+                    setStatus(value);
+                  }}
+                  className="sr-only"
+                />
+                {STATUS_LABELS[value]}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <div className="flex items-start gap-3">
+          <input
+            id="looking-for-partner"
+            type="checkbox"
+            className="mt-2.5 size-6 shrink-0 accent-brand-600"
+            checked={looking}
+            aria-describedby="looking-for-partner-hint"
+            onChange={(e) => {
+              setLooking(e.target.checked);
+            }}
+          />
+          <div>
+            <label
+              htmlFor="looking-for-partner"
+              className="flex min-h-11 cursor-pointer items-center font-semibold text-ink"
+            >
+              I&apos;m looking for a partner for this event.
+            </label>
+            <p id="looking-for-partner-hint" className="text-small text-muted">
+              Only members who also turn this on for {event.name} can see that you&apos;re going.
+              Your attendance is never shown on the event page.
+            </p>
+          </div>
         </div>
-      </div>
-      {error && <Alert tone="error">{error}</Alert>}
-      <div className="flex flex-wrap items-center gap-4">
-        <Button type="submit" className="w-auto! px-6" loading={save.isPending}>
-          Save
-        </Button>
-        {saved && (
-          <Button variant="link" disabled={save.isPending} onClick={() => void handleRemove()}>
-            I&apos;m not going
-          </Button>
+        {error && <Alert tone="error">{error}</Alert>}
+        {save.isSuccess && !error && (
+          <Alert tone="success">{saved ? 'Saved.' : "Removed. You're not marked as going."}</Alert>
         )}
-      </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <Button type="submit" className="sm:w-auto" loading={save.isPending}>
+            Save
+          </Button>
+          {saved && (
+            <Button
+              variant="ghost"
+              className="sm:w-auto"
+              disabled={save.isPending}
+              onClick={() => void handleRemove()}
+            >
+              I&apos;m not going
+            </Button>
+          )}
+        </div>
+      </Card>
       {saved?.lookingForPartner && (
-        <Link
-          to={`/discover?event=${event.id}&city=all`}
-          className="inline-block rounded-xl bg-brand-600 px-5 py-3 font-semibold text-white hover:bg-brand-700"
-        >
-          See who&apos;s looking for a partner here
-        </Link>
+        <LinkButton to={`/discover?event=${event.id}&city=all`} variant="cta" fullWidth>
+          <Icon name="compass" />
+          See who&apos;s looking for a partner
+        </LinkButton>
       )}
     </form>
   );
@@ -121,31 +145,36 @@ export function FindPartnerPage() {
   const profile = useMyProfile();
 
   if (event.isPending) return <FullPageSpinner />;
-  if (event.isError) return <Alert tone="error">This event is not available.</Alert>;
+  if (event.isError) {
+    return (
+      <EmptyState
+        icon="calendar"
+        title="This event isn't available"
+        action={<LinkButton to="/events">Browse events</LinkButton>}
+      >
+        <h1 className="sr-only">Event not available</h1>
+        It may have been removed or unpublished.
+      </EmptyState>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <Link
-        to={`/events/${event.data.slug}`}
-        className="text-sm font-semibold text-brand-700 hover:underline"
-      >
-        ← {event.data.name}
-      </Link>
-      <div>
-        <h1 className="text-3xl font-extrabold tracking-tight">Find a partner</h1>
-        <p className="mt-1 text-sm text-muted">
-          {event.data.name} · {formatEventDate(event.data.eventDate)}
-        </p>
-      </div>
+      <PageHeader
+        title="Find a partner"
+        description={`${event.data.name} · ${formatEventDate(event.data.eventDate)}`}
+        back={{ to: `/events/${event.data.slug}`, label: event.data.name }}
+      />
       {event.data.hasEnded ? (
         <Alert tone="info">This event has ended.</Alert>
       ) : profile.data?.profileStatus !== 'complete' ? (
-        <Alert tone="info">
-          Add a profile photo to find a partner.{' '}
-          <Link to="/profile/edit" className="font-semibold underline">
-            Finish your profile
-          </Link>
-        </Alert>
+        <EmptyState
+          icon="user"
+          title="Finish your profile first"
+          action={<LinkButton to="/profile/edit">Finish your profile</LinkButton>}
+        >
+          Add a profile photo to find a partner.
+        </EmptyState>
       ) : (
         <AttendanceLoader event={event.data} />
       )}

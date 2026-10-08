@@ -1,37 +1,207 @@
 /*
- * Garba Partner design tokens (Tailwind CSS v4).
+ * GarbaMates design tokens (Tailwind CSS v4). Reference: docs/design/design-system.md
  * Import after `@import 'tailwindcss';` in each app's stylesheet.
+ *
+ * The five brand colours are fixed. Everything else here is derived from them or is a
+ * neutral. Never hardcode a colour in a component: use a token.
  */
+
+/* Plus Jakarta Sans (SIL Open Font License 1.1), self-hosted: the production CSP allows
+   fonts from our own origin only. The file lives in each app's `public/fonts/`. */
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url('/fonts/plus-jakarta-sans-latin.woff2') format('woff2');
+}
+
 @theme {
+  /* ---- Typography ------------------------------------------------------------------ */
   --font-sans:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
-    'Noto Sans', sans-serif;
+    'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
 
-  /* Marigold — primary brand colour */
-  --color-brand-50: #fff8eb;
-  --color-brand-100: #ffebc6;
-  --color-brand-200: #ffd488;
-  --color-brand-300: #ffb84a;
-  --color-brand-400: #ff9d20;
-  --color-brand-500: #f97a07;
-  --color-brand-600: #dd5602;
-  --color-brand-700: #b73a06;
-  --color-brand-800: #942c0c;
-  --color-brand-900: #7a260d;
+  /* One scale, used as `text-display`, `text-h1` … Headings are fluid between mobile and
+     desktop, so no breakpoint classes are needed on them. */
+  --text-display: clamp(2.25rem, 1.55rem + 3.2vw, 3.5rem);
+  --text-display--line-height: 1.05;
+  --text-display--letter-spacing: -0.025em;
+  --text-display--font-weight: 800;
+  --text-h1: clamp(1.75rem, 1.45rem + 1.4vw, 2.25rem);
+  --text-h1--line-height: 1.15;
+  --text-h1--letter-spacing: -0.02em;
+  --text-h1--font-weight: 800;
+  --text-h2: clamp(1.375rem, 1.25rem + 0.6vw, 1.625rem);
+  --text-h2--line-height: 1.25;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h2--font-weight: 700;
+  --text-h3: 1.125rem;
+  --text-h3--line-height: 1.35;
+  --text-h3--font-weight: 700;
+  --text-body: 1rem;
+  --text-body--line-height: 1.6;
+  --text-small: 0.875rem;
+  --text-small--line-height: 1.5;
+  /* The smallest size for anything a member has to read (13px). */
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+  --text-label: 0.875rem;
+  --text-label--line-height: 1.3;
+  --text-label--font-weight: 600;
+  --text-button: 1rem;
+  --text-button--line-height: 1.25;
+  --text-button--font-weight: 600;
 
-  /* Kumkum — accent colour */
-  --color-accent-50: #fdf2f6;
-  --color-accent-100: #fce7ef;
-  --color-accent-500: #d6336c;
-  --color-accent-600: #c2255c;
-  --color-accent-700: #a61e4d;
+  /* ---- Brand colours (exact, do not change) ---------------------------------------- */
+  --color-primary: #2d1b69; /* Deep Purple */
+  --color-secondary: #e91e63; /* Garba Pink */
+  --color-accent-orange: #ff8a00; /* Vibrant Orange */
+  --color-accent-yellow: #ffc107; /* Marigold Yellow */
+  --color-background: #fff7ed; /* Soft Cream */
 
-  /* Semantic */
-  --color-surface: #fffdf9;
-  --color-ink: #1f1a17;
-  --color-muted: #6b625c;
-  --color-success: #2f9e44;
-  --color-danger: #e03131;
+  /*
+   * Deep Purple scale. `brand-600` is the exact brand colour; the rest are its tints and
+   * shades. Use for text, links, navigation, focus rings and the primary button.
+   */
+  --color-brand-50: #f5f2fb;
+  --color-brand-100: #e9e3f6;
+  --color-brand-200: #d2c8ec;
+  --color-brand-300: #b0a0db;
+  --color-brand-400: #8670c4;
+  --color-brand-500: #5a43a3;
+  --color-brand-600: #2d1b69;
+  --color-brand-700: #24155a;
+  --color-brand-800: #1c1047;
+  --color-brand-900: #140b33;
 
-  --radius-card: 1rem;
+  /*
+   * Garba Pink scale. `accent-500` is the exact brand colour. White text on it is 4.35:1,
+   * so use it only behind large bold text (the CTA button) or as a fill/icon colour.
+   * For small pink text use `accent-700`.
+   */
+  --color-accent-50: #fdeaf1;
+  --color-accent-100: #fbd0df;
+  --color-accent-200: #f6a1bf;
+  --color-accent-500: #e91e63;
+  --color-accent-600: #d1175a;
+  --color-accent-700: #b0124c;
+
+  /* Festive tints: backgrounds for badges and highlights, always with `text-primary`.
+     Orange and yellow are never text colours and never sit behind white text. */
+  --color-accent-orange-soft: #ffe8cc;
+  --color-accent-yellow-soft: #fff3cd;
+
+  /* ---- Neutrals and semantic colours ----------------------------------------------- */
+  --color-surface: #fff7ed; /* page background (= background) */
+  --color-card: #ffffff;
+  --color-ink: #1b1530; /* body text */
+  --color-muted: #625b76; /* secondary text: 6.0:1 on cream */
+  --color-line: #ebe3da; /* hairlines and dividers on cream */
+  --color-success: #166b3a;
+  --color-success-soft: #e8f5ec;
+  --color-danger: #b42318;
+  --color-danger-soft: #fdecea;
+
+  /* ---- Shape ------------------------------------------------------------------------- */
+  --radius-control: 0.875rem; /* buttons, inputs, alerts */
+  --radius-card: 1.25rem; /* cards, modals, sheets */
+
+  /* ---- Elevation (purple-tinted, soft) ----------------------------------------------- */
+  --shadow-card: 0 1px 2px rgb(45 27 105 / 0.06), 0 4px 16px -6px rgb(45 27 105 / 0.1);
+  --shadow-raised: 0 2px 4px rgb(45 27 105 / 0.06), 0 12px 28px -10px rgb(45 27 105 / 0.24);
+  --shadow-overlay: 0 24px 64px -16px rgb(27 21 48 / 0.4);
+
+  /* ---- Layout ------------------------------------------------------------------------ */
+  --container-page: 72rem; /* `max-w-page`: full page width */
+  --container-prose: 42rem; /* `max-w-prose`: forms and reading text */
+  --spacing-gutter: 1rem; /* horizontal page padding on mobile (`px-gutter`) */
+  --spacing-section: 2rem; /* vertical gap between page sections (`space-y-section`) */
+
+  /* ---- Motion ------------------------------------------------------------------------ */
+  --ease-soft: cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-fade-in: fade-in 160ms var(--ease-soft);
+  --animate-pop-in: pop-in 180ms var(--ease-soft);
+  --animate-sheet-up: sheet-up 240ms var(--ease-soft);
+  --animate-drawer-in: drawer-in 240ms var(--ease-soft);
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+  }
+  @keyframes sheet-up {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes drawer-in {
+    from {
+      transform: translateX(100%);
+    }
+  }
+}
+
+@layer base {
+  /*
+   * Type hierarchy. Headings get their size from their level, so a page reads the same
+   * everywhere without per-page classes. A utility class on the element still wins.
+   */
+  h1 {
+    font-size: var(--text-h1);
+    line-height: var(--text-h1--line-height);
+    letter-spacing: var(--text-h1--letter-spacing);
+    font-weight: var(--text-h1--font-weight);
+  }
+  h2 {
+    font-size: var(--text-h2);
+    line-height: var(--text-h2--line-height);
+    letter-spacing: var(--text-h2--letter-spacing);
+    font-weight: var(--text-h2--font-weight);
+  }
+  h3 {
+    font-size: var(--text-h3);
+    line-height: var(--text-h3--line-height);
+    font-weight: var(--text-h3--font-weight);
+  }
+  h1,
+  h2,
+  h3 {
+    color: var(--color-ink);
+    text-wrap: balance;
+  }
+
+  /* Anchor targets (#main, guideline sections) must not hide under the sticky header. */
+  :target {
+    scroll-margin-top: 5rem;
+  }
+
+  /* One visible focus style everywhere; components don't need their own. */
+  :focus-visible {
+    outline: 2px solid var(--color-brand-500);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--color-accent-100);
+    color: var(--color-brand-900);
+  }
+
+  /* Members who ask for less motion get none: no animation, no smooth scrolling. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    ::before,
+    ::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }

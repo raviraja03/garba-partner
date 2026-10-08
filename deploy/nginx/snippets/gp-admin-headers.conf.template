@@ -1,0 +1,13 @@
+# Garba Partner — security headers for the admin panel. TEMPLATE: rendered into
+# /etc/nginx/snippets/gp-admin-headers.conf. Explained in docs/deployment/nginx.md.
+#
+# Stricter than the web app: no payment or socket origins, never indexed, no referrer.
+
+add_header Strict-Transport-Security "max-age=31536000" always;
+add_header Content-Security-Policy "default-src 'self'; img-src 'self' https://res.cloudinary.com data: blob:; connect-src 'self' https://${API_DOMAIN}; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Referrer-Policy "no-referrer" always;
+add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()" always;
+add_header Cross-Origin-Opener-Policy "same-origin" always;
+add_header X-Robots-Tag "noindex, nofollow" always;

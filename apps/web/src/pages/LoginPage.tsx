@@ -1,11 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { normalizeIndianMobile } from '@garba-partner/shared';
 import { AuthLayout } from '../components/AuthLayout';
-import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
+import { cx } from '../components/ui/cx';
 import { sendOtp } from '../features/auth/auth-api';
 import type { OtpPageState } from './VerifyOtpPage';
+import { TEXT_LINK } from '../components/ui/link-styles';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -42,13 +43,23 @@ export function LoginPage() {
       title="Find your Garba partner"
       subtitle="Log in or sign up with your mobile number. We'll text you a 6-digit code."
     >
-      <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-4">
+      <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-5">
         <div>
-          <label htmlFor="phone" className="block text-sm font-semibold">
+          <label htmlFor="phone" className="block text-label">
             Mobile number
           </label>
-          <div className="mt-1 flex rounded-xl bg-white ring-1 ring-black/10 focus-within:ring-2 focus-within:ring-brand-600">
-            <span className="flex items-center pl-4 text-muted" aria-hidden="true">
+          <div
+            className={cx(
+              'mt-1.5 flex min-h-13 items-center rounded-control bg-card ring-1 transition-shadow focus-within:ring-2',
+              error
+                ? 'ring-2 ring-danger'
+                : 'ring-brand-200 hover:ring-brand-300 focus-within:ring-brand-500',
+            )}
+          >
+            <span
+              className="flex items-center gap-2 border-r border-line py-1 pr-3 pl-4 font-semibold text-ink"
+              aria-hidden="true"
+            >
               +91
             </span>
             <input
@@ -57,32 +68,40 @@ export function LoginPage() {
               type="tel"
               inputMode="numeric"
               autoComplete="tel-national"
+              enterKeyHint="go"
               placeholder="98765 43210"
               value={phone}
               onChange={(event) => {
                 setPhone(event.target.value);
               }}
               aria-invalid={error !== null}
-              aria-describedby={error ? 'phone-error' : undefined}
-              className="w-full rounded-xl bg-transparent px-3 py-3 outline-none"
+              aria-describedby={error ? 'phone-error' : 'phone-hint'}
+              className="w-full min-w-0 bg-transparent px-3 py-3 text-[1.0625rem] tracking-wide outline-none placeholder:text-muted/60"
               required
             />
           </div>
+          {error ? (
+            <p id="phone-error" role="alert" className="mt-1.5 text-small font-medium text-danger">
+              {error}
+            </p>
+          ) : (
+            <p id="phone-hint" className="mt-1.5 text-caption text-muted">
+              We only use your number to sign you in. Other members never see it.
+            </p>
+          )}
         </div>
 
-        {error && (
-          <div id="phone-error">
-            <Alert tone="error">{error}</Alert>
-          </div>
-        )}
-
-        <Button type="submit" loading={submitting}>
+        <Button type="submit" size="lg" loading={submitting}>
           Send code
         </Button>
       </form>
 
-      <p className="mt-6 text-xs text-muted">
-        By continuing you confirm you are 18 or older and agree to our Terms and Privacy Policy.
+      <p className="mt-6 text-caption text-muted">
+        By continuing you confirm you are 18 or older and agree to follow our{' '}
+        <Link to="/guidelines" className={TEXT_LINK}>
+          community guidelines
+        </Link>
+        .
       </p>
     </AuthLayout>
   );

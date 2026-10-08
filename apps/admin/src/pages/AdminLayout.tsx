@@ -42,8 +42,13 @@ export function AdminLayout() {
   return (
     <div className="flex min-h-dvh">
       <aside className="hidden w-60 shrink-0 bg-ink p-5 text-white md:block">
-        <p className="font-bold">{APP_NAME}</p>
-        <p className="text-xs text-white/60">Admin console</p>
+        <div className="flex items-center gap-3">
+          <img src="/brand/icon.webp" width={192} height={192} alt="" className="size-10" />
+          <div>
+            <p className="font-bold">{APP_NAME}</p>
+            <p className="text-xs text-white/60">Admin console</p>
+          </div>
+        </div>
         <nav aria-label="Admin sections" className="mt-8">
           <ul className="space-y-1 text-sm">
             {visibleSections.map((section) => (
@@ -69,18 +74,19 @@ export function AdminLayout() {
         </nav>
       </aside>
 
-      <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between gap-4 border-b border-black/5 bg-white px-6 py-4">
-          <div>
-            <p className="text-sm font-semibold">{admin.name}</p>
-            <p className="text-xs text-muted">
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center justify-between gap-4 border-b border-black/5 bg-white px-4 py-3 md:px-6 md:py-4">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{admin.name}</p>
+            <p className="truncate text-xs text-muted">
               {admin.email} · {admin.role.replace('_', ' ')}
             </p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex shrink-0 items-center gap-3 md:gap-4">
             <ApiStatus />
             <Button
               variant="link"
+              className="whitespace-nowrap"
               loading={signingOut}
               onClick={() => {
                 void handleSignOut();
@@ -90,7 +96,27 @@ export function AdminLayout() {
             </Button>
           </div>
         </header>
-        <main className="flex-1 p-6">
+        {/* Phones: the sidebar is hidden, so the sections become a strip that scrolls sideways. */}
+        <nav aria-label="Admin sections" className="overflow-x-auto bg-ink md:hidden">
+          <ul className="flex w-max gap-1 px-3 py-2 text-sm">
+            {visibleSections
+              .filter((section) => section.path)
+              .map((section) => (
+                <li key={section.label}>
+                  <NavLink
+                    to={section.path ?? '/'}
+                    end={section.path === '/'}
+                    className={({ isActive }) =>
+                      `flex min-h-11 items-center rounded-md px-3 whitespace-nowrap ${isActive ? 'bg-white/15 font-semibold text-white' : 'text-white/80'}`
+                    }
+                  >
+                    {section.label}
+                  </NavLink>
+                </li>
+              ))}
+          </ul>
+        </nav>
+        <main className="min-w-0 flex-1 p-4 md:p-6">
           <Outlet />
         </main>
       </div>

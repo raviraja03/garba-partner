@@ -47,10 +47,9 @@ garba-partner/
 │   │   │   ├── main.tsx             React root
 │   │   │   ├── App.tsx              router (public-only login routes, protected routes)
 │   │   │   ├── pages/               Login, VerifyOtp, Onboarding, Home, Profile, EditProfile, Preferences, NotFound
-│   │   │   ├── components/          AuthLayout, ApiStatus, FullPageSpinner, ui/ (Button, Alert)
+│   │   │   ├── components/          AppShell, Navbar, Footer, AuthLayout, FullPageSpinner, ui/ (design-system components)
 │   │   │   ├── features/auth/       AuthProvider, auth context, guards, auth API calls
 │   │   │   ├── features/profile/    profile API + TanStack Query hooks, ProfileForm, ImageUpload, PreferencesForm, ProfileCard
-│   │   │   ├── features/system/     useApiHealth hook
 │   │   │   ├── lib/                 env (validated VITE_* vars), api-client (in-memory token, silent refresh)
 │   │   │   └── styles/index.css     Tailwind + shared theme tokens
 │   │   ├── tsconfig.json            references tsconfig.app.json (browser) + tsconfig.node.json (vite.config)
@@ -78,7 +77,14 @@ garba-partner/
 │           ├── utils/text.ts        contact-detail detection, text normalisation
 │           ├── errors/error-codes.ts ERROR_CODES (+ HTTP status, default message)
 │           └── types/               ApiResponse envelope types, HealthDto
+├── deploy/                          production deployment (docs/deployment/); nothing here runs in development
+│   ├── env/production.env.example   template of the server env file (placeholders only)
+│   ├── nginx/                       site templates + snippets, rendered by scripts/render-nginx.sh
+│   ├── postgres/                    role setup (SQL), server settings, pg_hba rules
+│   ├── scripts/                     deploy, rollback, preflight, healthcheck, backup-db, restore-db
+│   ├── logrotate/  cron/            log rotation and the nightly backup schedule
 ├── docs/                            product, architecture, development, setup docs
+├── ecosystem.config.cjs             PM2 process file (production)
 ├── .editorconfig  .gitattributes  .gitignore  .nvmrc  .prettierignore
 ├── .env.example                     documented env template (committed)
 ├── .env                             local env (git-ignored, never committed)

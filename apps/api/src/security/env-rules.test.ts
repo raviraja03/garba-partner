@@ -7,7 +7,6 @@ describe('security environment rules', () => {
     DATABASE_URL: 'postgres://u:p@localhost:5432/app',
     PHONE_HASH_SECRET: 'x'.repeat(40),
     PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
-    TOTP_ENCRYPTION_KEY: Buffer.alloc(32, 2).toString('base64'),
     OTP_HMAC_SECRET: 'y'.repeat(40),
     JWT_ACCESS_SECRET: 'm'.repeat(40),
     JWT_ADMIN_ACCESS_SECRET: 'a'.repeat(40),
@@ -29,16 +28,6 @@ describe('security environment rules', () => {
 
   it('accepts a valid development configuration', () => {
     expect(issues({})).toEqual([]);
-  });
-
-  it('requires a 32-byte admin TOTP key, different from the phone key', () => {
-    expect(issues({ TOTP_ENCRYPTION_KEY: undefined })).toContain('TOTP_ENCRYPTION_KEY');
-    expect(issues({ TOTP_ENCRYPTION_KEY: Buffer.alloc(16, 2).toString('base64') })).toContain(
-      'TOTP_ENCRYPTION_KEY',
-    );
-    expect(issues({ TOTP_ENCRYPTION_KEY: base.PHONE_ENCRYPTION_KEY })).toContain(
-      'TOTP_ENCRYPTION_KEY',
-    );
   });
 
   it('requires separate, long member and admin JWT secrets', () => {

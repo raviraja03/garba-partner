@@ -1,0 +1,11 @@
+# Garba Partner — scheduled jobs. Guide: docs/deployment/database-backup.md
+#
+# Install as /etc/cron.d/garba-partner (owner root, mode 644). Times are server time (UTC).
+# Change "garba" if the deploy user has another name. A failed run exits non-zero and writes
+# "ERROR" to the log: point your monitoring at it.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# Nightly database backup at 21:15 UTC (02:45 IST, the quietest hour).
+15 21 * * * garba bash /srv/garba-partner/current/deploy/scripts/backup-db.sh >> /var/log/garba-partner/backup.log 2>&1
