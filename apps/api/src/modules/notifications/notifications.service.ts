@@ -30,6 +30,7 @@ import {
 } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
 import type { RealtimeHub } from '../../realtime/hub.js';
+import type { ChannelNotifier } from './channel-notifier.js';
 
 export interface NotifyInput {
   userId: string;
@@ -220,8 +221,11 @@ export function createNotifier(deps: {
   media: MediaStorage;
   hub: RealtimeHub;
   logger: Logger;
+  /** SMS / WhatsApp delivery (docs/notifications/notification-channels.md). Absent = in-app only. */
+  channels?: ChannelNotifier | null;
 }): Notifier {
   const { sequelize, media, hub, logger } = deps;
+  const channels = deps.channels ?? null;
 
   async function push(ids: readonly string[]): Promise<void> {
     if (ids.length === 0) return;
@@ -237,6 +241,9 @@ export function createNotifier(deps: {
         unreadCount: unreadByUser.get(userId) ?? 0,
       });
     }
+    // Not awaited: a slow SMS or WhatsApp provider must not hold up the request that caused
+    // the notification. `deliver` never rejects and sends each notification once per channel.
+    if (channels) void channels.deliver(rows);
   }
 
   async function store(input: NotifyInput): Promise<string | null> {

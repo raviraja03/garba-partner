@@ -275,6 +275,8 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 
 | Document | Contents |
 |---|---|
+| [Logging](docs/development/logging.md) | Request logging (`[API]` lines, `api_logs` table), what is never logged, the `LOG_OTP` debugging switch, how to read the logs |
+| [Notification channels](docs/notifications/notification-channels.md) | SMS and WhatsApp delivery pipeline, the `notification_deliveries` history table, failure handling, duplicate prevention, how to add a real provider |
 | [Notifications](docs/notifications/notifications.md) | Types and triggers, privacy rules, **API reference** (list, unread count, mark read, preferences), realtime event, jobs (event reminders, retention), admin monitoring, database, tests |
 
 ### Safety & moderation

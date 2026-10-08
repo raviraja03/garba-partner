@@ -52,6 +52,9 @@ flowchart LR
 | `admin_users` | `user_sanctions` | 1 : 0..n (creator, revoker) | `created_by_admin_id`, `revoked_by_admin_id` | FK | `RESTRICT` | none |
 | `users` | `notifications` | 1 : 0..n (recipient, actor) | `notifications.user_id`, `notifications.actor_user_id` | FK | `CASCADE` | `(user_id, occurred_at DESC, id DESC)`, partial `(actor_user_id, user_id)` |
 | `matches` / `partner_interests` / `events` | `notifications` | 0..1 : 0..n | `match_id`, `interest_id`, `event_id` | FK | `CASCADE` | partial unique `(user_id, match_id)` unread messages, `(user_id, event_id)` reminders |
+| `users` | `notification_deliveries` | 1 : 0..n | `notification_deliveries.user_id` | FK | `CASCADE` | `(user_id, created_at DESC)` |
+| `notifications` | `notification_deliveries` | 0..1 : 0..n | `notification_deliveries.notification_id` | FK + `UNIQUE (reference_key)` | `SET NULL` | partial `(notification_id)` |
+| `users` / `admin_users` | `api_logs` | 0..1 : 0..n | `api_logs.user_id`, `api_logs.admin_id` | FK | `SET NULL` | partial `(user_id, created_at DESC)` |
 | `users` | `notification_preferences` | 1 : 0..1 | `notification_preferences.user_id` (PK) | FK | `CASCADE` | PK |
 | `users` / `events` | `orders` | 1 : 0..n | `orders.user_id`, `orders.event_id` | FK + `UNIQUE (user_id, idempotency_key)` | `RESTRICT` | `(user_id, created_at DESC)`, partial `(event_id, expires_at)` |
 | `orders` | `payments` | 1 : 0..n (attempts) | `payments.order_id` | FK + `UNIQUE (razorpay_payment_id)` | `RESTRICT` | `(order_id, created_at DESC)` |

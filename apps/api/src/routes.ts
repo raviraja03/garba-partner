@@ -11,6 +11,8 @@ import {
   createMemberRateLimiter,
 } from './middlewares/rate-limit.js';
 import { createAdminAuthController } from './modules/admin/auth/admin-auth.controller.js';
+import type { ApiLogSink } from './modules/api-logs/api-log.store.js';
+import { createChannelNotifier } from './modules/notifications/channel-notifier.js';
 import { createAdminAuthRouter } from './modules/admin/auth/admin-auth.routes.js';
 import { createAdminAuthService } from './modules/admin/auth/admin-auth.service.js';
 import { createAdminDashboardRouter } from './modules/admin/dashboard/admin-dashboard.routes.js';
@@ -81,12 +83,17 @@ import { createSuspiciousActivityDetector } from './modules/safety/suspicious-ac
 import type { MediaStorage } from './providers/media/index.js';
 import type { PaymentGateway } from './providers/payments/index.js';
 import type { RealtimeHub } from './realtime/hub.js';
+import type { MessageProviders } from './providers/messaging/index.js';
 import type { SmsProvider } from './providers/sms/index.js';
 
 /** External dependencies, injected so tests can supply their own (test database, fake SMS). */
 export interface ApiDependencies extends HealthDependencies {
   sequelize: Sequelize;
   sms: SmsProvider;
+  /** SMS / WhatsApp notification channels. Omitted or `null` per channel = switched off. */
+  messaging?: MessageProviders;
+  /** Receives one entry per finished request for the `api_logs` table. Omitted = not stored. */
+  apiLogs?: ApiLogSink;
   media: MediaStorage;
   /** Socket.IO seam: emits and disconnects (no-ops until a socket server is attached). */
   realtime: RealtimeHub;
@@ -115,7 +122,10 @@ export function createApiRouter(options: {
   );
 
   // In-app notifications (docs/notifications/notifications.md): created after commits, never fatal.
-  const notifier = createNotifier({ sequelize, media, hub, logger });
+  const channels = dependencies.messaging
+    ? createChannelNotifier({ sequelize, env, providers: dependencies.messaging, logger })
+    : null;
+  const notifier = createNotifier({ sequelize, media, hub, logger, channels });
 
   const router = Router();
   // Global per-IP ceiling (on top of the per-endpoint limits). Signed Razorpay webhooks are

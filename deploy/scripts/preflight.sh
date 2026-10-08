@@ -70,6 +70,11 @@ if grep -qE '^NODE_ENV=' "$GP_ENV_FILE"; then
 else
   pass "NODE_ENV is not set in the env file"
 fi
+if [ "$(env_get LOG_OTP)" = "true" ]; then
+  warn "LOG_OTP=true: one-time login codes are written to the server log. Turn it off after debugging."
+else
+  pass "LOG_OTP is off"
+fi
 if grep -q 'REPLACE_ME' "$GP_ENV_FILE"; then
   fail "placeholder REPLACE_ME is still present"
 else

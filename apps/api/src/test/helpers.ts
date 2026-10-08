@@ -18,7 +18,9 @@ import { createChatService } from '../modules/chat/chat.service.js';
 import { createNotifier } from '../modules/notifications/notifications.service.js';
 import { createSafetyLogger } from '../modules/safety/safety-log.service.js';
 import { createSuspiciousActivityDetector } from '../modules/safety/suspicious-activity.service.js';
+import type { ApiLogSink } from '../modules/api-logs/api-log.store.js';
 import type { MediaStorage } from '../providers/media/index.js';
+import type { MessageProviders } from '../providers/messaging/index.js';
 import type { PaymentGateway } from '../providers/payments/index.js';
 import { createRealtimeHub, type RealtimeHub } from '../realtime/hub.js';
 import { attachSocketServer } from '../realtime/socket-server.js';
@@ -89,6 +91,10 @@ export function createTestApp(options: {
   realtime?: RealtimeHub;
   /** Razorpay gateway (tests pass the mocked one from `razorpay-mock.ts`). Default: disabled. */
   payments?: PaymentGateway | null;
+  /** SMS / WhatsApp notification channels. Default: both off. */
+  messaging?: MessageProviders;
+  /** Sink for the `api_logs` table. Default: nothing is stored. */
+  apiLogs?: ApiLogSink;
   /** Defaults to a silent logger. */
   logger?: Logger;
   pingDatabase?: () => Promise<boolean>;
@@ -99,6 +105,8 @@ export function createTestApp(options: {
     dependencies: {
       sequelize: options.sequelize,
       sms: options.sms ?? devSmsProvider,
+      ...(options.messaging ? { messaging: options.messaging } : {}),
+      ...(options.apiLogs ? { apiLogs: options.apiLogs } : {}),
       media: options.media ?? createFakeMediaStorage(),
       realtime: options.realtime ?? createRealtimeHub(),
       payments: options.payments ?? null,

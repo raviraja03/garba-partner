@@ -65,6 +65,17 @@ export const serverEnvSchema = z
     WEB_ORIGIN: originSchema.default('http://localhost:5173'),
     ADMIN_ORIGIN: originSchema.default('http://localhost:5174'),
     LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+    /** One `[API]` line per request in the server log (docs/development/logging.md). */
+    LOG_API_REQUESTS: z.stringbool().default(true),
+    /** Also store every request in the `api_logs` table (written in batches, off the request path). */
+    LOG_API_TO_DATABASE: z.stringbool().default(true),
+    /** `api_logs` rows older than this are deleted daily. */
+    API_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
+    /**
+     * Prints each one-time code to the server log (`[OTP]` line, phone masked). For debugging
+     * only: anyone who can read the log can sign in as that member. Off unless set to true.
+     */
+    LOG_OTP: z.stringbool().default(false),
 
     DATABASE_URL: postgresUrlSchema,
     /** Optional owner role used by the db CLI (migrations); defaults to DATABASE_URL. */
@@ -83,6 +94,14 @@ export const serverEnvSchema = z
     /** HMAC key for OTP codes and client IP hashes. */
     OTP_HMAC_SECRET: secretSchema,
     SMS_PROVIDER: z.enum(SMS_PROVIDERS).default('dev'),
+
+    /**
+     * Send member notifications by SMS / WhatsApp as well as in the app
+     * (docs/notifications/notification-channels.md). Only the development "log" provider exists
+     * so far, so both are refused outside APP_ENV=development until a real provider is added.
+     */
+    SMS_ENABLED: z.stringbool().default(false),
+    WHATSAPP_ENABLED: z.stringbool().default(false),
 
     /** Member access tokens (JWT HS256, audience "garba-partner:app"). */
     JWT_ACCESS_SECRET: secretSchema,
@@ -203,6 +222,19 @@ export const serverEnvSchema = z
         path: ['SMS_PROVIDER'],
         message: '"dev" is only allowed when APP_ENV=development; configure a real SMS provider',
       });
+    }
+
+    // The only channel provider so far writes to the log instead of sending: recording those
+    // as "sent" outside local development would be false.
+    for (const key of ['SMS_ENABLED', 'WHATSAPP_ENABLED'] as const) {
+      if (env[key] && env.APP_ENV !== 'development') {
+        ctx.addIssue({
+          code: 'custom',
+          path: [key],
+          message:
+            'can only be true when APP_ENV=development: no real SMS/WhatsApp provider is configured yet',
+        });
+      }
     }
 
     if (env.MEDIA_STORAGE === 'local' && env.APP_ENV !== 'development') {

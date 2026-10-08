@@ -22,6 +22,10 @@
 | `NODE_ENV` | no | `development` | `development`, `test`, `production` | api | **Don't set it in `.env`** ([why](#why-node_env-is-not-in-env)). Set by PM2 in production and by the shell when needed |
 | `APP_ENV` | no | `development` | `development`, `staging`, `production` | api | The deployment environment. `production` requires `NODE_ENV=production` and `https://` origins |
 | `LOG_LEVEL` | no | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` | api | Pretty logs in development, JSON otherwise |
+| `LOG_API_REQUESTS` | no | `true` | `true`, `false` | api | One `[API]` line per request in the server log ([logging](../development/logging.md)) |
+| `LOG_API_TO_DATABASE` | no | `true` | `true`, `false` | api | Also store each request in the `api_logs` table (batched, never blocks a request) |
+| `API_LOG_RETENTION_DAYS` | no | `30` | `1`–`365` | api | `api_logs` rows older than this are deleted daily |
+| `LOG_OTP` | no | `false` | `true`, `false` | api | Prints each one-time login code to the server log (phone masked). **Debugging only**: anyone who can read the log can sign in as that member |
 
 ### API
 
@@ -60,6 +64,8 @@ Details: [docs/auth/](../auth/authentication.md).
 |---|---|---|---|---|
 | `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for stored OTP codes and client-IP hashes |
 | `SMS_PROVIDER` | no | `dev` | api | `dev` = no SMS, and the code is returned in the send-otp response. **Only accepted when `APP_ENV=development`** (boot fails otherwise). Real providers are added before launch |
+| `SMS_ENABLED` | no | `false` | api | Also send notifications by SMS ([notification channels](../notifications/notification-channels.md)). **Only accepted when `APP_ENV=development`** until a real provider is connected |
+| `WHATSAPP_ENABLED` | no | `false` | api | Same, for WhatsApp |
 | `JWT_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs member access tokens |
 | `JWT_ADMIN_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs admin access tokens. **Must differ** from `JWT_ACCESS_SECRET` |
 | `ACCESS_TOKEN_TTL_SECONDS` | no | `900` | api | 60–3600 |

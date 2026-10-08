@@ -18,6 +18,7 @@ import {
 } from '../../lib/crypto.js';
 import { User, UserProfile, UserSession } from '../../models/index.js';
 import type { SmsProvider } from '../../providers/sms/index.js';
+import { logOtp } from './otp-log.js';
 import { createOtpService } from './otp.service.js';
 import type { TokenService } from './token.service.js';
 
@@ -28,6 +29,8 @@ const USER_AGENT_MAX = 255;
 export interface ClientContext {
   ip: string;
   userAgent: string | undefined;
+  /** For log lines that belong to this request (see `logOtp`). */
+  requestId?: string | undefined;
 }
 
 export interface IssuedMemberSession {
@@ -137,6 +140,15 @@ export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuth
       });
 
       if (deliver) {
+        if (env.LOG_OTP) {
+          logOtp(logger, {
+            purpose: 'LOGIN',
+            phone,
+            code,
+            expiresAt: new Date(Date.now() + LIMITS.OTP_TTL_SECONDS * 1000),
+            requestId: client.requestId,
+          });
+        }
         try {
           await sms.sendOtp(phone, code);
         } catch (err) {

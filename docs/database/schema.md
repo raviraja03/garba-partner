@@ -749,6 +749,50 @@ Migration `20261002100000-create-payments`. See [payment flow](../payments/payme
 
 Also: `notifications.booking_id` (FK → `event_bookings` `CASCADE`), notification type `booking` (check `type <> 'booking' OR booking_id IS NOT NULL`), and audit target type `booking`.
 
+### 4.23 `api_logs`
+
+Migration `20261008100000-create-api-logs`. See [logging](../development/logging.md#the-api_logs-table). One row per API request, append-only (no `updated_at`), deleted after `API_LOG_RETENTION_DAYS`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `request_id` | `varchar(64)` | Indexed |
+| `user_id` | `uuid` | FK → `users.id` `SET NULL` |
+| `admin_id` | `uuid` | FK → `admin_users.id` `SET NULL` |
+| `method` | `varchar(10)` | |
+| `endpoint` | `varchar(255)` | Path only, no query string |
+| `status_code` | `smallint` | Check 100–599 |
+| `response_time_ms` | `integer` | Check ≥ 0 |
+| `ip_address` | `inet` | The real client address (personal data; see the logging doc) |
+| `user_agent` | `varchar(255)` | |
+| `request_timestamp`, `response_timestamp` | `timestamptz` | |
+| `success` | `boolean` | Status below 400 |
+| `error_code`, `error_message` | `varchar(40)`, `varchar(300)` | Public message (4xx) or sanitised cause (5xx) |
+| `created_at` | `timestamptz` | |
+
+Indexes: `(request_id)`; partial `(user_id, created_at DESC)` where `user_id IS NOT NULL`; `(created_at)`; partial `(status_code, created_at DESC)` where `status_code >= 400`; `(endpoint, created_at DESC)`. Never stores bodies, headers, cookies or query strings.
+
+### 4.24 `notification_deliveries`
+
+Migration `20261008100100-create-notification-deliveries`. See [notification channels](../notifications/notification-channels.md). One row per notification and channel (SMS, WhatsApp), sent or failed.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `user_id` | `uuid` | FK → `users.id` `CASCADE` |
+| `notification_id` | `uuid` | FK → `notifications.id` `SET NULL` |
+| `notification_type` | `varchar(30)` | |
+| `title`, `message` | `varchar(120)`, `varchar(500)` | Fixed wording by type; never chat text or names |
+| `channel` | `varchar(20)` | Check `sms`, `whatsapp` |
+| `recipient` | `varchar(20)` | Masked number only |
+| `status` | `varchar(20)` | Check `pending`, `sent`, `delivered`, `failed`; `failed` requires `error_message` |
+| `provider`, `provider_message_id` | `varchar(40)`, `varchar(120)` | |
+| `error_message` | `varchar(300)` | |
+| `reference_key` | `varchar(120)` | **Unique**: `<notification id>:<channel>` (no duplicate sends) |
+| `sent_at`, `delivered_at`, `created_at`, `updated_at` | `timestamptz` | `updated_at` trigger |
+
+Indexes: unique `(reference_key)`; `(user_id, created_at DESC)`; `(channel, status, created_at DESC)`; partial `(provider, provider_message_id)`; partial `(notification_id)`.
+
 ## 5. Database functions and triggers
 
 | Object | Created in | Purpose |

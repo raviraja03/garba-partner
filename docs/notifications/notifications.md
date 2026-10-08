@@ -4,6 +4,8 @@
 
 ## 1. Purpose
 
+> Delivery by SMS and WhatsApp, and its history table, are described in [notification channels](notification-channels.md).
+
 In-app notifications tell members that something needs their attention: someone is interested, a match happened, a message arrived, an event starts soon, or a moderator acted on their account. They appear behind a **bell with an unread count** in the web app and on a **Notifications** page, and arrive live over Socket.IO.
 
 Principles:
