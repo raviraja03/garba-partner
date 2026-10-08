@@ -163,7 +163,7 @@ No critical issues were found. All high issues were fixed and covered by tests. 
 - [ ] 🟡 Server deployed and verified as in [production setup §11](../deployment/production-setup.md#11-deployment-checklist): TLS, HSTS, CSP, `limit_req`, API bound to `127.0.0.1`, admin IP allow-list (or a recorded decision not to), encrypted off-site backups, restore drill.
 - [ ] 🟡 Separate, CSPRNG-generated production secrets in a secret store (`JWT_*`, `PHONE_*`, `OTP_HMAC_SECRET`, Cloudinary, SMS, Razorpay).
 - [ ] 🟡 Database roles: DML-only API role; migrations with the owner role; TLS to the database.
-- [ ] ⏳ Real SMS provider (the dev provider is refused outside development).
+- [ ] ⏳ MSG91 configured and a real login code received (the adapter exists; the dev provider is refused outside development).
 - [ ] ⏳ Move in-memory rate limiters to a shared store (Redis) before running more than one API process.
 
 ## 6. Residual risks

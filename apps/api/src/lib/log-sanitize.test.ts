@@ -63,7 +63,7 @@ describe('logging and channel settings', () => {
     expect(env.SMS_ENABLED).toBe(true);
   });
 
-  it('refuses SMS and WhatsApp outside development while only the log provider exists', () => {
+  it('refuses SMS and WhatsApp outside development with the log provider (it sends nothing)', () => {
     const source = { ...process.env, ...createTestEnvSource(), ...production };
     for (const key of ['SMS_ENABLED', 'WHATSAPP_ENABLED']) {
       expect(() => loadServerEnv({ source: { ...source, [key]: 'true' } })).toThrow(key);

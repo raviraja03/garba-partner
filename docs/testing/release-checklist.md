@@ -35,7 +35,7 @@ Run on staging (test keys, test SMS) with the release build.
 - [ ] `APP_ENV=production`, `NODE_ENV=production`; the API refuses to start otherwise-invalid config (env schema).
 - [ ] Secrets set in the secret store only: JWT secrets (different for member/admin), `PHONE_HASH_SECRET`, `PHONE_ENCRYPTION_KEY`, `OTP_HMAC_SECRET`, Cloudinary, SMS, **Razorpay live keys** (`rzp_live_`) and webhook secret.
 - [ ] Razorpay live webhook configured to `https://<api>/api/v1/webhooks/razorpay` with the events in [webhook §3](../payments/webhook.md#3-events-handled); auto-capture on.
-- [ ] Real SMS provider with DLT-approved templates (the dev provider is refused outside development).
+- [ ] MSG91 configured with DLT-approved templates and a real login code received on a phone ([MSG91 setup](../notifications/msg91.md)). The dev provider is refused outside development.
 - [ ] `MEDIA_STORAGE=cloudinary` (local storage is refused outside development).
 - [ ] The [deployment checklist](../deployment/production-setup.md#11-deployment-checklist) is complete: `preflight.sh` and the full `healthcheck.sh` pass on the server (TLS, HSTS, CSP including the Razorpay entries, WebSocket upgrade, CORS for both app origins, API bound to `127.0.0.1`).
 - [ ] `WEB_ORIGIN` / `ADMIN_ORIGIN` are the `https://` production origins (CORS and CSRF depend on them).

@@ -2,7 +2,7 @@
 
 How a notification is delivered outside the app, and where the delivery history is kept. The in-app list is described in [notifications](notifications.md); this builds on it.
 
-> **Status: no real provider is connected yet.** The project has no SMS or WhatsApp integration (the only SMS code is the development stub for login codes). What exists is the full pipeline with a development provider that writes the message to the server log instead of sending it. Both channels are therefore refused outside `APP_ENV=development` until a real provider is added (§5).
+> **Providers.** `MESSAGING_PROVIDER=msg91` sends through MSG91: see [MSG91 setup](msg91.md) for templates, variables and the first-send check. `MESSAGING_PROVIDER=log` (the default) writes the message to the server log instead of sending it, and is only accepted when `APP_ENV=development`.
 
 ## 1. Flow
 
@@ -79,20 +79,23 @@ Chat messages are a special case that this also handles: the app keeps one unrea
 - The member's number is decrypted only to hand it to the provider. It is stored and logged masked.
 - Banned and deleted accounts receive nothing.
 
-## 6. Adding a real provider
+## 6. Adding another provider
+
+MSG91 is implemented (`apps/api/src/providers/messaging/msg91.provider.ts`). For a different one:
 
 1. Choose the provider(s). In India, SMS needs DLT-registered templates; WhatsApp needs approved message templates on the WhatsApp Business Platform.
 2. Implement `MessageProvider` (`apps/api/src/providers/messaging/message.provider.ts`) once per channel. `send` must resolve only when the provider accepted the message and reject otherwise.
 3. Return it from `createMessageProviders` in `apps/api/src/providers/messaging/index.ts`, and add its credentials to the env schema (`packages/config/src/server/env.ts`), `.env.example` and `deploy/env/production.env.example`. Credentials go in environment variables only.
-4. Relax the rule in the env schema that refuses `SMS_ENABLED` / `WHATSAPP_ENABLED` outside development.
+4. Add its name to `MESSAGING_PROVIDERS` in the env schema, with the rules for the variables it requires.
 5. If the provider sends delivery receipts, add a signed webhook that sets `status = 'delivered'` and `delivered_at`, looked up by `(provider, provider_message_id)`.
 
 ## 7. Environment variables
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `SMS_ENABLED` | `false` | Deliver notifications by SMS. Development only for now |
-| `WHATSAPP_ENABLED` | `false` | Deliver notifications by WhatsApp. Development only for now |
+| `SMS_ENABLED` | `false` | Deliver notifications by SMS |
+| `WHATSAPP_ENABLED` | `false` | Deliver notifications by WhatsApp |
+| `MESSAGING_PROVIDER` | `log` | `log` (development only) or `msg91`. The MSG91 variables are in [MSG91 setup](msg91.md#2-environment-variables) |
 
 With both `false` (the default) nothing changes: notifications are in-app only and `notification_deliveries` stays empty.
 
@@ -102,7 +105,7 @@ With both `false` (the default) nothing changes: notifications are in-app only a
 
 ## 9. Limitations
 
-- No real SMS or WhatsApp message is sent until a provider is added.
+- The MSG91 provider is tested against a stand-in, not the live service. A type is sent on a channel only if a template is configured for it.
 - A row can stay `pending` if the process dies between claiming the reference and the provider answering. It is not retried automatically.
 - Failed sends are not retried. Retrying needs a queue and a retry policy, which this project does not have yet.
 - Members cannot yet choose channels individually; the existing per-type preferences apply to every channel.

@@ -1,6 +1,9 @@
+import type { NotificationType } from '@garba-partner/shared';
 import type { NotificationChannel } from '../../models/index.js';
 
 export interface OutboundMessage {
+  /** Providers that send pre-approved templates (MSG91) pick the template by type. */
+  type: NotificationType;
   /** Full phone number in E.164. Implementations must never log it. */
   to: string;
   title: string;
@@ -24,5 +27,10 @@ export interface SendResult {
 export interface MessageProvider {
   readonly name: string;
   readonly channel: NotificationChannel;
+  /**
+   * False when this provider cannot send that type (no approved template for it). The
+   * notification is then not attempted on this channel. Absent = every type is supported.
+   */
+  supports?(type: NotificationType): boolean;
   send(message: OutboundMessage): Promise<SendResult>;
 }

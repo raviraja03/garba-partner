@@ -174,7 +174,7 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `PHONE_ENCRYPTION_KEY` | api | 32-byte key, base64 (AES-256-GCM) |
 | `PHONE_ENCRYPTION_KEY_VERSION` | api | `1` |
 | `SMS_PROVIDER` | api | `dev` today (no SMS; code returned in the response, **only accepted when `APP_ENV=development`**). A real provider (e.g. `msg91`) is added before launch |
-| `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` | api | Provider credentials / DLT IDs |
+| `SMS_PROVIDER`, `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID` | api | SMS provider, its credential and the DLT-approved login-code template ([MSG91 setup](../notifications/msg91.md)) |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | api | Cloudinary credentials |
 | `CLOUDINARY_FOLDER_PREFIX` | api | `garba-partner/production` |
 | `LOG_LEVEL` | api | `info` in production |

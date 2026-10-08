@@ -30,7 +30,7 @@ A member token can never authenticate an admin route, and the reverse also holds
 | Authorization middleware | `apps/api/src/middlewares/authorize.ts` |
 | CSRF guard for the refresh endpoints | `apps/api/src/middlewares/csrf.ts` |
 | IP rate limiters | `apps/api/src/middlewares/rate-limit.ts` |
-| SMS providers (dev only for now) | `apps/api/src/providers/sms/` |
+| SMS providers (`dev`, `msg91`) | `apps/api/src/providers/sms/` |
 | Shared contracts (schemas, DTOs, error codes, limits) | `packages/shared/src/{schemas/auth.schema,types/dto/auth.dto,constants/*}.ts` |
 | Web: login, OTP, auth state, guards | `apps/web/src/{pages,features/auth}/` |
 | Admin: login, guards, layout | `apps/admin/src/{pages,features/auth}/` |
@@ -283,6 +283,6 @@ Integration tests need `TEST_DATABASE_URL` ([database setup](../database/databas
 ## 7. Known limitations (to address before launch)
 
 - **No admin second factor.** Admin sign-in is email + password only (authenticator sign-in was removed), so a leaked or guessed admin password gives full access. A **forced password change on first login** is not implemented either: admins created with `admin:create` keep the printed password until they change it through a future admin-management screen. Deliver the password over a secure channel.
-- **No production SMS provider yet.** Only `SMS_PROVIDER=dev` exists, and it is rejected outside `APP_ENV=development`, so staging and production cannot start until a real provider (e.g. MSG91 with DLT templates) is added.
+- **Production SMS needs your MSG91 account.** `SMS_PROVIDER=msg91` texts login codes through MSG91 ([setup](../notifications/msg91.md)); `dev` is rejected outside `APP_ENV=development`. The adapter is tested against a stand-in, not the live service: do the first-send check there before launch.
 - The admin API is reachable on the API domain and is not restricted by host in the application; restrict it by IP in Nginx where possible ([nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel)).
 - In-memory rate limiters reset on restart and aren't shared between processes. The OTP limits are DB-backed, and the rest move to Redis when scaling out.

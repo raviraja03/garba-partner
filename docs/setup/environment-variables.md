@@ -63,8 +63,16 @@ Details: [docs/auth/](../auth/authentication.md).
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
 | `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for stored OTP codes and client-IP hashes |
-| `SMS_PROVIDER` | no | `dev` | api | `dev` = no SMS, and the code is returned in the send-otp response. **Only accepted when `APP_ENV=development`** (boot fails otherwise). Real providers are added before launch |
-| `SMS_ENABLED` | no | `false` | api | Also send notifications by SMS ([notification channels](../notifications/notification-channels.md)). **Only accepted when `APP_ENV=development`** until a real provider is connected |
+| `SMS_PROVIDER` | no | `dev` | api | Who texts login codes. `dev` = no SMS, and the code is returned in the send-otp response; **only accepted when `APP_ENV=development`** (boot fails otherwise). `msg91` = a real SMS through MSG91 ([setup](../notifications/msg91.md)) |
+| `MSG91_AUTH_KEY` | if MSG91 is used | — | api | **Secret.** MSG91 auth key. Sent only in a request header |
+| `MSG91_OTP_TEMPLATE_ID` | if `SMS_PROVIDER=msg91` | — | api | MSG91 template for login codes; its one variable is `##otp##` |
+| `MESSAGING_PROVIDER` | no | `log` | api | Who delivers notifications by SMS / WhatsApp. `log` writes them to the server log (development only); `msg91` sends them |
+| `MSG91_SMS_TEMPLATE_IDS` | if `SMS_ENABLED` with MSG91 | — | api | `type:templateId` pairs, comma-separated. Unlisted notification types are not sent |
+| `MSG91_WHATSAPP_NUMBER` | if `WHATSAPP_ENABLED` with MSG91 | — | api | WhatsApp Business number connected in MSG91, digits with country code |
+| `MSG91_WHATSAPP_TEMPLATES` | if `WHATSAPP_ENABLED` with MSG91 | — | api | `type:templateName` pairs, comma-separated |
+| `MSG91_WHATSAPP_LANGUAGE` | no | `en` | api | Template language code |
+| `MSG91_WHATSAPP_NAMESPACE` | no | — | api | Only if MSG91 shows a namespace for your templates |
+| `SMS_ENABLED` | no | `false` | api | Also send notifications by SMS ([notification channels](../notifications/notification-channels.md)). Outside development it needs `MESSAGING_PROVIDER=msg91` |
 | `WHATSAPP_ENABLED` | no | `false` | api | Same, for WhatsApp |
 | `JWT_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs member access tokens |
 | `JWT_ADMIN_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs admin access tokens. **Must differ** from `JWT_ACCESS_SECRET` |
@@ -111,7 +119,6 @@ These are listed, commented out, in `.env.example`. They **aren't read by any co
 
 | Phase | Variables |
 |---|---|
-| Production SMS | `SMS_API_KEY`, `SMS_SENDER_ID`, `SMS_OTP_TEMPLATE_ID` (with a real `SMS_PROVIDER` value) |
 
 Generate secrets with a CSPRNG, e.g. `node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"`.
 
@@ -175,6 +182,6 @@ Check a file before starting anything: `npm run env:check -w @garba-partner/api`
 
 - `NODE_ENV` is **not** in the file: PM2 sets `NODE_ENV=production` ([`ecosystem.config.cjs`](../../ecosystem.config.cjs)), and the scripts set it for the CLI commands.
 - Format: one `KEY=value` per line, no quotes, no spaces around `=`; URL-encode special characters in database passwords. The deploy scripts read single keys from the file and never execute it.
-- `SMS_PROVIDER`: no production value exists yet (only `dev`, refused outside development). **The API cannot start in production until a real provider is added.**
+- `SMS_PROVIDER`: must be `msg91` (with `MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID`); `dev` is refused outside development. See [MSG91 setup](../notifications/msg91.md).
 - Razorpay: live keys (`rzp_live_`) are required in production and refused elsewhere.
 - Optional path overrides for the scripts (environment of the shell, not the file): `GP_ENV_FILE`, `GP_ROOT` (`/srv/garba-partner`), `GP_LOG_DIR` (`/var/log/garba-partner`), `GP_CERT_NAME`, `GP_ACME_ROOT`, `GP_KEEP_RELEASES` (5).

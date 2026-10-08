@@ -31,7 +31,10 @@ export interface ChannelMessageInput {
 
 export interface DeliveryOutcome {
   channel: NotificationChannel;
-  /** `skipped`: channel off, already sent for this reference, or the member has no number. */
+  /**
+   * `skipped`: channel off, no template for this type, already sent for this reference, or the
+   * member has no number.
+   */
   status: Extract<DeliveryStatus, 'sent' | 'failed'> | 'skipped';
 }
 
@@ -130,6 +133,8 @@ export function createChannelNotifier(deps: {
     phone: string,
   ): Promise<DeliveryOutcome> {
     const { channel } = provider;
+    // No approved template for this type on this channel: nothing to attempt.
+    if (provider.supports && !provider.supports(input.type)) return { channel, status: 'skipped' };
     const referenceKey = `${input.referenceId}:${channel}`;
 
     // Claim the reference first. Only the request that inserts the row sends the message, so
@@ -163,6 +168,7 @@ export function createChannelNotifier(deps: {
     try {
       const result = await provider.send({
         to: phone,
+        type: input.type,
         title: input.title,
         text: input.message,
         reference: referenceKey,

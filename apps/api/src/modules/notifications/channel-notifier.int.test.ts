@@ -284,10 +284,7 @@ describe.skipIf(!hasTestDatabase)('SMS and WhatsApp notification channels (integ
   });
 
   it('the development log provider records SENT and prints a masked line', async () => {
-    const providers = createMessageProviders(
-      { SMS_ENABLED: true, WHATSAPP_ENABLED: false },
-      logger,
-    );
+    const providers = createMessageProviders(createTestEnv({ SMS_ENABLED: 'true' }), logger);
     expect(providers.whatsapp).toBeNull();
     const outcomes = await notifierWith(providers).sendNotification(input());
     expect(outcomes).toEqual([{ channel: 'sms', status: 'sent' }]);

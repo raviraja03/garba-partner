@@ -10,7 +10,7 @@ Two things block a production start today:
 
 | Blocker | Why | What is needed |
 |---|---|---|
-| **No real SMS provider** | Members sign in with an SMS code. Only the `dev` provider exists, and the API refuses it unless `APP_ENV=development`, so the API **will not start** with `APP_ENV=production` | Implement a provider (for India: DLT-registered templates, e.g. MSG91) and add its variables |
+| **MSG91 is not configured or verified** | Members sign in with an SMS code. The API **will not start** with `APP_ENV=production` unless `SMS_PROVIDER=msg91` and its two variables are set. The MSG91 adapter has only been tested against a stand-in | Follow [MSG91 setup](../notifications/msg91.md): DLT registration, the login-code template, the auth key, then the first-send check |
 | **The deployment checklist (§11) has never been run on a server** | Nginx, PM2, certbot and the deploy script could not be run on the Windows development machine | Run §3–§9 on the VPS; the deployment is complete only when `healthcheck.sh` passes there |
 
 Also open before launch: admins sign in with a password only (no second factor), see [security checklist §5](../security/security-checklist.md#5-before-launch-open-items).
@@ -274,7 +274,7 @@ A deployment is **complete only when every box is ticked on the server**. Items 
 
 **Before the first deploy**
 
-- [ ] A real SMS provider is implemented and configured (§1). Without it the API cannot start.
+- [ ] MSG91 is configured (`SMS_PROVIDER=msg91`, auth key, login-code template) and a real login code arrived on a phone ([MSG91 setup §6](../notifications/msg91.md#6-first-send-check)). Without the configuration the API cannot start.
 - [ ] `npm run check` is green on the commit to deploy, with the integration tests running (not skipped).
 - [ ] The [release checklist](../testing/release-checklist.md) and the open items in the [security checklist §5](../security/security-checklist.md#5-before-launch-open-items) are closed or explicitly accepted.
 - [ ] DNS records for the three domains point at the server.
