@@ -48,6 +48,7 @@ garba-partner/
 │   │   │   ├── App.tsx              router (public-only login routes, protected routes)
 │   │   │   ├── pages/               Login, VerifyOtp, Onboarding, Home, Profile, EditProfile, Preferences, NotFound
 │   │   │   ├── components/          AppShell, Navbar, Footer, AuthLayout, FullPageSpinner, ui/ (design-system components)
+│   │   │   ├── features/landing/    visitor home page: wording (content.ts), Section/Reveal/Tile/Sparkle, HomeGate
 │   │   │   ├── features/auth/       AuthProvider, auth context, guards, auth API calls
 │   │   │   ├── features/profile/    profile API + TanStack Query hooks, ProfileForm, ImageUpload, PreferencesForm, ProfileCard
 │   │   │   ├── lib/                 env (validated VITE_* vars), api-client (in-memory token, silent refresh)

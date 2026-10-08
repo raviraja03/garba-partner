@@ -89,6 +89,7 @@ The heading sizes scale with the screen on their own; don't add breakpoint class
 | `shadow-raised` | medium | Hovered cards, menus |
 | `shadow-overlay` | strong | Dialogs |
 | `animate-fade-in`, `pop-in`, `sheet-up`, `drawer-in` | 160–240ms | Overlays |
+| `animate-float` | 6s, repeating | Small decorations on the landing page only. Always written `motion-safe:animate-float` |
 
 Inside components use Tailwind's 4px scale (`gap-2`, `p-4`, `p-5` …).
 
@@ -230,6 +231,21 @@ Every member and visitor page now uses the components above. Patterns to copy:
 | Form inside a `Modal` | Reporting a message in `ChatPage` |
 
 `/`, `/events`, `/discover` and `/events/<slug>` use the wide container; every other page uses the content width.
+
+### The visitor home page
+
+`/` is two pages at one address (`features/landing/HomeGate.tsx`): visitors get `LandingPage`, signed-in members get `HomePage` behind the usual profile check. The landing page explains the product in ten blocks: hero, what it is, features, who it is for, why it was built, community, trust and safety, vision, the journey, and a closing call to action.
+
+| Piece | Where | Notes |
+|---|---|---|
+| All wording | `features/landing/content.ts` | Edit text here, not in the page. The file's header lists the honesty rules: no invented numbers, testimonials or dates; anything not built is marked `comingSoon`; never promise safety |
+| `Section` | `features/landing/components.tsx` | An `h2` (styled as `text-h1`), optional intro, then content |
+| `Reveal` | same | Fades content up once, when it scrolls into view. Opacity and transform only, so nothing shifts. Shown immediately with reduced motion |
+| `Tile` | same | Tinted square for an icon or emoji at the top of a card. Decorative (`aria-hidden`) |
+| `Sparkle` | same | The logo's four-point star as an absolutely positioned decoration. On phones keep it in a section's padded corners so it never sits over text |
+
+The page loads no data and adds no images beyond the logo files already in use. "Join Garba Groups" carries a "Coming soon" badge because groups do not exist in the product yet: remove `comingSoon` in `content.ts` when they do.
+
 
 ## 11. Mobile rules
 

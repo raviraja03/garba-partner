@@ -4,6 +4,7 @@ import { AppShell } from './components/AppShell';
 import { AuthProvider } from './features/auth/AuthProvider';
 import { ChatRealtime } from './features/chat/ChatRealtime';
 import { PublicOnly, RequireAuth } from './features/auth/guards';
+import { HomeGate } from './features/landing/HomeGate';
 import { RequireProfile } from './features/profile/RequireProfile';
 import { ApiClientError } from './lib/api-client';
 import { BlockedMembersPage } from './pages/BlockedMembersPage';
@@ -59,6 +60,13 @@ const router = createBrowserRouter([
       // Public: safety information must be reachable by everyone, signed in or not.
       { path: '/safety', element: <SafetyCenterPage /> },
       { path: '/guidelines', element: <CommunityGuidelinesPage /> },
+      // Home: the landing page for visitors, the member home for signed-in members.
+      {
+        element: <HomeGate />,
+        children: [
+          { element: <RequireProfile />, children: [{ path: '/', element: <HomePage /> }] },
+        ],
+      },
       {
         element: <RequireAuth />,
         children: [
@@ -66,7 +74,6 @@ const router = createBrowserRouter([
           {
             element: <RequireProfile />,
             children: [
-              { path: '/', element: <HomePage /> },
               { path: '/profile', element: <ProfilePage /> },
               { path: '/profile/edit', element: <EditProfilePage /> },
               { path: '/profile/preferences', element: <PreferencesPage /> },

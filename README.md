@@ -94,6 +94,7 @@ Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-
 
 - **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
 - **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. The event manager (`events@…`) manages events and organizers; moderators can view them only.
+- **Home** (http://localhost:5173): visitors see the landing page (what GarbaMates is, why it was built, how to join); signed-in members see their own home at the same address.
 - **Events** (http://localhost:5173/events): public, no login needed. The seed adds three published events and one draft.
 - **Real admin accounts:** `npm run admin:create -- --email you@example.com --name "Your Name" --role super_admin` prints a one-time random password.
 
