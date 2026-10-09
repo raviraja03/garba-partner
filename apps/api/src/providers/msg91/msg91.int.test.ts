@@ -41,12 +41,13 @@ function fakeMsg91(fail?: string) {
 describe.skipIf(!hasTestDatabase)('MSG91 (integration, MSG91 itself replaced by a fake)', () => {
   const db = useTestDatabase();
   const otpEnv = createTestEnv({
-    SMS_PROVIDER: 'msg91',
+    SMS_PROVIDER: 'msg91_whatsapp',
     MSG91_AUTH_KEY: AUTH_KEY,
-    MSG91_OTP_TEMPLATE_ID: 'otp_template_0001',
+    MSG91_WHATSAPP_NUMBER: '919000000001',
+    MSG91_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
   });
 
-  it('login: the code goes to MSG91, never to the browser, and signs the member in', async () => {
+  it('login: the code goes to WhatsApp through MSG91, never to the browser, and signs the member in', async () => {
     const msg91 = fakeMsg91();
     const app = createTestApp({
       sequelize: db(),
@@ -63,15 +64,31 @@ describe.skipIf(!hasTestDatabase)('MSG91 (integration, MSG91 itself replaced by 
       .expect(200);
     expect((sent.body as { data: { devOtp?: string } }).data.devOtp).toBeUndefined();
 
-    const recipient = (msg91.bodies[0]?.body.recipients as { mobiles: string; otp: string }[])[0];
-    expect(recipient?.mobiles).toBe(`91${phone}`);
-    expect(recipient?.otp).toMatch(/^\d{6}$/);
-    expect(JSON.stringify(sent.body)).not.toContain(recipient?.otp);
+    // The WhatsApp template message MSG91 was asked to send.
+    const sentTo = (
+      msg91.bodies[0]?.body as {
+        payload: {
+          template: {
+            name: string;
+            to_and_components: { to: string[]; components: { body_1: { value: string } } }[];
+          };
+        };
+      }
+    ).payload.template;
+    expect(msg91.bodies[0]?.url).toContain('/whatsapp/');
+    expect(sentTo.name).toBe('garbamates_login_code');
+    const recipient = {
+      mobiles: sentTo.to_and_components[0]?.to[0],
+      otp: sentTo.to_and_components[0]?.components.body_1.value,
+    };
+    expect(recipient.mobiles).toBe(`91${phone}`);
+    expect(recipient.otp).toMatch(/^\d{6}$/);
+    expect(JSON.stringify(sent.body)).not.toContain(recipient.otp);
 
     const verified = await request(app)
       .post('/api/v1/auth/verify-otp')
       .set('X-Forwarded-For', ip)
-      .send({ phone, code: recipient?.otp })
+      .send({ phone, code: recipient.otp })
       .expect(200);
     expect((verified.body as { data: { accessToken: string } }).data.accessToken).toBeTruthy();
   });

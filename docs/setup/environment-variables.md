@@ -63,12 +63,14 @@ Details: [docs/auth/](../auth/authentication.md).
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
 | `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for stored OTP codes and client-IP hashes |
-| `SMS_PROVIDER` | no | `dev` | api | Who texts login codes. `dev` = no SMS, and the code is returned in the send-otp response; **only accepted when `APP_ENV=development`** (boot fails otherwise). `msg91` = a real SMS through MSG91 ([setup](../notifications/msg91.md)) |
+| `SMS_PROVIDER` | no | `dev` | api | Who delivers login codes (the name is historical). `dev` = nothing is sent, and the code is returned in the send-otp response; **only accepted when `APP_ENV=development`** (boot fails otherwise). `msg91_whatsapp` = a WhatsApp message through MSG91 ([setup](../notifications/msg91.md)). `msg91` (SMS) is switched off and refused |
 | `MSG91_AUTH_KEY` | if MSG91 is used | — | api | **Secret.** MSG91 auth key. Sent only in a request header |
-| `MSG91_OTP_TEMPLATE_ID` | if `SMS_PROVIDER=msg91` | — | api | MSG91 template for login codes; its one variable is `##otp##` |
+| `MSG91_WHATSAPP_OTP_TEMPLATE` | if `SMS_PROVIDER=msg91_whatsapp` | — | api | Name of the approved WhatsApp "Authentication" template that carries the login code |
+| `MSG91_WHATSAPP_OTP_COPY_BUTTON` | no | `true` | api | `false` only if that template has no "Copy code" button |
+| `MSG91_OTP_TEMPLATE_ID` | no | — | api | SMS login-code template. Unused while the SMS option is switched off |
 | `MESSAGING_PROVIDER` | no | `log` | api | Who delivers notifications by SMS / WhatsApp. `log` writes them to the server log (development only); `msg91` sends them |
 | `MSG91_SMS_TEMPLATE_IDS` | if `SMS_ENABLED` with MSG91 | — | api | `type:templateId` pairs, comma-separated. Unlisted notification types are not sent |
-| `MSG91_WHATSAPP_NUMBER` | if `WHATSAPP_ENABLED` with MSG91 | — | api | WhatsApp Business number connected in MSG91, digits with country code |
+| `MSG91_WHATSAPP_NUMBER` | if `SMS_PROVIDER=msg91_whatsapp`, or `WHATSAPP_ENABLED` with MSG91 | — | api | WhatsApp Business number connected in MSG91, digits with country code |
 | `MSG91_WHATSAPP_TEMPLATES` | if `WHATSAPP_ENABLED` with MSG91 | — | api | `type:templateName` pairs, comma-separated |
 | `MSG91_WHATSAPP_LANGUAGE` | no | `en` | api | Template language code |
 | `MSG91_WHATSAPP_NAMESPACE` | no | — | api | Only if MSG91 shows a namespace for your templates |
@@ -182,6 +184,6 @@ Check a file before starting anything: `npm run env:check -w @garba-partner/api`
 
 - `NODE_ENV` is **not** in the file: PM2 sets `NODE_ENV=production` ([`ecosystem.config.cjs`](../../ecosystem.config.cjs)), and the scripts set it for the CLI commands.
 - Format: one `KEY=value` per line, no quotes, no spaces around `=`; URL-encode special characters in database passwords. The deploy scripts read single keys from the file and never execute it.
-- `SMS_PROVIDER`: must be `msg91` (with `MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID`); `dev` is refused outside development. See [MSG91 setup](../notifications/msg91.md).
+- `SMS_PROVIDER`: must be `msg91_whatsapp` (with `MSG91_AUTH_KEY`, `MSG91_WHATSAPP_NUMBER` and `MSG91_WHATSAPP_OTP_TEMPLATE`); `dev` is refused outside development. See [MSG91 setup](../notifications/msg91.md).
 - Razorpay: live keys (`rzp_live_`) are required in production and refused elsewhere.
 - Optional path overrides for the scripts (environment of the shell, not the file): `GP_ENV_FILE`, `GP_ROOT` (`/srv/garba-partner`), `GP_LOG_DIR` (`/var/log/garba-partner`), `GP_CERT_NAME`, `GP_ACME_ROOT`, `GP_KEEP_RELEASES` (5).

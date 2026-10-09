@@ -7,9 +7,15 @@ export const APP_ENVS = ['development', 'staging', 'production'] as const;
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 /**
  * Who texts login codes. `dev` sends no SMS and returns the code in the send-otp response; it
- * is only accepted when APP_ENV=development. `msg91` sends a real SMS through MSG91.
+ * is only accepted when APP_ENV=development. `msg91_whatsapp` sends the code as a WhatsApp
+ * message through MSG91. (The variable keeps its old name; `msg91`, the SMS option, is off.)
  */
-export const SMS_PROVIDERS = ['dev', 'msg91'] as const;
+export const SMS_PROVIDERS = [
+  'dev',
+  // 'msg91', // SMS login codes: switched off for now (login codes go by WhatsApp). To bring
+  //          // them back, uncomment this, the rule below and the case in providers/sms/index.ts.
+  'msg91_whatsapp',
+] as const;
 /**
  * Who delivers notifications by SMS / WhatsApp. `log` writes them to the server log instead of
  * sending (development only). `msg91` sends them through MSG91.
@@ -120,7 +126,7 @@ export const serverEnvSchema = z
 
     /** MSG91 (docs/notifications/msg91.md). The auth key is a secret: server only. */
     MSG91_AUTH_KEY: z.string().min(10).optional(),
-    /** Flow template for login codes: one variable, `##otp##`. Required when SMS_PROVIDER=msg91. */
+    /** SMS login-code template (`##otp##`). Unused while the SMS option is switched off. */
     MSG91_OTP_TEMPLATE_ID: z
       .string()
       .regex(/^[\w-]{6,64}$/, 'must be a MSG91 template ID')
@@ -132,6 +138,16 @@ export const serverEnvSchema = z
       .string()
       .regex(/^\+?\d{8,15}$/, 'digits with country code')
       .optional(),
+    /**
+     * Name of the approved WhatsApp "Authentication" template that carries the login code.
+     * Required when SMS_PROVIDER=msg91_whatsapp.
+     */
+    MSG91_WHATSAPP_OTP_TEMPLATE: z
+      .string()
+      .regex(/^[a-z0-9_]{1,512}$/, 'lowercase letters, digits and underscores (a template name)')
+      .optional(),
+    /** false only if that template has no "Copy code" button. */
+    MSG91_WHATSAPP_OTP_COPY_BUTTON: z.stringbool().default(true),
     /** Approved WhatsApp template name per notification type. */
     MSG91_WHATSAPP_TEMPLATES: templateMapSchema.optional(),
     MSG91_WHATSAPP_LANGUAGE: z
@@ -279,9 +295,15 @@ export const serverEnvSchema = z
         ctx.addIssue({ code: 'custom', path: [key], message: `is required when ${when}` });
       }
     };
-    if (env.SMS_PROVIDER === 'msg91') {
-      required('MSG91_AUTH_KEY', 'SMS_PROVIDER=msg91');
-      required('MSG91_OTP_TEMPLATE_ID', 'SMS_PROVIDER=msg91');
+    // SMS login codes are switched off for now (see SMS_PROVIDERS).
+    // if (env.SMS_PROVIDER === 'msg91') {
+    //   required('MSG91_AUTH_KEY', 'SMS_PROVIDER=msg91');
+    //   required('MSG91_OTP_TEMPLATE_ID', 'SMS_PROVIDER=msg91');
+    // }
+    if (env.SMS_PROVIDER === 'msg91_whatsapp') {
+      required('MSG91_AUTH_KEY', 'SMS_PROVIDER=msg91_whatsapp');
+      required('MSG91_WHATSAPP_NUMBER', 'SMS_PROVIDER=msg91_whatsapp');
+      required('MSG91_WHATSAPP_OTP_TEMPLATE', 'SMS_PROVIDER=msg91_whatsapp');
     }
     if (env.MESSAGING_PROVIDER === 'msg91') {
       required('MSG91_AUTH_KEY', 'MESSAGING_PROVIDER=msg91');

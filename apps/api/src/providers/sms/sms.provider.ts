@@ -1,6 +1,7 @@
 /**
  * Sends one-time codes. Implementations must never log the code or the phone number.
- * `dev` is for local development; `msg91` sends real SMS (docs/notifications/msg91.md).
+ * `dev` is for local development; `msg91_whatsapp` sends the code on WhatsApp
+ * (docs/notifications/msg91.md). The name says "SMS" for historical reasons.
  */
 export interface SmsProvider {
   readonly name: string;

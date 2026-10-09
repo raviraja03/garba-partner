@@ -8,6 +8,10 @@ import {
 import type { SmsProvider } from './sms.provider.js';
 
 /**
+ * NOT IN USE: login codes currently go by WhatsApp (msg91-whatsapp.otp.ts), and the `msg91`
+ * option that selects this provider is commented out in providers/sms/index.ts and in the env
+ * schema. Kept, with its tests, so SMS can be switched back on.
+ *
  * Sends login codes through MSG91's Flow API (docs/notifications/msg91.md#3-login-codes).
  *
  * The SMS text lives in MSG91 as a DLT-approved template; this only supplies the code. The

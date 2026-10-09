@@ -41,7 +41,7 @@ export function LoginPage() {
   return (
     <AuthLayout
       title="Find your Garba partner"
-      subtitle="Log in or sign up with your mobile number. We'll text you a 6-digit code."
+      subtitle="Log in or sign up with your mobile number. We'll send a 6-digit code to your WhatsApp."
     >
       <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-5">
         <div>
