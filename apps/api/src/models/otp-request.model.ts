@@ -38,6 +38,20 @@ export class OtpRequest extends Model<
   @Column({ type: DataType.CHAR(64), allowNull: false, validate: { is: SHA256_HEX } })
   ipHash!: string;
 
+  /** SHA-256 of the provider's message ID (set once the code was handed over). Never the code. */
+  @Column({ type: DataType.STRING(120), allowNull: true })
+  providerMessageId!: CreationOptional<string | null>;
+
+  /** What the provider last reported about that message: sent, delivered, read or failed. */
+  @Column({ type: DataType.STRING(20), allowNull: true })
+  deliveryStatus!: CreationOptional<'sent' | 'delivered' | 'read' | 'failed' | null>;
+
+  @Column({ type: DataType.STRING(300), allowNull: true })
+  deliveryError!: CreationOptional<string | null>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  deliveryUpdatedAt!: CreationOptional<Date | null>;
+
   @CreatedAt
   override createdAt!: CreationOptional<Date>;
 

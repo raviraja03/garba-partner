@@ -32,7 +32,10 @@ garba-partner/
 │   │   │   │   ├── locations/       cities and areas (reference data)
 │   │   │   │   ├── events/          public event list/detail, event mappers, slug
 │   │   │   │   └── admin/           auth/ (login…), users/ (list, detail, suspend/reactivate), events/, organizers/, audit/ (audit log)
-│   │   │   ├── providers/sms/       SmsProvider interface + development provider
+│   │   │   ├── providers/otp/       OtpProvider interface: development provider, Meta WhatsApp
+│   │   │   ├── providers/meta/      Meta WhatsApp Cloud API client (send template, verify webhook)
+│   │   │   ├── providers/messaging/ notification channels: log (development), Meta WhatsApp
+│   │   │   ├── modules/whatsapp/    Meta webhook: delivery reports
 │   │   │   ├── providers/media/     MediaStorage: Cloudinary + local (development only)
 │   │   │   ├── scripts/             db.ts (db CLI), create-admin.ts
 │   │   │   ├── test/                test helpers + global setup (migrates the test DB once)

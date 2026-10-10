@@ -9,7 +9,7 @@ import {
   purgeOldApiLogs,
   type ApiLogStore,
 } from '../modules/api-logs/api-log.store.js';
-import type { SmsProvider } from '../providers/sms/index.js';
+import type { OtpProvider } from '../providers/otp/index.js';
 import {
   createTestApp,
   createTestEnv,
@@ -59,13 +59,13 @@ describe.skipIf(!hasTestDatabase)('central API logging (integration)', () => {
   let app: Express;
   let ip: string;
 
-  const build = (overrides: Record<string, string> = {}, sms?: SmsProvider) =>
+  const build = (overrides: Record<string, string> = {}, otpProvider?: OtpProvider) =>
     createTestApp({
       sequelize: db(),
       env: createTestEnv({ ...overrides }),
       logger: log.logger,
       apiLogs: store,
-      ...(sms ? { sms } : {}),
+      ...(otpProvider ? { otpProvider } : {}),
     });
 
   beforeEach(async () => {
@@ -317,8 +317,8 @@ describe.skipIf(!hasTestDatabase)('central API logging (integration)', () => {
   });
 
   describe('OTP logging', () => {
-    /** Stands in for a real SMS provider: sends nothing, and never returns the code. */
-    const realSms = (): SmsProvider & { sent: string[] } => {
+    /** Stands in for a real delivery provider: sends nothing, and never returns the code. */
+    const realSms = (): OtpProvider & { sent: string[] } => {
       const sent: string[] = [];
       return {
         name: 'fake-real',
@@ -326,7 +326,7 @@ describe.skipIf(!hasTestDatabase)('central API logging (integration)', () => {
         sent,
         sendOtp: (_phone, code) => {
           sent.push(code);
-          return Promise.resolve();
+          return Promise.resolve({ providerMessageId: null });
         },
       };
     };

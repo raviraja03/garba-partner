@@ -19,9 +19,16 @@ export type OtpCheckResult =
 export interface OtpService {
   /**
    * Enforces send limits, invalidates the previous code and stores a new one.
-   * Returns the plaintext code, which must only be handed to the SMS provider (never logged).
+   * Returns the plaintext code, which must only be handed to the delivery provider (never
+   * logged), and the ID of the stored request.
    */
-  issue(phoneHash: string, ipHash: string, transaction: Transaction): Promise<string>;
+  issue(
+    phoneHash: string,
+    ipHash: string,
+    transaction: Transaction,
+  ): Promise<{ code: string; requestId: string }>;
+  /** Remembers which provider message carried the code, so delivery reports can be matched. */
+  recordDelivery(requestId: string, providerMessageId: string): Promise<void>;
   /** Checks a code and records the attempt. Never throws for a wrong/expired code. */
   check(phoneHash: string, code: string, transaction: Transaction): Promise<OtpCheckResult>;
 }
@@ -129,7 +136,7 @@ export function createOtpService(deps: {
       );
 
       const code = randomNumericCode(LIMITS.OTP_LENGTH);
-      await OtpRequest.create(
+      const request = await OtpRequest.create(
         {
           phoneHash,
           otpHash: hashCode(phoneHash, code),
@@ -138,7 +145,14 @@ export function createOtpService(deps: {
         },
         { transaction },
       );
-      return code;
+      return { code, requestId: request.id };
+    },
+
+    async recordDelivery(requestId, providerMessageId) {
+      await OtpRequest.update(
+        { providerMessageId, deliveryStatus: 'sent', deliveryUpdatedAt: new Date() },
+        { where: { id: requestId, providerMessageId: null } },
+      );
     },
 
     async check(phoneHash, code, transaction) {

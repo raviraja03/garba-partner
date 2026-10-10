@@ -17,11 +17,11 @@ export const NOTIFICATION_CHANNELS = ['sms', 'whatsapp'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 
 /**
- * `pending` (about to be sent) → `sent` (the provider accepted it) or `failed`. `delivered` is
- * set by a provider delivery receipt, when a provider that sends them is connected. "Read" lives
- * on the in-app `notifications.read_at`.
+ * `pending` (about to be sent) → `sent` (the provider accepted it) or `failed`. `delivered`,
+ * `read` and a later `failed` come from the provider's delivery reports (the Meta webhook).
+ * `read` here means read ON WHATSAPP; reading it in the app is `notifications.read_at`.
  */
-export const DELIVERY_STATUSES = ['pending', 'sent', 'delivered', 'failed'] as const;
+export const DELIVERY_STATUSES = ['pending', 'sent', 'delivered', 'read', 'failed'] as const;
 export type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 /**
@@ -93,6 +93,12 @@ export class NotificationDelivery extends Model<
 
   @Column({ type: DataType.DATE, allowNull: true })
   deliveredAt!: CreationOptional<Date | null>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  readAt!: CreationOptional<Date | null>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  failedAt!: CreationOptional<Date | null>;
 
   @CreatedAt
   override createdAt!: CreationOptional<Date>;

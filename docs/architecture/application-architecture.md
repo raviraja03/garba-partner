@@ -126,7 +126,7 @@ packages/config/
 
 `loadServerEnv()` also enforces cross-field rules:
 
-- `SMS_PROVIDER=dev` (codes returned in API responses) is only accepted when `APP_ENV=development`.
+- `OTP_PROVIDER=dev` (codes returned in API responses) is only accepted when `APP_ENV=development`.
 - `JWT_ACCESS_SECRET !== JWT_ADMIN_ACCESS_SECRET`, and each secret is ≥ 32 bytes.
 - Keys decode to exactly 32 bytes.
 
@@ -161,7 +161,7 @@ Rules:
 - Socket handlers call the **same service methods** as REST controllers (e.g. `chatService.sendMessage`), so the rules are identical over both transports.
 - Cross-domain calls go through the other domain's service (e.g. `interestsService` calls `safetyService.assertCanInteract`).
 - Repository classes are **not** used by default. Complex or reused queries go in `<domain>.queries.ts` functions, as allowed by the CLAUDE.md rule "repositories only when they provide clear value".
-- Providers (`SmsProvider`, `MediaStorage`) are interfaces in `src/providers/`, with implementations chosen from env at startup.
+- Providers (`OtpProvider`, `MessageProvider`, `MediaStorage`) are interfaces in `src/providers/`, with implementations chosen from env at startup.
 
 ### 4.2 Folder structure
 
@@ -215,7 +215,9 @@ apps/api/src/
 │   ├── not-found.ts
 │   └── error-handler.ts
 ├── providers/
-│   ├── sms/{sms.provider.ts, msg91.sms.ts, twilio.sms.ts, mock.sms.ts}
+│   ├── otp/{otp.provider.ts, dev.otp.ts, meta-whatsapp.otp.ts}   login-code delivery
+│   ├── meta/whatsapp.client.ts                                  the one Meta Cloud API client
+│   ├── messaging/{message.provider.ts, log.provider.ts, meta.provider.ts}
 │   └── media/{media.storage.ts, cloudinary.storage.ts}
 ├── lib/
 │   ├── app-error.ts           # AppError(code, httpStatus, message?, details?)

@@ -8,7 +8,7 @@ How the API logs requests, where to find the logs, and the two debugging switche
 | --- | --- | --- |
 | One line per API request (`[API]` / `[API ERROR]`) | Server log | `LOG_API_REQUESTS` (default `true`) |
 | One row per API request | `api_logs` table | `LOG_API_TO_DATABASE` (default `true`) |
-| One-time login codes (`[OTP]`) | Server log only | `LOG_OTP` (default `false`) |
+| One-time login codes (`[OTP]`) | Server log only | `LOG_OTP` (default `false`, development only) |
 | SMS / WhatsApp notification attempts (`[NOTIFICATION]`) | Server log and `notification_deliveries` | See [notification channels](../notifications/notification-channels.md) |
 
 The logger is [pino](https://getpino.io) (already a dependency; no library was added). In development the output is pretty-printed; in production each line is JSON with the same text in `msg`, so `grep '\[API'` works on both.
@@ -84,14 +84,14 @@ SELECT endpoint, count(*), round(avg(response_time_ms)) AS avg_ms, max(response_
 
 Implemented in `apps/api/src/modules/auth/otp-log.ts`, called from `sendOtp` in `apps/api/src/modules/auth/auth.service.ts` right after the code is generated.
 
-- **Off by default.** It prints only when `LOG_OTP=true`. Set it in the env file and restart the API; set it back to `false` (or remove the line) and restart to turn it off.
+- **Off by default, and local only.** The API refuses `LOG_OTP=true` unless `APP_ENV=development`, so it cannot be turned on in staging or production. It prints only when `LOG_OTP=true`. Set it in the env file and restart the API; set it back to `false` (or remove the line) and restart to turn it off.
 - When it is on, the API writes a warning at start-up saying so.
 - The phone number is masked. The code appears only in this line: not in the `[API]` lines, not in `api_logs`, not in the API response.
 - Nothing is printed for a banned number (no code is delivered to it either).
 
-**Risk.** Anyone who can read the server log can sign in as the member whose code is printed, and PM2 keeps the log in files on disk. Use it to debug, then turn it off. This is a deliberate exception to the rule "never log OTPs" in `CLAUDE.md`; with `LOG_OTP=false` that rule holds everywhere.
+**Why local only.** Anyone who can read the server log could sign in as the member whose code is printed, so outside local development the rule "never log OTPs" has no exception.
 
-**The development banner is separate.** With `SMS_PROVIDER=dev` (accepted only when `APP_ENV=development`) the send-otp response contains `devOtp` and the web app shows it on the code screen. That behaviour is unchanged and cannot be enabled in staging or production.
+**The development banner is separate.** With `OTP_PROVIDER=dev` (accepted only when `APP_ENV=development`) the send-otp response contains `devOtp` and the web app shows it on the code screen. That behaviour is unchanged and cannot be enabled in staging or production.
 
 ## 4. Reading the logs
 
@@ -112,7 +112,7 @@ Implemented in `apps/api/src/modules/auth/otp-log.ts`, called from `sendOtp` in 
 | `LOG_API_REQUESTS` | `true` | Write the `[API]` line for each request |
 | `LOG_API_TO_DATABASE` | `true` | Store each request in `api_logs` |
 | `API_LOG_RETENTION_DAYS` | `30` | Delete `api_logs` rows older than this (1–365) |
-| `LOG_OTP` | `false` | Print one-time codes to the server log |
+| `LOG_OTP` | `false` | Print one-time codes to the server log. Refused unless `APP_ENV=development` |
 | `LOG_LEVEL` | `info` | Existing. `warn` hides successful `[API]` lines but keeps `[API ERROR]` and `[OTP]` |
 
 ## 6. Tests

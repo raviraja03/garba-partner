@@ -59,10 +59,10 @@ Why 5 attempts × 5 codes/hour is enough: an attacker gets at most 25 guesses pe
 
 | | Development | Staging / Production |
 |---|---|---|
-| `SMS_PROVIDER` | `dev` | a real provider (added before launch) |
-| SMS sent | No | Yes |
+| `OTP_PROVIDER` | `dev` | `meta_whatsapp` ([Meta WhatsApp](../notifications/meta-whatsapp.md)) |
+| Message sent | No | Yes, on WhatsApp |
 | Code in `send-otp` response (`devOtp`) | **Yes**, shown on the OTP screen in a "Development only" banner | **Never** |
-| Guards | — | 1. `loadServerEnv()` **refuses to start** with `SMS_PROVIDER=dev` unless `APP_ENV=development`. 2. The service only adds `devOtp` when the provider is the dev provider **and** `APP_ENV === 'development'`. 3. A test asserts `devOtp` is absent when a delivering provider is used, and another asserts the env guard |
+| Guards | — | 1. `loadServerEnv()` **refuses to start** with `OTP_PROVIDER=dev` unless `APP_ENV=development`. 2. The service only adds `devOtp` when the provider is the dev provider **and** `APP_ENV === 'development'`. 3. A test asserts `devOtp` is absent when a delivering provider is used, and another asserts the env guard |
 
 The dev provider never writes the code to logs or files. The only place it appears is the HTTP response to the requester in local development.
 

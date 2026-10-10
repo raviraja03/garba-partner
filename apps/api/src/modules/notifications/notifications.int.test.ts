@@ -274,9 +274,10 @@ describe.skipIf(!hasTestDatabase)('notifications (integration)', () => {
       const defaults = await request(app)
         .get('/api/v1/notifications/preferences')
         .set(bearer(member.accessToken));
-      expect(Object.values(defaults.body.data as NotificationPreferencesDto).every(Boolean)).toBe(
-        true,
-      );
+      // Every notification type is on by default; WhatsApp is consent, so it starts off.
+      const { whatsapp, ...types } = defaults.body.data as NotificationPreferencesDto;
+      expect(Object.values(types).every(Boolean)).toBe(true);
+      expect(whatsapp).toBe(false);
       const saved = await setPreferences(member, { new_message: false, interest_received: false });
       expect(saved.status).toBe(200);
       expect(saved.body.data).toMatchObject({

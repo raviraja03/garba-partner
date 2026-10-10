@@ -17,7 +17,7 @@ import {
   sha256Hex,
 } from '../../lib/crypto.js';
 import { User, UserProfile, UserSession } from '../../models/index.js';
-import type { SmsProvider } from '../../providers/sms/index.js';
+import type { OtpProvider } from '../../providers/otp/index.js';
 import { logOtp } from './otp-log.js';
 import { createOtpService } from './otp.service.js';
 import type { TokenService } from './token.service.js';
@@ -51,7 +51,8 @@ export interface MemberAuthService {
 export interface MemberAuthServiceDeps {
   sequelize: Sequelize;
   env: ServerEnv;
-  sms: SmsProvider;
+  /** Delivers login codes (the development stub, or WhatsApp through Meta). */
+  otpProvider: OtpProvider;
   tokens: TokenService;
   logger: Logger;
 }
@@ -76,7 +77,7 @@ export function toMeDto(user: User): MeDto {
 }
 
 export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuthService {
-  const { sequelize, env, sms, tokens, logger } = deps;
+  const { sequelize, env, otpProvider, tokens, logger } = deps;
   const otp = createOtpService({ sequelize, env });
 
   const hashIp = (ip: string) => hmacSha256Hex(env.OTP_HMAC_SECRET, `ip:${ip}`);
@@ -128,15 +129,15 @@ export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuth
     async sendOtp(phone, client) {
       const phoneHash = hashPhone(phone, env.PHONE_HASH_SECRET);
 
-      const { code, deliver } = await sequelize.transaction(async (transaction) => {
-        const issuedCode = await otp.issue(phoneHash, hashIp(client.ip), transaction);
+      const { code, requestId, deliver } = await sequelize.transaction(async (transaction) => {
+        const issued = await otp.issue(phoneHash, hashIp(client.ip), transaction);
         const existing = await User.findOne({
           where: { phoneHash },
           attributes: ['id', 'status'],
           transaction,
         });
-        // Banned numbers get the same response but no SMS (no cost, no signal).
-        return { code: issuedCode, deliver: existing?.status !== 'banned' };
+        // Banned numbers get the same response but no message (no cost, no signal).
+        return { ...issued, deliver: existing?.status !== 'banned' };
       });
 
       if (deliver) {
@@ -149,12 +150,20 @@ export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuth
             requestId: client.requestId,
           });
         }
+        let delivery;
         try {
-          await sms.sendOtp(phone, code);
+          delivery = await otpProvider.sendOtp(phone, code);
         } catch (err) {
-          logger.error({ err, provider: sms.name }, 'OTP delivery failed');
+          logger.error({ err, provider: otpProvider.name }, 'OTP delivery failed');
           throw new AppError('SERVICE_UNAVAILABLE', {
             message: 'We could not send the code. Please try again.',
+          });
+        }
+        if (delivery.providerMessageId) {
+          // Only for matching the delivery report later. The code is already on its way, so a
+          // failure here must not fail the request.
+          await otp.recordDelivery(requestId, delivery.providerMessageId).catch((err: unknown) => {
+            logger.error({ err }, 'OTP delivery reference could not be stored');
           });
         }
       }
@@ -163,7 +172,9 @@ export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuth
         expiresInSeconds: LIMITS.OTP_TTL_SECONDS,
         resendAvailableInSeconds: LIMITS.OTP_RESEND_COOLDOWN_SECONDS,
         // Double guard: the env schema already forbids the dev provider outside development.
-        ...(sms.exposesCodeInResponse && env.APP_ENV === 'development' ? { devOtp: code } : {}),
+        ...(otpProvider.exposesCodeInResponse && env.APP_ENV === 'development'
+          ? { devOtp: code }
+          : {}),
       };
     },
 

@@ -192,7 +192,7 @@ Phones and tablets: one column, logo on top. Desktop: a Deep Purple panel with t
 
 Deep Purple, with the app icon and name (the full logo's purple wordmark can't sit on purple), the brand line, and three link groups: Product, Safety, Rules. Signed-in members also get "Find a partner" and "My passes". Two columns on phones, three on tablets, four on desktop.
 
-**Never add a link to a page that does not exist.** There are no About, Privacy, Terms or Contact pages yet; add them when they are written.
+**Never add a link to a page that does not exist.** There are no About or Contact pages yet; add them when they are written. The privacy policy (`/privacy-policy`) and terms (`/terms`) are in the "Legal" group with the community guidelines.
 
 ## 8. Loading, empty and error states
 
@@ -273,7 +273,7 @@ There is no separate mobile app or codebase: the same responsive components serv
 - The admin panel has the new colours, font, logo and favicon and works on phones (section strip, scrolling tables), but it is not redesigned: its tables are not turned into cards, and its controls are not all 44px. Its status badges use Tailwind's stock green, red and amber rather than the design tokens.
 - The Razorpay checkout window still names the merchant "Garba Partner": that string is set by the API, which this work does not touch.
 - The events list API does not send `passPricePaise` (the shared type says it does), so event cards cannot show "Passes from ₹…". The card shows the price as soon as the API sends it; the event page already shows it.
-- There are no About, Privacy, Terms or Contact pages. The onboarding consent text still names a Terms of Service and Privacy Policy.
+- There are no About or Contact pages. The privacy policy and terms exist (`features/legal/content.ts`) but are a draft: the operator's name, address, contact email and grievance officer are not filled in (`OPERATOR`), and the text has not been reviewed by a lawyer.
 - The "page not found" screen is branded but renders outside the site header and footer.
 - No per-page browser titles or social-sharing meta tags, and no route-level code splitting.
 - In a phone's sideways (landscape) position the page gutters do not yet allow for a notch at the side (`env(safe-area-inset-left/right)`).

@@ -56,6 +56,20 @@ function Preferences() {
         Safety notices about your account are always shown. Notifications never include message text
         or anyone&apos;s contact details.
       </p>
+
+      <h3 className="mt-5 border-t border-line pt-4 text-h3">WhatsApp</h3>
+      <Choice
+        label="Also notify me on WhatsApp"
+        checked={values.whatsapp}
+        disabled={update.isPending}
+        onChange={(e) => {
+          update.mutate({ whatsapp: e.target.checked });
+        }}
+      />
+      <p className="mt-1 text-caption text-muted">
+        Off unless you turn it on. We only send the kinds of notification switched on above, to the
+        mobile number you log in with. Login codes are always sent on WhatsApp.
+      </p>
       {update.isError && (
         <Alert tone="error" className="mt-3">
           {update.error.message}

@@ -24,8 +24,8 @@ import type { MessageProviders } from '../providers/messaging/index.js';
 import type { PaymentGateway } from '../providers/payments/index.js';
 import { createRealtimeHub, type RealtimeHub } from '../realtime/hub.js';
 import { attachSocketServer } from '../realtime/socket-server.js';
-import { devSmsProvider } from '../providers/sms/dev.sms.js';
-import type { SmsProvider } from '../providers/sms/index.js';
+import { devOtpProvider } from '../providers/otp/dev.otp.js';
+import type { OtpProvider } from '../providers/otp/index.js';
 
 /** Disposable integration-test database (see docs/database/database-setup.md). */
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? '';
@@ -86,7 +86,8 @@ export function createFakeMediaStorage(): FakeMediaStorage {
 export function createTestApp(options: {
   sequelize: Sequelize;
   env?: ServerEnv;
-  sms?: SmsProvider;
+  /** Delivers login codes. Default: the development stub (code in the response). */
+  otpProvider?: OtpProvider;
   media?: MediaStorage;
   realtime?: RealtimeHub;
   /** Razorpay gateway (tests pass the mocked one from `razorpay-mock.ts`). Default: disabled. */
@@ -104,7 +105,7 @@ export function createTestApp(options: {
     logger: options.logger ?? pino({ level: 'silent' }),
     dependencies: {
       sequelize: options.sequelize,
-      sms: options.sms ?? devSmsProvider,
+      otpProvider: options.otpProvider ?? devOtpProvider,
       ...(options.messaging ? { messaging: options.messaging } : {}),
       ...(options.apiLogs ? { apiLogs: options.apiLogs } : {}),
       media: options.media ?? createFakeMediaStorage(),

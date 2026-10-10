@@ -25,7 +25,7 @@
 | `LOG_API_REQUESTS` | no | `true` | `true`, `false` | api | One `[API]` line per request in the server log ([logging](../development/logging.md)) |
 | `LOG_API_TO_DATABASE` | no | `true` | `true`, `false` | api | Also store each request in the `api_logs` table (batched, never blocks a request) |
 | `API_LOG_RETENTION_DAYS` | no | `30` | `1`–`365` | api | `api_logs` rows older than this are deleted daily |
-| `LOG_OTP` | no | `false` | `true`, `false` | api | Prints each one-time login code to the server log (phone masked). **Debugging only**: anyone who can read the log can sign in as that member |
+| `LOG_OTP` | no | `false` | `true`, `false` | api | Prints each one-time login code to the server log (phone masked). **Local debugging only: refused unless `APP_ENV=development`** |
 
 ### API
 
@@ -63,16 +63,17 @@ Details: [docs/auth/](../auth/authentication.md).
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
 | `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for stored OTP codes and client-IP hashes |
-| `SMS_PROVIDER` | no | `dev` | api | Who texts login codes. `dev` = no SMS, and the code is returned in the send-otp response; **only accepted when `APP_ENV=development`** (boot fails otherwise). `msg91` = a real SMS through MSG91 ([setup](../notifications/msg91.md)) |
-| `MSG91_AUTH_KEY` | if MSG91 is used | — | api | **Secret.** MSG91 auth key. Sent only in a request header |
-| `MSG91_OTP_TEMPLATE_ID` | if `SMS_PROVIDER=msg91` | — | api | MSG91 template for login codes; its one variable is `##otp##` |
-| `MESSAGING_PROVIDER` | no | `log` | api | Who delivers notifications by SMS / WhatsApp. `log` writes them to the server log (development only); `msg91` sends them |
-| `MSG91_SMS_TEMPLATE_IDS` | if `SMS_ENABLED` with MSG91 | — | api | `type:templateId` pairs, comma-separated. Unlisted notification types are not sent |
-| `MSG91_WHATSAPP_NUMBER` | if `WHATSAPP_ENABLED` with MSG91 | — | api | WhatsApp Business number connected in MSG91, digits with country code |
-| `MSG91_WHATSAPP_TEMPLATES` | if `WHATSAPP_ENABLED` with MSG91 | — | api | `type:templateName` pairs, comma-separated |
-| `MSG91_WHATSAPP_LANGUAGE` | no | `en` | api | Template language code |
-| `MSG91_WHATSAPP_NAMESPACE` | no | — | api | Only if MSG91 shows a namespace for your templates |
-| `SMS_ENABLED` | no | `false` | api | Also send notifications by SMS ([notification channels](../notifications/notification-channels.md)). Outside development it needs `MESSAGING_PROVIDER=msg91` |
+| `OTP_PROVIDER` | no | `dev` | api | Who delivers login codes. `dev` = nothing is sent, and the code is returned in the send-otp response; **only accepted when `APP_ENV=development`** (boot fails otherwise). `meta_whatsapp` = a WhatsApp message through the Meta Cloud API ([setup](../notifications/meta-whatsapp.md)). Was `SMS_PROVIDER` |
+| `META_WHATSAPP_ACCESS_TOKEN` | if Meta is used | — | api | **Secret.** System-user access token. Sent only in a request header |
+| `META_WHATSAPP_PHONE_NUMBER_ID` | if Meta is used | — | api | The Phone Number ID from the Meta dashboard (not the phone number) |
+| `META_WHATSAPP_APP_SECRET` | if Meta is used | — | api | **Secret.** Verifies webhook signatures |
+| `META_WHATSAPP_VERIFY_TOKEN` | if Meta is used | — | api | **Secret.** A random string you also enter when registering the webhook |
+| `META_WHATSAPP_API_VERSION` | no | `v25.0` | api | Graph API version for every call |
+| `META_WHATSAPP_TEMPLATE_LANGUAGE` | no | `en` | api | Language code of the approved templates |
+| `META_WHATSAPP_OTP_TEMPLATE` | if `OTP_PROVIDER=meta_whatsapp` | — | api | Name of the approved "Authentication" template for login codes |
+| `META_WHATSAPP_TEMPLATES` | if `WHATSAPP_ENABLED` with Meta | — | api | `type:templateName` pairs, comma-separated. Unlisted notification types are not sent |
+| `MESSAGING_PROVIDER` | no | `log` | api | Who delivers notifications outside the app. `log` writes them to the server log (development only); `meta` sends WhatsApp messages through Meta |
+| `SMS_ENABLED` | no | `false` | api | Send notifications by SMS. **Development only** (the `log` provider): there is no SMS provider |
 | `WHATSAPP_ENABLED` | no | `false` | api | Same, for WhatsApp |
 | `JWT_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs member access tokens |
 | `JWT_ADMIN_ACCESS_SECRET` | **yes** | — | api | ≥ 32 characters. Signs admin access tokens. **Must differ** from `JWT_ACCESS_SECRET` |
@@ -182,6 +183,7 @@ Check a file before starting anything: `npm run env:check -w @garba-partner/api`
 
 - `NODE_ENV` is **not** in the file: PM2 sets `NODE_ENV=production` ([`ecosystem.config.cjs`](../../ecosystem.config.cjs)), and the scripts set it for the CLI commands.
 - Format: one `KEY=value` per line, no quotes, no spaces around `=`; URL-encode special characters in database passwords. The deploy scripts read single keys from the file and never execute it.
-- `SMS_PROVIDER`: must be `msg91` (with `MSG91_AUTH_KEY` and `MSG91_OTP_TEMPLATE_ID`); `dev` is refused outside development. See [MSG91 setup](../notifications/msg91.md).
+- `OTP_PROVIDER`: must be `meta_whatsapp`, with the access token, Phone Number ID, app secret, verify token and login-code template; `dev` is refused outside development. See [Meta WhatsApp setup](../notifications/meta-whatsapp.md).
+- `LOG_OTP` and `SMS_ENABLED` must be `false`.
 - Razorpay: live keys (`rzp_live_`) are required in production and refused elsewhere.
 - Optional path overrides for the scripts (environment of the shell, not the file): `GP_ENV_FILE`, `GP_ROOT` (`/srv/garba-partner`), `GP_LOG_DIR` (`/var/log/garba-partner`), `GP_CERT_NAME`, `GP_ACME_ROOT`, `GP_KEEP_RELEASES` (5).

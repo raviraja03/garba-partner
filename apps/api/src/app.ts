@@ -9,6 +9,7 @@ import { createApiLogger } from './middlewares/api-logger.js';
 import { errorHandler } from './middlewares/error-handler.js';
 import { notFound } from './middlewares/not-found.js';
 import { RAZORPAY_WEBHOOK_PATH } from './modules/payments/payments.routes.js';
+import { META_WHATSAPP_WEBHOOK_PATH } from './modules/whatsapp/whatsapp-webhook.routes.js';
 import { LOCAL_MEDIA_DIRECTORY, LOCAL_MEDIA_ROUTE } from './providers/media/index.js';
 import { createApiRouter, type ApiDependencies } from './routes.js';
 
@@ -19,7 +20,11 @@ export interface CreateAppOptions {
   dependencies: ApiDependencies;
 }
 
-const WEBHOOK_PATH = `${API_PREFIX}${RAZORPAY_WEBHOOK_PATH}`;
+/** Signed webhooks: their signatures are computed over the exact bytes received. */
+const SIGNED_WEBHOOK_PATHS = new Set([
+  `${API_PREFIX}${RAZORPAY_WEBHOOK_PATH}`,
+  `${API_PREFIX}${META_WHATSAPP_WEBHOOK_PATH}`,
+]);
 
 /** Builds the Express application. Kept free of side effects so tests can create instances. */
 export function createApp({ env, logger, dependencies }: CreateAppOptions): Express {
@@ -66,9 +71,10 @@ export function createApp({ env, logger, dependencies }: CreateAppOptions): Expr
   app.use(
     express.json({
       limit: '100kb',
-      // Webhook signatures are computed over the exact bytes received: keep them for that path.
+      // Keep the raw bytes for the signed webhook paths only (everything else is parsed JSON).
       verify: (req, _res, buffer) => {
-        if (req.url === WEBHOOK_PATH) (req as express.Request).rawBody = Buffer.from(buffer);
+        const path = (req.url ?? '').split('?')[0] ?? '';
+        if (SIGNED_WEBHOOK_PATHS.has(path)) (req as express.Request).rawBody = Buffer.from(buffer);
       },
     }),
   );

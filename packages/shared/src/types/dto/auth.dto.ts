@@ -6,7 +6,7 @@ export interface SendOtpResultDto {
   expiresInSeconds: number;
   resendAvailableInSeconds: number;
   /**
-   * DEVELOPMENT ONLY (SMS_PROVIDER=dev, APP_ENV=development). Never present otherwise.
+   * DEVELOPMENT ONLY (OTP_PROVIDER=dev, APP_ENV=development). Never present otherwise.
    */
   devOtp?: string;
 }

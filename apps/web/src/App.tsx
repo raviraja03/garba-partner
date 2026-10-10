@@ -19,6 +19,7 @@ import { EventsPage } from './pages/EventsPage';
 import { FindPartnerPage } from './pages/FindPartnerPage';
 import { HomePage } from './pages/HomePage';
 import { InterestsPage } from './pages/InterestsPage';
+import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import { LoginPage } from './pages/LoginPage';
 import { MatchesPage } from './pages/MatchesPage';
 import { MatchPage } from './pages/MatchPage';
@@ -60,6 +61,9 @@ const router = createBrowserRouter([
       // Public: safety information must be reachable by everyone, signed in or not.
       { path: '/safety', element: <SafetyCenterPage /> },
       { path: '/guidelines', element: <CommunityGuidelinesPage /> },
+      // Public: the rules of the service must be readable before signing up.
+      { path: '/privacy-policy', element: <PrivacyPolicyPage /> },
+      { path: '/terms', element: <TermsPage /> },
       // Home: the landing page for visitors, the member home for signed-in members.
       {
         element: <HomeGate />,

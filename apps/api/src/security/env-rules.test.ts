@@ -39,7 +39,7 @@ describe('security environment rules', () => {
 
   it('refuses development-only mechanisms outside development', () => {
     const staging = issues({ ...production, APP_ENV: 'staging', MEDIA_STORAGE: 'local' });
-    expect(staging).toContain('SMS_PROVIDER'); // the dev provider returns OTPs in responses
+    expect(staging).toContain('OTP_PROVIDER'); // the dev provider returns OTPs in responses
     expect(staging).toContain('MEDIA_STORAGE');
   });
 

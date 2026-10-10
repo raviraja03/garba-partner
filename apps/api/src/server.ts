@@ -19,7 +19,8 @@ import { createPaymentsService } from './modules/payments/payments.service.js';
 import { createMediaStorage } from './providers/media/index.js';
 import { createMessageProviders } from './providers/messaging/index.js';
 import { createPaymentGateway } from './providers/payments/index.js';
-import { createSmsProvider } from './providers/sms/index.js';
+import { createMetaClientFromEnv } from './providers/meta/index.js';
+import { createOtpProvider } from './providers/otp/index.js';
 import { createRealtimeHub } from './realtime/hub.js';
 import { attachSocketServer } from './realtime/socket-server.js';
 
@@ -56,7 +57,9 @@ function start(): void {
   const media = createMediaStorage(env);
   const realtime = createRealtimeHub();
   const paymentGateway = createPaymentGateway(env, logger);
-  const messaging = createMessageProviders(env, logger);
+  // One Meta client for login codes and notifications (null when Meta is not configured).
+  const meta = createMetaClientFromEnv(env);
+  const messaging = createMessageProviders(env, logger, meta);
   // `api_logs` rows are queued and written in the background (docs/development/logging.md).
   const apiLogs = env.LOG_API_TO_DATABASE ? createApiLogStore({ logger }) : null;
   const server = createServer(
@@ -65,7 +68,7 @@ function start(): void {
       logger,
       dependencies: {
         sequelize,
-        sms: createSmsProvider(env),
+        otpProvider: createOtpProvider(env, meta),
         messaging,
         ...(apiLogs ? { apiLogs } : {}),
         media,

@@ -2,7 +2,7 @@
 
 How a notification is delivered outside the app, and where the delivery history is kept. The in-app list is described in [notifications](notifications.md); this builds on it.
 
-> **Providers.** `MESSAGING_PROVIDER=msg91` sends through MSG91: see [MSG91 setup](msg91.md) for templates, variables and the first-send check. `MESSAGING_PROVIDER=log` (the default) writes the message to the server log instead of sending it, and is only accepted when `APP_ENV=development`.
+> **Providers.** `MESSAGING_PROVIDER=meta` sends WhatsApp messages through the Meta WhatsApp Cloud API: see [Meta WhatsApp](meta-whatsapp.md) for templates, variables, the webhook and the first-send check. `MESSAGING_PROVIDER=log` (the default) writes the message to the server log instead of sending it, and is only accepted when `APP_ENV=development`. There is no SMS provider; the SMS channel only works with `log`.
 
 ## 1. Flow
 
@@ -81,21 +81,21 @@ Chat messages are a special case that this also handles: the app keeps one unrea
 
 ## 6. Adding another provider
 
-MSG91 is implemented (`apps/api/src/providers/messaging/msg91.provider.ts`). For a different one:
+Meta WhatsApp is implemented (`apps/api/src/providers/messaging/meta.provider.ts`, on the shared client in `providers/meta/`). For a different one:
 
 1. Choose the provider(s). In India, SMS needs DLT-registered templates; WhatsApp needs approved message templates on the WhatsApp Business Platform.
 2. Implement `MessageProvider` (`apps/api/src/providers/messaging/message.provider.ts`) once per channel. `send` must resolve only when the provider accepted the message and reject otherwise.
 3. Return it from `createMessageProviders` in `apps/api/src/providers/messaging/index.ts`, and add its credentials to the env schema (`packages/config/src/server/env.ts`), `.env.example` and `deploy/env/production.env.example`. Credentials go in environment variables only.
 4. Add its name to `MESSAGING_PROVIDERS` in the env schema, with the rules for the variables it requires.
-5. If the provider sends delivery receipts, add a signed webhook that sets `status = 'delivered'` and `delivered_at`, looked up by `(provider, provider_message_id)`.
+5. If the provider sends delivery reports, add a signed webhook that moves `status` forward only, as `modules/whatsapp/whatsapp-webhook.service.ts` does for Meta.
 
 ## 7. Environment variables
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `SMS_ENABLED` | `false` | Deliver notifications by SMS |
+| `SMS_ENABLED` | `false` | Deliver notifications by SMS. Development only (`log`): there is no SMS provider |
 | `WHATSAPP_ENABLED` | `false` | Deliver notifications by WhatsApp |
-| `MESSAGING_PROVIDER` | `log` | `log` (development only) or `msg91`. The MSG91 variables are in [MSG91 setup](msg91.md#2-environment-variables) |
+| `MESSAGING_PROVIDER` | `log` | `log` (development only) or `meta`. The Meta variables are in [Meta WhatsApp](meta-whatsapp.md#3-environment-variables) |
 
 With both `false` (the default) nothing changes: notifications are in-app only and `notification_deliveries` stays empty.
 
@@ -105,8 +105,8 @@ With both `false` (the default) nothing changes: notifications are in-app only a
 
 ## 9. Limitations
 
-- The MSG91 provider is tested against a stand-in, not the live service. A type is sent on a channel only if a template is configured for it.
+- The Meta provider is tested against a stand-in, not the live service. A type is sent only if a template is configured for it.
 - A row can stay `pending` if the process dies between claiming the reference and the provider answering. It is not retried automatically.
 - Failed sends are not retried. Retrying needs a queue and a retry policy, which this project does not have yet.
-- Members cannot yet choose channels individually; the existing per-type preferences apply to every channel.
-- Login codes do not go through this pipeline. They use the separate `SmsProvider` (`SMS_PROVIDER`).
+- WhatsApp is all-or-nothing per member (the opt-in); the per-type switches then apply to it as they do in the app.
+- Login codes do not go through this pipeline. They use the separate `OtpProvider` (`OTP_PROVIDER`), on the same Meta client.

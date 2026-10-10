@@ -58,14 +58,25 @@ describe('logging and channel settings', () => {
 
   it('reads the switches from the environment', () => {
     const env = createTestEnv({ LOG_OTP: 'true', LOG_API_REQUESTS: 'false', SMS_ENABLED: 'true' });
+    // (Both LOG_OTP and SMS_ENABLED are development-only switches; tests run as development.)
     expect(env.LOG_OTP).toBe(true);
     expect(env.LOG_API_REQUESTS).toBe(false);
     expect(env.SMS_ENABLED).toBe(true);
   });
 
-  it('refuses SMS and WhatsApp outside development with the log provider (it sends nothing)', () => {
-    const source = { ...process.env, ...createTestEnvSource(), ...production };
-    for (const key of ['SMS_ENABLED', 'WHATSAPP_ENABLED']) {
+  it('development-only switches are refused elsewhere: LOG_OTP, SMS, and WhatsApp with the log provider', () => {
+    const source = {
+      ...createTestEnvSource(),
+      ...production,
+      OTP_PROVIDER: 'meta_whatsapp',
+      META_WHATSAPP_ACCESS_TOKEN: 'test-meta-access-token-000000',
+      META_WHATSAPP_PHONE_NUMBER_ID: '100000000000001',
+      META_WHATSAPP_APP_SECRET: 'test-meta-app-secret-0000',
+      META_WHATSAPP_VERIFY_TOKEN: 'test-meta-verify-token-00',
+      META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
+    };
+    expect(() => loadServerEnv({ source: { ...source } })).not.toThrow();
+    for (const key of ['LOG_OTP', 'SMS_ENABLED', 'WHATSAPP_ENABLED']) {
       expect(() => loadServerEnv({ source: { ...source, [key]: 'true' } })).toThrow(key);
     }
   });

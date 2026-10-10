@@ -6,15 +6,16 @@ export const NODE_ENVS = ['development', 'test', 'production'] as const;
 export const APP_ENVS = ['development', 'staging', 'production'] as const;
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 /**
- * Who texts login codes. `dev` sends no SMS and returns the code in the send-otp response; it
- * is only accepted when APP_ENV=development. `msg91` sends a real SMS through MSG91.
+ * Who delivers login codes. `dev` sends nothing and returns the code in the send-otp response;
+ * it is only accepted when APP_ENV=development. `meta_whatsapp` sends the code as a WhatsApp
+ * message through the Meta WhatsApp Cloud API (docs/notifications/meta-whatsapp.md).
  */
-export const SMS_PROVIDERS = ['dev', 'msg91'] as const;
+export const OTP_PROVIDERS = ['dev', 'meta_whatsapp'] as const;
 /**
- * Who delivers notifications by SMS / WhatsApp. `log` writes them to the server log instead of
- * sending (development only). `msg91` sends them through MSG91.
+ * Who delivers notifications outside the app. `log` writes them to the server log instead of
+ * sending (development only). `meta` sends WhatsApp messages through the Meta Cloud API.
  */
-export const MESSAGING_PROVIDERS = ['log', 'msg91'] as const;
+export const MESSAGING_PROVIDERS = ['log', 'meta'] as const;
 /**
  * `cloudinary` for real deployments. `local` stores images on disk and serves them from the API;
  * it is only accepted when APP_ENV=development (docs/users/cloudinary.md).
@@ -36,7 +37,7 @@ export const PAYMENT_PROVIDERS = ['disabled', 'razorpay'] as const;
 export type NodeEnv = (typeof NODE_ENVS)[number];
 export type AppEnv = (typeof APP_ENVS)[number];
 export type LogLevel = (typeof LOG_LEVELS)[number];
-export type SmsProvider = (typeof SMS_PROVIDERS)[number];
+export type OtpProviderKind = (typeof OTP_PROVIDERS)[number];
 export type MessagingProviderKind = (typeof MESSAGING_PROVIDERS)[number];
 export type MediaStorageKind = (typeof MEDIA_STORAGES)[number];
 export type IdentityProviderKind = (typeof IDENTITY_PROVIDERS)[number];
@@ -50,7 +51,7 @@ const postgresUrlSchema = z.url({ protocol: /^postgres(ql)?$/ });
 /** At least 32 characters of secret material (e.g. 32 random bytes, base64-encoded). */
 const secretSchema = z.string().min(32, 'must be at least 32 characters');
 
-/** `type:template,type:template` (which MSG91 template to use for each notification type). */
+/** `type:template,type:template` (which WhatsApp template to use for each notification type). */
 const templateMapSchema = z
   .string()
   .regex(
@@ -86,8 +87,9 @@ export const serverEnvSchema = z
     /** `api_logs` rows older than this are deleted daily. */
     API_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
     /**
-     * Prints each one-time code to the server log (`[OTP]` line, phone masked). For debugging
-     * only: anyone who can read the log can sign in as that member. Off unless set to true.
+     * Prints each one-time code to the server log (`[OTP]` line, phone masked). Local debugging
+     * only: refused unless APP_ENV=development, because anyone who can read the log could sign in
+     * as that member.
      */
     LOG_OTP: z.stringbool().default(false),
 
@@ -107,39 +109,52 @@ export const serverEnvSchema = z
 
     /** HMAC key for OTP codes and client IP hashes. */
     OTP_HMAC_SECRET: secretSchema,
-    SMS_PROVIDER: z.enum(SMS_PROVIDERS).default('dev'),
+    OTP_PROVIDER: z.enum(OTP_PROVIDERS).default('dev'),
+    /** Renamed to OTP_PROVIDER. Still read only to say so clearly at start-up. */
+    SMS_PROVIDER: z.string().optional(),
 
     /**
-     * Send member notifications by SMS / WhatsApp as well as in the app
-     * (docs/notifications/notification-channels.md). With MESSAGING_PROVIDER=log nothing is
-     * really sent, so that combination is refused outside APP_ENV=development.
+     * Send member notifications outside the app as well
+     * (docs/notifications/notification-channels.md). WhatsApp goes through Meta
+     * (MESSAGING_PROVIDER=meta). There is no SMS provider: SMS_ENABLED only works with the
+     * development `log` provider.
      */
     SMS_ENABLED: z.stringbool().default(false),
     WHATSAPP_ENABLED: z.stringbool().default(false),
     MESSAGING_PROVIDER: z.enum(MESSAGING_PROVIDERS).default('log'),
 
-    /** MSG91 (docs/notifications/msg91.md). The auth key is a secret: server only. */
-    MSG91_AUTH_KEY: z.string().min(10).optional(),
-    /** Flow template for login codes: one variable, `##otp##`. Required when SMS_PROVIDER=msg91. */
-    MSG91_OTP_TEMPLATE_ID: z
+    /**
+     * Meta WhatsApp Cloud API (docs/notifications/meta-whatsapp.md). All server-only; the access
+     * token and the app secret are secrets and must never reach the web apps.
+     */
+    /** System-user access token with the whatsapp_business_messaging permission. */
+    META_WHATSAPP_ACCESS_TOKEN: z.string().min(20).optional(),
+    /** The ID Meta gives the sending number (not the phone number itself). */
+    META_WHATSAPP_PHONE_NUMBER_ID: z
       .string()
-      .regex(/^[\w-]{6,64}$/, 'must be a MSG91 template ID')
+      .regex(/^\d{5,25}$/, 'digits only (the Phone Number ID from the Meta dashboard)')
       .optional(),
-    /** Flow template ID per notification type, for SMS notifications. */
-    MSG91_SMS_TEMPLATE_IDS: templateMapSchema.optional(),
-    /** The WhatsApp Business number connected in MSG91: digits with country code. */
-    MSG91_WHATSAPP_NUMBER: z
+    /** App secret of the Meta app: verifies that webhook calls really come from Meta. */
+    META_WHATSAPP_APP_SECRET: z.string().min(16).optional(),
+    /** Any long random string you choose; entered again when registering the webhook in Meta. */
+    META_WHATSAPP_VERIFY_TOKEN: z.string().min(16).optional(),
+    /** Graph API version used for every call. */
+    META_WHATSAPP_API_VERSION: z
       .string()
-      .regex(/^\+?\d{8,15}$/, 'digits with country code')
-      .optional(),
-    /** Approved WhatsApp template name per notification type. */
-    MSG91_WHATSAPP_TEMPLATES: templateMapSchema.optional(),
-    MSG91_WHATSAPP_LANGUAGE: z
+      .regex(/^v\d{1,3}\.\d{1,2}$/, 'e.g. v25.0')
+      .default('v25.0'),
+    /** Language code of the approved templates, exactly as shown in WhatsApp Manager. */
+    META_WHATSAPP_TEMPLATE_LANGUAGE: z
       .string()
       .regex(/^[a-z]{2}(_[A-Z]{2})?$/, 'e.g. en or en_US')
       .default('en'),
-    /** Only if MSG91 shows a namespace for your templates. */
-    MSG91_WHATSAPP_NAMESPACE: z.string().min(1).optional(),
+    /** Name of the approved "Authentication" template that carries the login code. */
+    META_WHATSAPP_OTP_TEMPLATE: z
+      .string()
+      .regex(/^[a-z0-9_]{1,512}$/, 'lowercase letters, digits and underscores (a template name)')
+      .optional(),
+    /** Approved "Utility" template name per notification type. */
+    META_WHATSAPP_TEMPLATES: templateMapSchema.optional(),
 
     /** Member access tokens (JWT HS256, audience "garba-partner:app"). */
     JWT_ACCESS_SECRET: secretSchema,
@@ -253,43 +268,64 @@ export const serverEnvSchema = z
         message: 'must differ from JWT_ACCESS_SECRET (member and admin tokens are separate)',
       });
     }
-    // The dev OTP mechanism returns codes in API responses: never outside local development.
-    if (env.SMS_PROVIDER === 'dev' && env.APP_ENV !== 'development') {
+    if (env.SMS_PROVIDER !== undefined) {
       ctx.addIssue({
         code: 'custom',
         path: ['SMS_PROVIDER'],
-        message: '"dev" is only allowed when APP_ENV=development; configure a real SMS provider',
+        message: 'was renamed: use OTP_PROVIDER (dev | meta_whatsapp) and remove this line',
+      });
+    }
+    // The dev OTP mechanism returns codes in API responses: never outside local development.
+    if (env.OTP_PROVIDER === 'dev' && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['OTP_PROVIDER'],
+        message: '"dev" is only allowed when APP_ENV=development; use "meta_whatsapp"',
+      });
+    }
+    // Codes in a log file let anyone who can read it sign in as a member.
+    if (env.LOG_OTP && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['LOG_OTP'],
+        message: 'is only allowed when APP_ENV=development',
       });
     }
 
     // The log provider writes to the log instead of sending: recording those as "sent" outside
     // local development would be false.
-    for (const key of ['SMS_ENABLED', 'WHATSAPP_ENABLED'] as const) {
-      if (env[key] && env.MESSAGING_PROVIDER === 'log' && env.APP_ENV !== 'development') {
-        ctx.addIssue({
-          code: 'custom',
-          path: [key],
-          message:
-            'needs MESSAGING_PROVIDER=msg91 outside development ("log" does not send anything)',
-        });
-      }
+    if (env.WHATSAPP_ENABLED && env.MESSAGING_PROVIDER === 'log' && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['WHATSAPP_ENABLED'],
+        message: 'needs MESSAGING_PROVIDER=meta outside development ("log" does not send anything)',
+      });
+    }
+    if (env.SMS_ENABLED && env.APP_ENV !== 'development') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SMS_ENABLED'],
+        message: 'is only allowed when APP_ENV=development: there is no SMS provider',
+      });
     }
     const required = (key: keyof typeof env, when: string): void => {
       if (env[key] === undefined) {
         ctx.addIssue({ code: 'custom', path: [key], message: `is required when ${when}` });
       }
     };
-    if (env.SMS_PROVIDER === 'msg91') {
-      required('MSG91_AUTH_KEY', 'SMS_PROVIDER=msg91');
-      required('MSG91_OTP_TEMPLATE_ID', 'SMS_PROVIDER=msg91');
+    const metaForOtp = env.OTP_PROVIDER === 'meta_whatsapp';
+    const metaForNotifications = env.MESSAGING_PROVIDER === 'meta' && env.WHATSAPP_ENABLED;
+    if (metaForOtp) required('META_WHATSAPP_OTP_TEMPLATE', 'OTP_PROVIDER=meta_whatsapp');
+    if (metaForNotifications) {
+      required('META_WHATSAPP_TEMPLATES', 'WHATSAPP_ENABLED=true with MESSAGING_PROVIDER=meta');
     }
-    if (env.MESSAGING_PROVIDER === 'msg91') {
-      required('MSG91_AUTH_KEY', 'MESSAGING_PROVIDER=msg91');
-      if (env.SMS_ENABLED) required('MSG91_SMS_TEMPLATE_IDS', 'SMS_ENABLED=true with MSG91');
-      if (env.WHATSAPP_ENABLED) {
-        required('MSG91_WHATSAPP_NUMBER', 'WHATSAPP_ENABLED=true with MSG91');
-        required('MSG91_WHATSAPP_TEMPLATES', 'WHATSAPP_ENABLED=true with MSG91');
-      }
+    if (metaForOtp || metaForNotifications) {
+      const when = 'Meta WhatsApp is used';
+      required('META_WHATSAPP_ACCESS_TOKEN', when);
+      required('META_WHATSAPP_PHONE_NUMBER_ID', when);
+      // Delivery results only arrive through the signed webhook.
+      required('META_WHATSAPP_APP_SECRET', when);
+      required('META_WHATSAPP_VERIFY_TOKEN', when);
     }
 
     if (env.MEDIA_STORAGE === 'local' && env.APP_ENV !== 'development') {

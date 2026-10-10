@@ -6,8 +6,7 @@ import { cx } from './ui/cx';
 
 /*
  * Only pages that exist are linked: a footer must never contain a broken link. There are no
- * About, Privacy, Terms or Contact pages yet; add them to a "Company" / "Legal" group here
- * when they are written. Until then the community guidelines are the published rules.
+ * About or Contact pages yet; add them to a "Company" group here when they are written.
  */
 const LINK_GROUPS = [
   {
@@ -19,8 +18,12 @@ const LINK_GROUPS = [
     links: [{ to: '/safety', label: 'Safety centre' }],
   },
   {
-    title: 'Rules',
-    links: [{ to: '/guidelines', label: 'Community guidelines' }],
+    title: 'Legal',
+    links: [
+      { to: '/guidelines', label: 'Community guidelines' },
+      { to: '/privacy-policy', label: 'Privacy policy' },
+      { to: '/terms', label: 'Terms and conditions' },
+    ],
   },
 ] as const;
 

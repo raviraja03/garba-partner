@@ -9,7 +9,7 @@ import {
 } from '@garba-partner/shared';
 import { encryptString, hashPhone } from '../../lib/crypto.js';
 import { OtpRequest, User, UserSession } from '../../models/index.js';
-import type { SmsProvider } from '../../providers/sms/index.js';
+import type { OtpProvider } from '../../providers/otp/index.js';
 import {
   createTestApp,
   createTestEnv,
@@ -100,15 +100,15 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
 
     it('never returns the code when a real provider delivers it', async () => {
       const delivered: string[] = [];
-      const smsProvider: SmsProvider = {
+      const recordingProvider: OtpProvider = {
         name: 'recording',
         exposesCodeInResponse: false,
         sendOtp: (_phone, code) => {
           delivered.push(code);
-          return Promise.resolve();
+          return Promise.resolve({ providerMessageId: null });
         },
       };
-      const smsApp = createTestApp({ sequelize: db(), env, sms: smsProvider });
+      const smsApp = createTestApp({ sequelize: db(), env, otpProvider: recordingProvider });
 
       const res = await request(smsApp)
         .post('/api/v1/auth/send-otp')
@@ -122,7 +122,7 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
     });
 
     it('rejects the development provider outside APP_ENV=development', () => {
-      expect(() => createTestEnv({ APP_ENV: 'staging' })).toThrow(/SMS_PROVIDER/);
+      expect(() => createTestEnv({ APP_ENV: 'staging' })).toThrow(/OTP_PROVIDER/);
     });
 
     it('rejects an invalid phone number with VALIDATION_ERROR', async () => {

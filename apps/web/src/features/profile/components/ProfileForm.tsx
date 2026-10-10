@@ -38,12 +38,18 @@ interface Values {
   availableDates: string[];
   confirmsAdult: boolean;
   acceptTerms: boolean;
+  /** Optional: consent to be notified on WhatsApp. Not part of the profile itself. */
+  whatsappOptIn: boolean;
 }
 
 type Props =
   | {
       mode: 'create';
-      onCreate: (input: CreateProfileInput) => Promise<unknown>;
+      /** `options.whatsappOptIn`: the member ticked "notify me on WhatsApp". */
+      onCreate: (
+        input: CreateProfileInput,
+        options: { whatsappOptIn: boolean },
+      ) => Promise<unknown>;
       submitLabel: string;
     }
   | {
@@ -73,6 +79,7 @@ function initialValues(props: Props): Values {
       availableDates: [],
       confirmsAdult: false,
       acceptTerms: false,
+      whatsappOptIn: false,
     };
   }
   const p = props.initial;
@@ -88,6 +95,7 @@ function initialValues(props: Props): Values {
     availableDates: p.availableDates,
     confirmsAdult: true,
     acceptTerms: true,
+    whatsappOptIn: false,
   };
 }
 
@@ -134,12 +142,18 @@ export function ProfileForm(props: Props) {
     setSubmitting(true);
     try {
       if (props.mode === 'create') {
-        await props.onCreate({
-          ...(common as Omit<CreateProfileInput, 'dateOfBirth' | 'confirmsAdult' | 'acceptTerms'>),
-          dateOfBirth: values.dateOfBirth,
-          confirmsAdult: true,
-          acceptTerms: true,
-        });
+        await props.onCreate(
+          {
+            ...(common as Omit<
+              CreateProfileInput,
+              'dateOfBirth' | 'confirmsAdult' | 'acceptTerms'
+            >),
+            dateOfBirth: values.dateOfBirth,
+            confirmsAdult: true,
+            acceptTerms: true,
+          },
+          { whatsappOptIn: values.whatsappOptIn },
+        );
       } else {
         await props.onUpdate(common as UpdateProfileInput);
       }
@@ -435,10 +449,36 @@ export function ProfileForm(props: Props) {
           )}
           <p className="pt-1 pl-8 text-caption text-muted">
             Read the{' '}
+            <Link to="/terms" target="_blank" className={TEXT_LINK}>
+              terms
+            </Link>
+            ,{' '}
+            <Link to="/privacy-policy" target="_blank" className={TEXT_LINK}>
+              privacy policy
+            </Link>{' '}
+            and{' '}
             <Link to="/guidelines" target="_blank" className={TEXT_LINK}>
               community guidelines
             </Link>
             .
+          </p>
+          {/* Optional, and unticked by default: WhatsApp needs the member's own choice. */}
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 border-t border-line pt-2 text-body">
+            <input
+              type="checkbox"
+              checked={values.whatsappOptIn}
+              onChange={(event) => {
+                set('whatsappOptIn', event.target.checked);
+              }}
+              className="size-5 shrink-0 accent-brand-600"
+            />
+            <span>
+              Also notify me on WhatsApp <span className="text-muted">(optional)</span>
+            </span>
+          </label>
+          <p className="pl-8 text-caption text-muted">
+            New interests, matches and pass updates. You can turn this off any time in notification
+            settings.
           </p>
         </Card>
       )}

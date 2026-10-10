@@ -95,15 +95,15 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
       title="Enter your code"
       subtitle={
         <>
-          We sent a {LIMITS.OTP_LENGTH}-digit code to <strong>{maskPhone(initial.phone)}</strong>.
-          Never share this code with anyone.
+          We sent a {LIMITS.OTP_LENGTH}-digit code on WhatsApp to{' '}
+          <strong>{maskPhone(initial.phone)}</strong>. Never share this code with anyone.
         </>
       }
     >
       {devOtp && (
         <div className="mb-5">
           <Alert tone="warning">
-            <strong>Development only:</strong> no SMS is sent locally. Your code is{' '}
+            <strong>Development only:</strong> no message is sent locally. Your code is{' '}
             <code className="font-mono font-bold tracking-widest">{devOtp}</code>
           </Alert>
         </div>

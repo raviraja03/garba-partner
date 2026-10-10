@@ -22,7 +22,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Control | Status | Where | Test |
 |---|---|---|---|
 | Member sign-in by phone OTP; OTP stored as an HMAC, compared in constant time, 5-minute TTL, 5 attempts, single use | ✅ | `modules/auth/otp.service.ts` | `auth.int.test.ts` |
-| OTPs are never logged; the dev SMS provider logs nothing and is refused outside `APP_ENV=development` | ✅ | `providers/sms/`, env schema | `auth.int.test.ts`, `env-rules.test.ts` |
+| OTPs are never logged (`LOG_OTP` is a local-only debugging switch, refused outside `APP_ENV=development`); the dev provider logs nothing and is refused outside development | ✅ | `providers/otp/`, env schema | `auth.int.test.ts`, `env-rules.test.ts` |
 | `send-otp` gives the same response for new, existing and banned numbers | ✅ | `auth.service.ts` | `auth.int.test.ts` |
 | Admin passwords hashed with Argon2id; unknown/disabled admins run a dummy hash (same timing and response) | ✅ | `admin-auth.service.ts` | `admin-auth.int.test.ts` |
 | Admin second factor (TOTP) | ❌ **Removed** on request: admins sign in with email + password only ([authentication §3.1](../auth/authentication.md#31-post-apiv1adminauthlogin)) | migration `20261004100000-remove-admin-two-factor` | `admin-auth.int.test.ts` (no two-factor endpoints) |
@@ -131,7 +131,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Requirement | How it is met |
 |---|---|
 | No secrets in source code | Env-only secrets, boot-time validation, `.env` untracked, `.env.example` placeholders only. A scan of every tracked file for key patterns (Razorpay live keys, private keys, cloud credentials, quoted `secret`/`password` literals) found only one obviously fake test value (`rzp_live_Abc123Def`, used to test that live keys are refused). The development admin password in the dev seeder is deliberate and public: the seeder refuses to run outside development |
-| No OTP logging | OTPs are never passed to the logger; `*.otp`/`*.code` redacted as a second line of defence; the dev SMS provider logs nothing |
+| No OTP logging | OTPs are never passed to the logger; `*.otp`/`*.code` redacted as a second line of defence; the dev provider logs nothing; `LOG_OTP` is refused outside development |
 | No sensitive information in error responses | Central error handler; generic `INTERNAL_ERROR`; tested |
 | No phone numbers in public profiles | DTO mappers + PII guards; phone reveal is an audited super-admin action only |
 | No exact user location exposed | Only city/area names (area only when the member opts in); no coordinates stored; EXIF/GPS stripped |
@@ -163,7 +163,7 @@ No critical issues were found. All high issues were fixed and covered by tests. 
 - [ ] 🟡 Server deployed and verified as in [production setup §11](../deployment/production-setup.md#11-deployment-checklist): TLS, HSTS, CSP, `limit_req`, API bound to `127.0.0.1`, admin IP allow-list (or a recorded decision not to), encrypted off-site backups, restore drill.
 - [ ] 🟡 Separate, CSPRNG-generated production secrets in a secret store (`JWT_*`, `PHONE_*`, `OTP_HMAC_SECRET`, Cloudinary, SMS, Razorpay).
 - [ ] 🟡 Database roles: DML-only API role; migrations with the owner role; TLS to the database.
-- [ ] ⏳ MSG91 configured and a real login code received (the adapter exists; the dev provider is refused outside development).
+- [ ] ⏳ Meta WhatsApp configured and a real login code received (the integration exists; the dev provider is refused outside development).
 - [ ] ⏳ Move in-memory rate limiters to a shared store (Redis) before running more than one API process.
 
 ## 6. Residual risks

@@ -146,7 +146,7 @@ Each phase follows the completion rules in `CLAUDE.md` and [development rules](.
 | # | Question | Default if not decided |
 |---|---|---|
 | 1 | Production domain name | `garbapartner.example` placeholder in docs |
-| 2 | SMS provider (MSG91 vs Twilio Verify vs other) | MSG91 (India DLT support), behind an `SmsProvider` interface |
+| 2 | Login-code delivery | Originally MSG91 (SMS). Replaced by the Meta WhatsApp Cloud API: codes are sent on WhatsApp, behind an `OtpProvider` interface |
 | 3 | Launch cities | Ahmedabad, Vadodara, Surat, Mumbai, Pune, Bengaluru, Jaipur |
 | 4 | Whether to buy Cloudinary's AI moderation add-on | No. Manual post-moderation |
 | 5 | Managed PostgreSQL vs on-VPS PostgreSQL | On-VPS with off-site backups. Move to managed when budget allows |

@@ -91,7 +91,7 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 | Send limits | DB-backed: 5/h and 10/day per phone hash, 20/h per IP hash, 30 s resend cooldown |
 | Enumeration | `send-otp` always returns the same shape and timing class. Banned numbers silently get no SMS |
 | SMS content | DLT-approved template. Contains only the code, the app name and "Do not share this code" |
-| Dev/test | `SMS_PROVIDER=dev` returns the code in the send-otp response; the env schema refuses it unless `APP_ENV=development` (boot fails otherwise). There is **no** OTP logging in any environment ([OTP flow §4](../auth/otp-flow.md#4-development-otp-mechanism)) |
+| Dev/test | `OTP_PROVIDER=dev` returns the code in the send-otp response; the env schema refuses it unless `APP_ENV=development` (boot fails otherwise). There is **no** OTP logging in any environment ([OTP flow §4](../auth/otp-flow.md#4-development-otp-mechanism)) |
 
 ### 3.2 Tokens and sessions
 

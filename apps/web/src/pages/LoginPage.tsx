@@ -41,7 +41,7 @@ export function LoginPage() {
   return (
     <AuthLayout
       title="Find your Garba partner"
-      subtitle="Log in or sign up with your mobile number. We'll text you a 6-digit code."
+      subtitle="Log in or sign up with your mobile number. We'll send a 6-digit code to your WhatsApp."
     >
       <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-5">
         <div>
@@ -97,7 +97,15 @@ export function LoginPage() {
       </form>
 
       <p className="mt-6 text-caption text-muted">
-        By continuing you confirm you are 18 or older and agree to follow our{' '}
+        By continuing you confirm you are 18 or older and agree to our{' '}
+        <Link to="/terms" className={TEXT_LINK}>
+          terms
+        </Link>
+        ,{' '}
+        <Link to="/privacy-policy" className={TEXT_LINK}>
+          privacy policy
+        </Link>{' '}
+        and{' '}
         <Link to="/guidelines" className={TEXT_LINK}>
           community guidelines
         </Link>

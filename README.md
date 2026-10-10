@@ -276,8 +276,8 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 
 | Document | Contents |
 |---|---|
-| [Logging](docs/development/logging.md) | Request logging (`[API]` lines, `api_logs` table), what is never logged, the `LOG_OTP` debugging switch, how to read the logs |
-| [MSG91 setup](docs/notifications/msg91.md) | What to create in MSG91 (auth key, DLT templates, WhatsApp templates), the env variables, the login-code and notification flows, the first-send check, troubleshooting |
+| [Logging](docs/development/logging.md) | Request logging (`[API]` lines, `api_logs` table), what is never logged, the development-only `LOG_OTP` switch, how to read the logs |
+| [Meta WhatsApp](docs/notifications/meta-whatsapp.md) | Meta prerequisites, keeping the number in the WhatsApp Business app, env variables, login-code and notification templates, the delivery webhook, first-send check, token rotation, troubleshooting, rollback |
 | [Notification channels](docs/notifications/notification-channels.md) | SMS and WhatsApp delivery pipeline, the `notification_deliveries` history table, failure handling, duplicate prevention, how to add a real provider |
 | [Notifications](docs/notifications/notifications.md) | Types and triggers, privacy rules, **API reference** (list, unread count, mark read, preferences), realtime event, jobs (event reminders, retention), admin monitoring, database, tests |
 
@@ -349,7 +349,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **5e** | QA | ✅ Security QA (unauthorized access, JWT forgery, privilege escalation, IDOR, injection, XSS, uploads, CSRF, rate limits, logging), security test suite, 3 findings fixed (public profile visibility, phone numbers in logs, destructive DB commands on staging), test strategy, test cases, release checklist | ✅ Done |
 | **5f** | Security hardening | ✅ Admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change. Admin two-factor (authenticator) sign-in was built and then removed on request (migration `20261004100000-remove-admin-two-factor`) | ✅ Done |
 | **5g** | Deployment preparation | ✅ Three configurable domains (web, admin, API) with the apps calling the API cross-origin, PM2 process file, Nginx templates rendered from env, least-privilege PostgreSQL roles and server settings, deploy / rollback / preflight / health-check / backup / restore scripts, log rotation, [deployment docs](docs/deployment/production-setup.md) with checklist. ⏳ **Not run on a server yet** | 🟡 Prepared, not deployed |
-| **6** | Launch | **Configure MSG91 and confirm a real login code arrives (production cannot start without it)**, run the [deployment checklist](docs/deployment/production-setup.md#11-deployment-checklist) on the VPS, load test, restore drill and rollback rehearsal, admin second factor or IP allow-list, legal pages, Redis-backed rate limits, CI/CD | Planned |
+| **6** | Launch | **Configure the Meta WhatsApp Cloud API and confirm a real login code arrives (production cannot start without it)**, run the [deployment checklist](docs/deployment/production-setup.md#11-deployment-checklist) on the VPS, load test, restore drill and rollback rehearsal, admin second factor or IP allow-list, legal pages, Redis-backed rate limits, CI/CD | Planned |
 
 ### Post-MVP (indicative)
 

@@ -71,7 +71,7 @@ else
   pass "NODE_ENV is not set in the env file"
 fi
 if [ "$(env_get LOG_OTP)" = "true" ]; then
-  warn "LOG_OTP=true: one-time login codes are written to the server log. Turn it off after debugging."
+  fail "LOG_OTP=true is refused outside development (it writes login codes to the server log)"
 else
   pass "LOG_OTP is off"
 fi
@@ -100,7 +100,7 @@ done
 [ "$(env_get MEDIA_STORAGE)" = cloudinary ] && pass "MEDIA_STORAGE=cloudinary" || fail "MEDIA_STORAGE=cloudinary"
 
 for name in DATABASE_URL PHONE_HASH_SECRET PHONE_ENCRYPTION_KEY OTP_HMAC_SECRET JWT_ACCESS_SECRET \
-  JWT_ADMIN_ACCESS_SECRET CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET SMS_PROVIDER; do
+  JWT_ADMIN_ACCESS_SECRET CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET OTP_PROVIDER; do
   [ -n "$(env_get "$name")" ] && pass "$name is set" || fail "$name is set"
 done
 if [ -n "$(env_get DATABASE_MIGRATION_URL)" ] &&

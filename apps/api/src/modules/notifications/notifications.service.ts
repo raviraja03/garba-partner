@@ -335,6 +335,8 @@ export function createNotificationsService(deps: { media: MediaStorage }): Notif
       new_message: on('new_message'),
       verification_completed: on('verification_completed'),
       event_reminder: on('event_reminder'),
+      // Consent, not a type switch: off unless the member turned it on.
+      whatsapp: row?.whatsappOptIn ?? false,
     };
   }
 
@@ -407,7 +409,16 @@ export function createNotificationsService(deps: { media: MediaStorage }): Notif
         where: { userId },
         defaults: { userId },
       });
-      await row.update(values);
+      await row.update({
+        ...values,
+        ...(input.whatsapp === undefined
+          ? {}
+          : {
+              whatsappOptIn: input.whatsapp,
+              // When consent was (last) given; cleared when it is withdrawn.
+              whatsappOptInAt: input.whatsapp ? (row.whatsappOptInAt ?? new Date()) : null,
+            }),
+      });
       return preferences(userId);
     },
   };
