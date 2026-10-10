@@ -6,15 +6,18 @@ import { LinkButton } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Icon } from '../components/ui/Icon';
 import { TEXT_LINK } from '../components/ui/link-styles';
-import { Reveal, Section, Sparkle, Tile } from '../features/landing/components';
+import { PhotoPanel, Reveal, Section, Sparkle, Tile } from '../features/landing/components';
 import {
   ABOUT,
   COMMUNITY,
   FEATURES,
   FEATURES_HEADING,
   FINAL_CTA,
+  FIND,
   HERO,
+  HOW_IT_WORKS,
   JOURNEY,
+  PARTNER,
   PERSONAS,
   STORY,
   TRUST,
@@ -27,6 +30,8 @@ const tintAt = (index: number): Tint => TINTS[index % TINTS.length] ?? 'purple';
 
 /** Where "Join" leads: the sign-in screen, which is also how a new member signs up. */
 const JOIN = { to: '/login', state: { from: '/' } } as const;
+/** "Find Your Partner": sign in, then straight to the people who match. */
+const FIND_PARTNER = { to: '/login', state: { from: '/discover' } } as const;
 
 /**
  * The home page for visitors: what GarbaMates is, why it exists and how to join. Signed-in
@@ -123,6 +128,100 @@ export function LandingPage() {
             })}
           </ul>
         </Reveal>
+      </section>
+
+      {/* ---------------------------------------------------------------- Find your partner */}
+      <section
+        aria-labelledby="partner-heading"
+        className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14"
+      >
+        <Reveal>
+          <PhotoPanel photo={PARTNER.photo} />
+        </Reveal>
+        <Reveal delayMs={120}>
+          <p className="text-label tracking-widest text-accent-700 uppercase">{PARTNER.eyebrow}</p>
+          <h2 id="partner-heading" className="mt-2 text-h1 text-balance">
+            {PARTNER.heading}
+          </h2>
+          <p className="mt-4 text-muted">{PARTNER.body}</p>
+          <ul className="mt-5 space-y-3">
+            {PARTNER.points.map((point) => (
+              <li key={point} className="flex items-start gap-3">
+                <span
+                  aria-hidden="true"
+                  className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-success-soft text-success"
+                >
+                  <Icon name="check" className="size-4" />
+                </span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-7 flex flex-col sm:flex-row">
+            <LinkButton {...FIND_PARTNER} variant="cta">
+              <Icon name="heart" />
+              {PARTNER.button}
+            </LinkButton>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ---------------------------------------------------------------- How to find Garba mates */}
+      <Section heading={FIND.heading} intro={FIND.body}>
+        <ul className="grid gap-4 md:grid-cols-3">
+          {FIND.ways.map((way, index) => (
+            <li key={way.title}>
+              <Reveal delayMs={index * 80} className="h-full">
+                <Card className="h-full">
+                  <Tile tint={way.tint}>
+                    <Icon name={way.icon} className="size-6" />
+                  </Tile>
+                  <h3 className="mt-4 text-h3">{way.title}</h3>
+                  <p className="mt-1.5 text-small text-muted">{way.text}</p>
+                </Card>
+              </Reveal>
+            </li>
+          ))}
+        </ul>
+      </Section>
+
+      {/* ---------------------------------------------------------------- How GarbaMates works */}
+      <section
+        aria-labelledby="how-heading"
+        className="rounded-card bg-brand-50 px-5 py-10 ring-1 ring-brand-100 sm:px-10 sm:py-14"
+      >
+        <Reveal className="mx-auto max-w-2xl text-center">
+          <h2 id="how-heading" className="text-h1 text-balance">
+            {HOW_IT_WORKS.heading}
+          </h2>
+          <p className="mt-3 text-muted">{HOW_IT_WORKS.body}</p>
+        </Reveal>
+        <ol className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {HOW_IT_WORKS.steps.map((step, index) => (
+            <li key={step.title}>
+              <Reveal delayMs={index * 80} className="h-full">
+                <Card className="h-full">
+                  <span
+                    aria-hidden="true"
+                    className="flex size-10 items-center justify-center rounded-full bg-primary text-body font-bold text-white"
+                  >
+                    {index + 1}
+                  </span>
+                  <h3 className="mt-4 text-h3">
+                    <span className="sr-only">Step {index + 1}: </span>
+                    {step.title}
+                  </h3>
+                  <p className="mt-1.5 text-small text-muted">{step.text}</p>
+                </Card>
+              </Reveal>
+            </li>
+          ))}
+        </ol>
+        <div className="mt-8 flex flex-col justify-center sm:flex-row">
+          <LinkButton {...JOIN} size="lg">
+            Join {APP_NAME}
+          </LinkButton>
+        </div>
       </section>
 
       {/* ---------------------------------------------------------------- Core features */}

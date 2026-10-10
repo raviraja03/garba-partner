@@ -27,6 +27,99 @@ export const ABOUT = {
   tiles: ['Partners', 'Friends', 'Groups', 'Events'],
 } as const;
 
+export interface LandingPhoto {
+  /** Path under `apps/web/public`, e.g. `/images/garba-night.webp`. */
+  src: string;
+  /** What the photo shows, for people who cannot see it. */
+  alt: string;
+  /** The file's real pixel size: reserves the space so nothing jumps while it loads. */
+  width: number;
+  height: number;
+}
+
+/**
+ * "Find your Garba partner": a photo beside a short pitch and one button.
+ *
+ * `photo` is `null` until a real Garba photo is added, and the page shows a branded panel in
+ * its place. To use a photo: put a file you have the right to publish in
+ * `apps/web/public/images/` (WebP or JPEG, about 1200px wide, under ~200 KB) and fill this in:
+ *
+ *   photo: { src: '/images/garba-night.webp', alt: 'Dancers in a Garba circle at night', width: 1200, height: 900 },
+ */
+export const PARTNER: {
+  eyebrow: string;
+  heading: string;
+  body: string;
+  points: string[];
+  button: string;
+  photo: LandingPhoto | null;
+} = {
+  eyebrow: 'Find your partner',
+  heading: 'Nine Nights Are Better With the Right Partner.',
+  body: 'Tell us your city, your Garba level and the nights you’re free. We’ll show you people who are looking for a partner too.',
+  points: [
+    'People in your city who love Garba as much as you do',
+    'Matched on Garba level and the nights you’re both free',
+    'A chat opens only when both of you say yes',
+  ],
+  button: 'Find Your Partner',
+  photo: null,
+};
+
+/** Three real ways to meet people in the app today (Discover, an event's partner list, Interests). */
+export const FIND = {
+  heading: 'How to Find Your Garba Mates',
+  body: 'Three ways to meet people who match your vibe.',
+  ways: [
+    {
+      icon: 'compass',
+      tint: 'purple',
+      title: 'Discover people near you',
+      text: 'Browse members in your city and filter by age, Garba level and the dates you’re free.',
+    },
+    {
+      icon: 'calendar',
+      tint: 'yellow',
+      title: 'Start from an event',
+      text: 'Going to a Garba night? Open the event and see who else is looking for a partner there.',
+    },
+    {
+      icon: 'heart',
+      tint: 'pink',
+      title: 'See who’s interested in you',
+      text: 'When someone sends you an interest, you decide: accept it to match, or decline.',
+    },
+  ],
+} as const satisfies {
+  heading: string;
+  body: string;
+  ways: readonly { icon: IconName; tint: Tint; title: string; text: string }[];
+};
+
+/** The member's path, in order. Each step is something the app does today. */
+export const HOW_IT_WORKS = {
+  heading: 'How GarbaMates Works',
+  body: 'From signing up to your first Garba night together, in four steps.',
+  steps: [
+    {
+      title: 'Join with your mobile number',
+      text: 'Sign up with a one-time code. No password to remember, and your number is never shown to other members.',
+    },
+    {
+      title: 'Create your profile',
+      text: 'Add a photo, your city, your Garba level and the nights you’re free, and say who you’d like to dance with.',
+    },
+    {
+      title: 'Send an interest',
+      text: 'Found someone? Send an interest. If they accept, it’s a match.',
+    },
+    {
+      title: 'Chat and plan your night',
+      text: 'Matches can chat in the app. Pick an event, agree where to meet, and dance.',
+    },
+  ],
+} as const;
+
 export type Tint = 'purple' | 'pink' | 'orange' | 'yellow';
 
 export interface Feature {

@@ -246,7 +246,7 @@ When blocking is implemented, blocked pairs will also get `404` (interaction gat
 
 Public reference data (cached for 5 minutes). Cities: `[{ id, name, state }]`. Areas: `[{ id, cityId, name }]`. Unknown or inactive city → `404`.
 
-Launch cities (seeded by migration, fixed IDs): Ahmedabad, Vadodara, Surat, Mumbai, Pune, Bengaluru, each with 5–6 neighbourhood areas.
+Cities (seeded by migration, fixed IDs): Ahmedabad, Vadodara, Surat, Mumbai, Pune, Bengaluru and Jaipur, each with 5–6 neighbourhood areas. Jaipur was added after launch by `20261011100000-add-jaipur`; copy that migration to add another city.
 
 ## 4. Admin API
 

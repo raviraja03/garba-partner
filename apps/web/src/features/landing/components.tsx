@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { cx } from '../../components/ui/cx';
-import type { Tint } from './content';
+import { LogoIcon } from '../../components/Logo';
+import type { LandingPhoto, Tint } from './content';
 
 /** Soft background and icon colour for each brand tint (text on these is always dark). */
 const TINT: Record<Tint, string> = {
@@ -111,6 +112,57 @@ export function Tile({
     >
       {children}
     </span>
+  );
+}
+
+/**
+ * The picture beside a pitch. With a photo it is the photo (lazy-loaded, cropped to 4:3). Until
+ * one is added it is a branded panel: the app icon inside rings that echo a Garba circle.
+ * Either way it keeps the same 4:3 box, so the layout is identical.
+ */
+export function PhotoPanel({
+  photo,
+  className,
+}: {
+  photo: LandingPhoto | null;
+  className?: string;
+}) {
+  if (photo) {
+    return (
+      <img
+        src={photo.src}
+        alt={photo.alt}
+        width={photo.width}
+        height={photo.height}
+        loading="lazy"
+        decoding="async"
+        className={cx(
+          'aspect-[4/3] w-full rounded-card bg-brand-100 object-cover shadow-raised',
+          className,
+        )}
+      />
+    );
+  }
+  return (
+    <div
+      aria-hidden="true"
+      className={cx(
+        'relative flex aspect-[4/3] w-full items-center justify-center overflow-hidden rounded-card bg-gradient-to-br from-primary to-accent-700 shadow-raised',
+        className,
+      )}
+    >
+      <span className="absolute size-[125%] rounded-full border border-white/10" />
+      <span className="absolute size-[92%] rounded-full border border-white/15" />
+      <span className="absolute size-[60%] rounded-full border border-accent-yellow/40" />
+      <span className="absolute -right-10 -bottom-12 size-48 rounded-full bg-accent-orange/30 blur-3xl" />
+      <Sparkle float className="top-[14%] left-[12%] size-6 text-accent-yellow" />
+      <Sparkle
+        float
+        className="right-[14%] bottom-[16%] size-5 text-accent-yellow [animation-delay:1.4s]"
+      />
+      <Sparkle className="top-[20%] right-[24%] size-3 text-white/70" />
+      <LogoIcon decorative className="relative size-28 drop-shadow-xl sm:size-36" />
+    </div>
   );
 }
 

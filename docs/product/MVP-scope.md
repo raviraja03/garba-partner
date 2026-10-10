@@ -147,7 +147,7 @@ Each phase follows the completion rules in `CLAUDE.md` and [development rules](.
 |---|---|---|
 | 1 | Production domain name | `garbapartner.example` placeholder in docs |
 | 2 | SMS provider (MSG91 vs Twilio Verify vs other) | MSG91 (India DLT support), behind an `SmsProvider` interface |
-| 3 | Launch cities | Ahmedabad, Vadodara, Surat, Mumbai, Pune, Bengaluru |
+| 3 | Launch cities | Ahmedabad, Vadodara, Surat, Mumbai, Pune, Bengaluru, Jaipur |
 | 4 | Whether to buy Cloudinary's AI moderation add-on | No. Manual post-moderation |
 | 5 | Managed PostgreSQL vs on-VPS PostgreSQL | On-VPS with off-site backups. Move to managed when budget allows |
 | 6 | Legal retention periods for report evidence and logs | 180 days (placeholder, **counsel to confirm**) |
