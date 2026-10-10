@@ -90,8 +90,26 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
     it('lists launch cities and their areas publicly', async () => {
       const cities = await request(app).get('/api/v1/cities');
       expect(cities.status).toBe(200);
-      expect(cities.body.data).toHaveLength(6);
+      expect(cities.body.data).toHaveLength(7);
       expect(cities.body.data[0]).toEqual({ id: AHMEDABAD, name: 'Ahmedabad', state: 'Gujarat' });
+      // Jaipur was added after launch (migration 20261011100000-add-jaipur).
+      const jaipur = (cities.body.data as { id: string; name: string; state: string }[]).find(
+        (city) => city.name === 'Jaipur',
+      );
+      expect(jaipur).toEqual({
+        id: 'c1000000-0000-4000-8000-000000000007',
+        name: 'Jaipur',
+        state: 'Rajasthan',
+      });
+      const jaipurAreas = await request(app).get(`/api/v1/cities/${jaipur?.id ?? ''}/areas`);
+      expect((jaipurAreas.body.data as { name: string }[]).map((area) => area.name)).toEqual([
+        'Malviya Nagar',
+        'Vaishali Nagar',
+        'Mansarovar',
+        'C-Scheme',
+        'Raja Park',
+        'Jagatpura',
+      ]);
 
       const areas = await request(app).get(`/api/v1/cities/${AHMEDABAD}/areas`);
       expect(areas.body.data).toContainEqual({
