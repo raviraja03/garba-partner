@@ -5,6 +5,7 @@ import { Alert } from '../components/ui/Alert';
 import { Card } from '../components/ui/Card';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ImageUpload } from '../features/profile/components/ImageUpload';
+import { PhotoGallery } from '../features/profile/components/PhotoGallery';
 import { ProfileForm } from '../features/profile/components/ProfileForm';
 import { useMyProfile, useUpdateProfile } from '../features/profile/hooks';
 
@@ -29,10 +30,19 @@ export function EditProfilePage() {
 
       <Card as="section" id="photo" aria-labelledby="photo-title" className="space-y-4">
         <h2 id="photo-title" className="text-h3">
-          Profile photo
+          Main photo
         </h2>
-        <ImageUpload image={profile.image} />
+        <ImageUpload image={profile.image} canRemove={profile.photos.length > 0} />
       </Card>
+
+      {profile.image && (
+        <Card as="section" id="photos" aria-labelledby="photos-title" className="space-y-4">
+          <h2 id="photos-title" className="text-h3">
+            More photos
+          </h2>
+          <PhotoGallery photos={profile.photos} />
+        </Card>
+      )}
 
       <section aria-labelledby="details-title" className="space-y-4">
         <h2 id="details-title" className="sr-only">

@@ -26,6 +26,11 @@ export interface ProfileImageDto {
   thumbnailUrl: string;
 }
 
+/** An extra photo (besides the main one). */
+export interface ProfilePhotoDto extends ProfileImageDto {
+  id: string;
+}
+
 export interface ProfileCompletionDto {
   percentage: number;
   status: ProfileStatus;
@@ -56,7 +61,10 @@ export interface OwnProfileDto {
   garbaLevel: GarbaLevel;
   /** Upcoming dates only (past dates are hidden). */
   availableDates: string[];
+  /** The main photo: the one on cards, in chats and in search results. */
   image: ProfileImageDto | null;
+  /** Extra photos, oldest first (at most `LIMITS.PROFILE_EXTRA_PHOTOS_MAX`). */
+  photos: ProfilePhotoDto[];
   updatedAt: string;
 }
 
@@ -87,6 +95,8 @@ export interface PublicProfileDto {
   garbaLevel: GarbaLevel;
   availableDates: string[];
   image: ProfileImageDto | null;
+  /** Extra photos, oldest first. */
+  photos: ProfilePhotoDto[];
   /**
    * Verification badges. They describe what was checked (mobile number via OTP; identity via a
    * licensed provider; selfie matches photo) — never that a person is safe.

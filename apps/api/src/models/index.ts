@@ -21,6 +21,7 @@ import { Payment } from './payment.model.js';
 import { Report } from './report.model.js';
 import { SafetyLog } from './safety-log.model.js';
 import { UserPreference } from './user-preference.model.js';
+import { UserProfilePhoto } from './user-profile-photo.model.js';
 import { UserProfile } from './user-profile.model.js';
 import { UserSanction } from './user-sanction.model.js';
 import { UserSession } from './user-session.model.js';
@@ -62,6 +63,7 @@ export { SafetyLog } from './safety-log.model.js';
 export { User, USER_PHONE_ATTRIBUTES } from './user.model.js';
 export { UserPreference } from './user-preference.model.js';
 export { UserProfile } from './user-profile.model.js';
+export { UserProfilePhoto } from './user-profile-photo.model.js';
 export { UserSanction } from './user-sanction.model.js';
 export { UserSession } from './user-session.model.js';
 export { UserVerification } from './user-verification.model.js';
@@ -70,6 +72,7 @@ export { UserVerification } from './user-verification.model.js';
 export const MODELS = [
   User,
   UserProfile,
+  UserProfilePhoto,
   UserPreference,
   UserSession,
   UserVerification,

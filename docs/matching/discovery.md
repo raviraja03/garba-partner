@@ -122,7 +122,7 @@ Suspended members can still block and report. Blocks and reports take effect in 
 
 | Route | Contents |
 |---|---|
-| `/discover` | Filters (event you're looking at, city with "All cities", available date, age min/max, Garba level, **Verified only**), partner cards, "Show more". Filters live in the URL. A note explains that suggestions are simple signals, not a verdict on compatibility or safety. Members browsing with discovery off see a "you're hidden" notice |
+| `/discover` | **"I'd like to dance with"** (the member's saved gender preference: changing it here saves it with `PUT /me/preferences` and reloads the results; it is not a query parameter, because matching is mutual and the server reads it from the profile only), then filters (event you're looking at, city with "All cities", available date, age min/max, Garba level, **Verified only**), partner cards, "Show more". Filters live in the URL. A note explains that suggestions are simple signals, not a verdict on compatibility or safety. Members browsing with discovery off see a "you're hidden" notice |
 | `/partners/:id` | Profile card (public fields and badges), "Why you're seeing …" (highlights, shared events and dates), **Send interest** / pending / Accept / Decline / view match ([interests](interests.md)), **Block** (confirm), **Report** (reason, details, "also block"), safety tips |
 | `/events/:slug/find-partner` | Going / Interested + "I'm looking for a partner for this event" → "See who's looking for a partner here" (event-mode Discover) |
 

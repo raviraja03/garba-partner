@@ -1,36 +1,23 @@
 import { useEffect, useId, useState, type ChangeEvent } from 'react';
-import { LIMITS, PROFILE_IMAGE_MIME_TYPES, type ProfileImageDto } from '@garba-partner/shared';
+import type { ProfileImageDto } from '@garba-partner/shared';
 import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
 import { buttonClass } from '../../../components/ui/button-styles';
 import { useDeleteProfileImage, useUploadProfileImage } from '../hooks';
+import { PHOTO_ACCEPT, PHOTO_MAX_MB, checkPhotoFile } from '../photo-file';
 
-const ACCEPT: readonly string[] = PROFILE_IMAGE_MIME_TYPES;
-const MAX_MB = LIMITS.PROFILE_IMAGE_MAX_BYTES / 1024 / 1024;
-
-/** Quick client-side checks; the server re-validates by decoding the file. */
-async function checkFile(file: File): Promise<string | null> {
-  if (!ACCEPT.includes(file.type)) return 'Please choose a JPEG, PNG or WebP photo.';
-  if (file.size > LIMITS.PROFILE_IMAGE_MAX_BYTES)
-    return `Your photo must be ${String(MAX_MB)} MB or smaller.`;
-  try {
-    const bitmap = await createImageBitmap(file);
-    const smallest = Math.min(bitmap.width, bitmap.height);
-    bitmap.close();
-    if (smallest < LIMITS.PROFILE_IMAGE_MIN_DIMENSION) {
-      return `Your photo must be at least ${String(LIMITS.PROFILE_IMAGE_MIN_DIMENSION)}×${String(LIMITS.PROFILE_IMAGE_MIN_DIMENSION)} pixels.`;
-    }
-  } catch {
-    return 'That file could not be read as an image.';
-  }
-  return null;
-}
-
+/**
+ * The main profile photo. A profile always keeps one: it can be replaced at any time, and
+ * removed only when there is an extra photo to take its place (`canRemove`).
+ */
 export function ImageUpload({
   image,
+  canRemove = false,
   onDone,
 }: {
   image: ProfileImageDto | null;
+  /** True when the member has extra photos: removing this one promotes the oldest of them. */
+  canRemove?: boolean;
   onDone?: () => void;
 }) {
   const inputId = useId();
@@ -55,7 +42,7 @@ export function ImageUpload({
     event.target.value = '';
     setError(null);
     if (!chosen) return;
-    const problem = await checkFile(chosen);
+    const problem = await checkPhotoFile(chosen);
     if (problem) {
       setSelected(null);
       setError(problem);
@@ -102,7 +89,7 @@ export function ImageUpload({
           )}
         </div>
         <div className="space-y-2 text-small text-muted">
-          <p>A clear, recent photo of your face. JPEG, PNG or WebP, up to {MAX_MB} MB.</p>
+          <p>A clear, recent photo of your face. JPEG, PNG or WebP, up to {PHOTO_MAX_MB} MB.</p>
           <p>We remove location and camera data (EXIF) from every photo before storing it.</p>
         </div>
       </div>
@@ -120,7 +107,7 @@ export function ImageUpload({
           <input
             id={inputId}
             type="file"
-            accept={ACCEPT.join(',')}
+            accept={PHOTO_ACCEPT.join(',')}
             onChange={(event) => void handleChange(event)}
             className="sr-only"
           />
@@ -130,12 +117,19 @@ export function ImageUpload({
             Upload photo
           </Button>
         )}
-        {image && !file && (
+        {image && !file && canRemove && (
           <Button variant="link" loading={remove.isPending} onClick={() => void handleRemove()}>
             Remove photo
           </Button>
         )}
       </div>
+      {image && !file && (
+        <p className="text-caption text-muted">
+          {canRemove
+            ? 'If you remove your main photo, your oldest extra photo becomes the main one.'
+            : 'Your profile needs at least one photo. To change it, choose another photo.'}
+        </p>
+      )}
 
       {error && <Alert tone="error">{error}</Alert>}
     </div>

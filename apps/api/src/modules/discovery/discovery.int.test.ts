@@ -39,6 +39,7 @@ const PUBLIC_PROFILE_KEYS = [
   'name',
   'phoneVerified',
   'photoVerified',
+  'photos',
 ];
 
 describe.skipIf(!hasTestDatabase)('partner discovery (integration)', () => {

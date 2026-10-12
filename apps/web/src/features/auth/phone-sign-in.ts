@@ -75,8 +75,10 @@ export class PhoneSignInError extends Error {
     readonly reference: string | null = null,
   ) {
     // Set-up problems are ours to fix: the reference tells support which setting is wrong.
+    // A failed security check is often one too (domain, API key or reCAPTCHA configuration).
     const showReference =
-      reference !== null && (problem === 'unavailable' || problem === 'unknown');
+      reference !== null &&
+      (problem === 'unavailable' || problem === 'unknown' || problem === 'security_check');
     super(showReference ? `${MESSAGES[problem]} (Code: ${reference})` : MESSAGES[problem]);
     this.name = 'PhoneSignInError';
   }

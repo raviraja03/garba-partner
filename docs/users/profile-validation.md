@@ -19,10 +19,10 @@ All objects are **strict**: unknown keys (e.g. `phone`, `status`, `dateOfBirth` 
 | `gender` | `woman` \| `man` \| `non_binary` | — | enum error |
 | `cityId` | UUID of an **active** city | — | "Choose one of the available cities." |
 | `areaId` | Optional. UUID of an **active** area **in the chosen city** (also enforced by a composite FK) | Changing the city without an area clears the area | "Choose an area in the selected city." |
-| `bio` | Optional, ≤ 300 characters. **No phone numbers, emails or links** | NFKC, invisible characters removed, trimmed. Empty → `null` | "Please remove phone numbers, email addresses and links from your bio." |
-| `instagramId` | Optional. Instagram username rules: `a–z 0–9 . _`, ≤ 30, no leading/trailing dot, no `..` | Leading `@` removed, lower-cased. Empty → `null` | "Enter a valid Instagram username…" |
+| `bio` | **Required**, 1–300 characters ("Tell other members a little about yourself."). **No phone numbers, emails or links** | NFKC, invisible characters removed, trimmed. Empty is rejected | "Please remove phone numbers, email addresses and links from your bio." |
+| `instagramId` | **Required** ("Enter your Instagram username."). Private: never shown to other members. Instagram username rules: `a–z 0–9 . _`, ≤ 30, no leading/trailing dot, no `..` | Leading `@` removed, lower-cased. Empty is rejected | "Enter a valid Instagram username…" |
 | `garbaLevel` | `beginner` \| `intermediate` \| `advanced` | — | enum error |
-| `availableDates` | Optional list, ≤ 30 dates, each a real date **from today (IST) to today + 365 days**, no duplicates | Sorted ascending, de-duplicated. Past dates are hidden when read | "Available dates cannot be in the past.", "…within the next 12 months." |
+| `availableDates` | **Required: at least one date** ("Add at least one date you're free for Garba."), ≤ 30 dates, each a real date **from today (IST) to today + 365 days**, no duplicates | Sorted ascending, de-duplicated. Past dates are hidden when read | "Available dates cannot be in the past.", "…within the next 12 months." |
 | `confirmsAdult` | Must be `true` (create) | — | "Please confirm that you are 18 or older." |
 | `acceptTerms` | Must be `true` (create). Stores `users.terms_version` and `terms_accepted_at` | — | "Please accept the Terms and Privacy Policy." |
 
@@ -52,6 +52,8 @@ Ordinary text such as "Dancing since 2005" or "Navratri 9 nights" passes. The we
 | `verifiedOnly`, `discoveryEnabled`, `showArea` | Booleans |
 
 ## 4. Image rules
+
+A profile needs **at least one photo** (the main photo): onboarding cannot continue without it, and the last photo cannot be removed, only replaced. Up to 5 extra photos can be added; each goes through the same rules below ([API](user-profile.md#36a-extra-photos-post-apiv1meprofilephotos-and-delete-apiv1meprofilephotosphotoid)).
 
 | Rule | Where |
 |---|---|

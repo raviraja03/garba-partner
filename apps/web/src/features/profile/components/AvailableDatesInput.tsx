@@ -20,9 +20,12 @@ export function AvailableDatesInput({
   const [draft, setDraft] = useState('');
   const full = value.length >= LIMITS.AVAILABLE_DATES_MAX;
 
-  function add() {
-    if (!draft || draft < today || draft > max || value.includes(draft) || full) return;
-    onChange([...value, draft].sort());
+  const canAdd = (date: string) =>
+    date !== '' && date >= today && date <= max && !value.includes(date) && !full;
+
+  function add(date = draft) {
+    if (!canAdd(date)) return;
+    onChange([...value, date].sort());
     setDraft('');
   }
 
@@ -36,7 +39,10 @@ export function AvailableDatesInput({
           max={max}
           value={draft}
           onChange={(event) => {
-            setDraft(event.target.value);
+            // A date that can be added is added as soon as it is picked: at least one date is
+            // required, and a picked-but-not-added date is an easy mistake to make.
+            if (canAdd(event.target.value)) add(event.target.value);
+            else setDraft(event.target.value);
           }}
           aria-invalid={invalid}
           className={INPUT_CLASS}
@@ -44,7 +50,9 @@ export function AvailableDatesInput({
         />
         <button
           type="button"
-          onClick={add}
+          onClick={() => {
+            add();
+          }}
           disabled={!draft || full}
           className="min-h-12 shrink-0 rounded-control bg-brand-100 px-5 font-semibold text-brand-800 transition-colors hover:bg-brand-200 disabled:cursor-not-allowed disabled:opacity-50"
         >

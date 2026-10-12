@@ -258,13 +258,17 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
       const { accessToken } = await loginMember(app, ip);
       await create(accessToken, validProfile());
 
-      const moved = await patch(accessToken, { cityId: VADODARA, bio: 'New bio', instagramId: '' });
+      const moved = await patch(accessToken, {
+        cityId: VADODARA,
+        bio: 'New bio',
+        instagramId: '@New.Handle',
+      });
       expect(moved.status).toBe(200);
       expect(moved.body.data.profile).toMatchObject({
         city: { id: VADODARA },
         area: null,
         bio: 'New bio',
-        instagramId: null,
+        instagramId: 'new.handle',
       });
 
       const withArea = await patch(accessToken, { areaId: ALKAPURI_VADODARA });
@@ -351,16 +355,21 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
       expect([...media.stored.keys()]).toEqual(['test/profile-images/img2']);
     });
 
-    it('removing the photo makes the profile incomplete again', async () => {
+    it('the only photo cannot be removed: a profile always keeps at least one', async () => {
       const { accessToken } = await loginMember(app, ip);
       await create(accessToken, validProfile());
       await upload(accessToken, await makeImage({ width: 600, height: 600 }));
 
       const res = await request(app).delete('/api/v1/me/profile/image').set(auth(accessToken));
 
-      expect(res.status).toBe(200);
-      expect(res.body.data.profileStatus).toBe('incomplete');
-      expect(media.destroyed).toEqual(['test/profile-images/img1']);
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe(
+        'Your profile needs at least one photo. Upload a new photo to replace this one.',
+      );
+      const mine = (await getMine(accessToken)).body.data;
+      expect(mine.profileStatus).toBe('complete');
+      expect(mine.profile.image).not.toBeNull();
+      expect(media.destroyed).toEqual([]);
     });
 
     it('revokes the photo-verified badge when the photo changes', async () => {
@@ -458,6 +467,207 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
     });
   });
 
+  describe('required details', () => {
+    it('a profile cannot be created without a bio, an Instagram username, a date, a city or a gender', async () => {
+      const { accessToken } = await loginMember(app, ip);
+      const cases: [Record<string, unknown>, string, string][] = [
+        [{ bio: '' }, 'bio', 'Tell other members a little about yourself.'],
+        [{ bio: '   ' }, 'bio', 'Tell other members a little about yourself.'],
+        [{ bio: undefined }, 'bio', ''],
+        [{ instagramId: '' }, 'instagramId', 'Enter your Instagram username.'],
+        [{ instagramId: '@' }, 'instagramId', 'Enter your Instagram username.'],
+        [{ instagramId: undefined }, 'instagramId', ''],
+        [{ availableDates: [] }, 'availableDates', "Add at least one date you're free for Garba."],
+        [{ availableDates: undefined }, 'availableDates', ''],
+        [{ cityId: undefined }, 'cityId', ''],
+        [{ cityId: '' }, 'cityId', 'Choose a city.'],
+        [{ gender: undefined }, 'gender', 'Choose your gender.'],
+        [{ gender: '' }, 'gender', 'Choose your gender.'],
+      ];
+      for (const [overrides, path, message] of cases) {
+        const res = await create(accessToken, validProfile(overrides));
+        expect(res.status, JSON.stringify(overrides)).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        const issue = (res.body.error.details as { path: string; message: string }[]).find(
+          (detail) => detail.path === path,
+        );
+        expect(issue, JSON.stringify(overrides)).toBeDefined();
+        if (message) expect(issue?.message).toBe(message);
+      }
+      expect((await getMine(accessToken)).body.data.profile).toBeNull();
+    });
+
+    it('an existing profile cannot have them cleared, and other edits do not need them resent', async () => {
+      const { accessToken } = await loginMember(app, ip);
+      await create(accessToken, validProfile());
+
+      for (const body of [
+        { bio: '' },
+        { bio: null },
+        { instagramId: '' },
+        { instagramId: null },
+        { availableDates: [] },
+        { cityId: null },
+        { gender: null },
+      ]) {
+        const res = await patch(accessToken, body);
+        expect(res.status, JSON.stringify(body)).toBe(400);
+      }
+      const unchanged = (await getMine(accessToken)).body.data.profile;
+      expect(unchanged).toMatchObject({ bio: 'Dancing since school.', instagramId: 'priya.garba' });
+      expect(unchanged.availableDates).toHaveLength(2);
+
+      // A partial update that does not mention them is still fine.
+      expect((await patch(accessToken, { garbaLevel: 'beginner' })).status).toBe(200);
+    });
+  });
+
+  describe('extra photos', () => {
+    const addPhoto = async (token: string, size = 600) =>
+      request(app)
+        .post('/api/v1/me/profile/photos')
+        .set(auth(token))
+        .attach('image', await makeImage({ width: size, height: size }), {
+          filename: 'more.jpg',
+          contentType: 'image/jpeg',
+        });
+    const deletePhoto = (token: string, photoId: string) =>
+      request(app).delete(`/api/v1/me/profile/photos/${photoId}`).set(auth(token));
+
+    it('adds extra photos next to the main one, oldest first, up to the limit', async () => {
+      const { accessToken } = await completeMember();
+
+      for (let i = 0; i < LIMITS.PROFILE_EXTRA_PHOTOS_MAX; i += 1) {
+        const res = await addPhoto(accessToken);
+        expect(res.status).toBe(201);
+        expect(res.body.data.profile.photos).toHaveLength(i + 1);
+      }
+      const { profile } = (await getMine(accessToken)).body.data;
+      expect(profile.image.url).toContain('img1'); // the main photo did not change
+      expect(profile.photos.map((photo: { url: string }) => photo.url)).toEqual(
+        [2, 3, 4, 5, 6].map((n) => `https://media.test/card/test/profile-images/img${String(n)}`),
+      );
+      expect(profile.photos[0]).toEqual({
+        id: expect.any(String),
+        url: expect.any(String),
+        thumbnailUrl: 'https://media.test/thumbnail/test/profile-images/img2',
+      });
+
+      const tooMany = await addPhoto(accessToken);
+      expect(tooMany.status).toBe(400);
+      expect(tooMany.body.message).toBe('You can add up to 5 extra photos. Remove one first.');
+      expect((await getMine(accessToken)).body.data.profile.photos).toHaveLength(5);
+    });
+
+    it('the first photo of a profile becomes its main photo', async () => {
+      const { accessToken } = await loginMember(app, ip);
+      await create(accessToken, validProfile());
+
+      const res = await addPhoto(accessToken);
+
+      expect(res.status).toBe(201);
+      expect(res.body.data.profile.image).not.toBeNull();
+      expect(res.body.data.profile.photos).toEqual([]);
+      expect(res.body.data.profileStatus).toBe('complete');
+    });
+
+    it('validates extra photos like the main one and needs a profile', async () => {
+      const { accessToken } = await completeMember();
+      expect((await addPhoto(accessToken, 200)).status).toBe(400); // too small
+      const noFile = await request(app).post('/api/v1/me/profile/photos').set(auth(accessToken));
+      expect(noFile.status).toBe(400);
+      const notAnImage = await request(app)
+        .post('/api/v1/me/profile/photos')
+        .set(auth(accessToken))
+        .attach('image', Buffer.from('<html>not an image</html>'), {
+          filename: 'x.jpg',
+          contentType: 'image/jpeg',
+        });
+      expect(notAnImage.status).toBe(400);
+      expect((await getMine(accessToken)).body.data.profile.photos).toEqual([]);
+
+      const fresh = await loginMember(app, uniqueIp());
+      expect((await addPhoto(fresh.accessToken)).status).toBe(409); // PROFILE_NOT_STARTED
+      expect((await request(app).post('/api/v1/me/profile/photos')).status).toBe(401);
+    });
+
+    it('removes an extra photo from the profile and from storage', async () => {
+      const { accessToken } = await completeMember();
+      const added = (await addPhoto(accessToken)).body.data.profile.photos as { id: string }[];
+      await addPhoto(accessToken);
+
+      const res = await deletePhoto(accessToken, added[0]?.id ?? '');
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.profile.photos).toHaveLength(1);
+      expect(res.body.data.profile.photos[0].url).toContain('img3');
+      expect(media.destroyed).toEqual(['test/profile-images/img2']);
+      // Gone means gone.
+      expect((await deletePhoto(accessToken, added[0]?.id ?? '')).status).toBe(404);
+      expect((await deletePhoto(accessToken, 'not-a-uuid')).status).toBe(400);
+    });
+
+    it('a member cannot remove another member’s photo', async () => {
+      const owner = await completeMember();
+      const [photo] = (await addPhoto(owner.accessToken)).body.data.profile.photos as {
+        id: string;
+      }[];
+      ip = uniqueIp();
+      const other = await completeMember({ name: 'Mallory' });
+
+      const res = await deletePhoto(other.accessToken, photo?.id ?? '');
+
+      expect(res.status).toBe(404);
+      expect((await getMine(owner.accessToken)).body.data.profile.photos).toHaveLength(1);
+      expect(media.destroyed).toEqual([]);
+    });
+
+    it('removing the main photo promotes the oldest extra photo and resets photo verification', async () => {
+      const { accessToken, userId } = await completeMember();
+      await addPhoto(accessToken);
+      await addPhoto(accessToken);
+      await User.update({ photoVerifiedAt: new Date() }, { where: { id: userId } });
+
+      const res = await request(app).delete('/api/v1/me/profile/image').set(auth(accessToken));
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.profileStatus).toBe('complete');
+      expect(res.body.data.profile.image.url).toContain('img2');
+      expect(res.body.data.profile.photos).toHaveLength(1);
+      expect(res.body.data.profile.photos[0].url).toContain('img3');
+      expect(res.body.data.photoVerified).toBe(false);
+      expect(media.destroyed).toEqual(['test/profile-images/img1']);
+    });
+
+    it('other members see the extra photos on the profile page, never in the storage form', async () => {
+      const owner = await completeMember();
+      await request(app)
+        .put('/api/v1/me/preferences')
+        .set(auth(owner.accessToken))
+        .send({ discoveryEnabled: true });
+      await addPhoto(owner.accessToken);
+      ip = uniqueIp();
+      const viewer = await completeMember({ name: 'Viewer' });
+
+      const res = await request(app)
+        .get(`/api/v1/users/${owner.userId}/profile`)
+        .set(auth(viewer.accessToken));
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.photos).toEqual([
+        {
+          id: expect.any(String),
+          url: 'https://media.test/card/test/profile-images/img2',
+          thumbnailUrl: 'https://media.test/thumbnail/test/profile-images/img2',
+        },
+      ]);
+      const preview = await request(app)
+        .get('/api/v1/me/profile/preview')
+        .set(auth(owner.accessToken));
+      expect(preview.body.data.photos).toHaveLength(1);
+    });
+  });
+
   describe('public profile', () => {
     const PUBLIC_KEYS = [
       'age',
@@ -473,6 +683,7 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
       'name',
       'phoneVerified',
       'photoVerified',
+      'photos',
     ];
 
     /** Public profiles follow discovery visibility, which is opt-in (QA finding SEC-01). */

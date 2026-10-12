@@ -21,6 +21,7 @@ import {
   User,
   UserPreference,
   UserProfile,
+  UserProfilePhoto,
   UserVerification,
 } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
@@ -39,7 +40,14 @@ export interface ProfileService {
   updateProfile(userId: string, input: UpdateProfileData): Promise<MyProfileDto>;
   updatePreferences(userId: string, input: UpdatePreferencesData): Promise<MyProfileDto>;
   uploadImage(userId: string, file: Buffer): Promise<MyProfileDto>;
+  /**
+   * Removes the main photo. A profile always keeps at least one photo: the oldest extra photo
+   * becomes the main one, and when there is none the request is refused.
+   */
   deleteImage(userId: string): Promise<MyProfileDto>;
+  /** Adds an extra photo (the first photo of a profile becomes its main photo instead). */
+  addPhoto(userId: string, file: Buffer): Promise<MyProfileDto>;
+  deletePhoto(userId: string, photoId: string): Promise<MyProfileDto>;
   getPreview(userId: string): Promise<PublicProfileDto>;
   getPublicProfile(viewerId: string, targetUserId: string): Promise<PublicProfileDto>;
 }
@@ -77,15 +85,20 @@ export function createProfileService(deps: {
     });
   }
 
+  function loadPhotos(userId: string) {
+    return UserProfilePhoto.findAll({ where: { userId }, order: [['createdAt', 'ASC']] });
+  }
+
   async function buildMyProfile(userId: string, transaction?: Transaction): Promise<MyProfileDto> {
     const options = transaction ? { transaction } : {};
-    const [user, profile, preferences] = await Promise.all([
+    const [user, profile, preferences, photos] = await Promise.all([
       User.findByPk(userId, {
         attributes: ['id', 'status', 'photoVerifiedAt', 'identityVerifiedAt'],
         ...options,
       }),
       loadProfile(userId, transaction),
       UserPreference.findOne({ where: { userId }, ...options }),
+      UserProfilePhoto.findAll({ where: { userId }, order: [['createdAt', 'ASC']], ...options }),
     ]);
     if (!user) throw new AppError('UNAUTHENTICATED');
 
@@ -97,7 +110,7 @@ export function createProfileService(deps: {
       accountStatus: user.status,
       photoVerified: user.photoVerifiedAt !== null,
       identityVerified: user.identityVerifiedAt !== null,
-      profile: profile ? toOwnProfileDto(profile, media, today) : null,
+      profile: profile ? toOwnProfileDto(profile, media, today, photos) : null,
       preferences: toPreferencesDto(preferences),
     };
   }
@@ -332,25 +345,108 @@ export function createProfileService(deps: {
         if (!profile) throw new AppError('PROFILE_NOT_STARTED');
         previousPublicId = profile.imagePublicId;
         if (!previousPublicId) return;
+        // A profile needs a photo: the oldest extra photo takes the main photo's place.
+        const next = await UserProfilePhoto.findOne({
+          where: { userId },
+          order: [['createdAt', 'ASC']],
+          lock: transaction.LOCK.UPDATE,
+          transaction,
+        });
+        if (!next) {
+          throw new AppError('VALIDATION_ERROR', {
+            message:
+              'Your profile needs at least one photo. Upload a new photo to replace this one.',
+          });
+        }
         await profile.update(
-          { imagePublicId: null, imageWidth: null, imageHeight: null, imageUploadedAt: null },
+          {
+            imagePublicId: next.publicId,
+            imageWidth: next.width,
+            imageHeight: next.height,
+            imageUploadedAt: new Date(),
+          },
           { transaction },
         );
+        await next.destroy({ transaction });
         await revokePhotoVerification(userId, transaction);
       });
       if (previousPublicId) await destroyQuietly(previousPublicId, 'deleted');
       return buildMyProfile(userId);
     },
 
+    async addPhoto(userId, file) {
+      const existing = await UserProfile.findOne({
+        where: { userId },
+        attributes: ['id', 'imagePublicId'],
+      });
+      if (!existing) throw new AppError('PROFILE_NOT_STARTED');
+      // The first photo of a profile is its main photo.
+      if (!existing.imagePublicId) return this.uploadImage(userId, file);
+
+      const tooMany = () =>
+        new AppError('VALIDATION_ERROR', {
+          message: `You can add up to ${String(LIMITS.PROFILE_EXTRA_PHOTOS_MAX)} extra photos. Remove one first.`,
+        });
+      // Checked before the upload to save the work, and again under the lock below.
+      if (
+        (await UserProfilePhoto.count({ where: { userId } })) >= LIMITS.PROFILE_EXTRA_PHOTOS_MAX
+      ) {
+        throw tooMany();
+      }
+      const image = await processProfileImage(file);
+
+      let stored;
+      try {
+        stored = await media.upload(image, 'profile-images');
+      } catch (err) {
+        logger.error({ err, storage: media.name }, 'Profile photo upload failed');
+        throw new AppError('SERVICE_UNAVAILABLE', {
+          message: 'We could not save your photo. Please try again.',
+        });
+      }
+
+      try {
+        await sequelize.transaction(async (transaction) => {
+          // The profile row is the lock that serialises a member's photo changes.
+          const profile = await UserProfile.findOne({
+            where: { userId },
+            lock: transaction.LOCK.UPDATE,
+            transaction,
+          });
+          if (!profile) throw new AppError('PROFILE_NOT_STARTED');
+          const count = await UserProfilePhoto.count({ where: { userId }, transaction });
+          if (count >= LIMITS.PROFILE_EXTRA_PHOTOS_MAX) throw tooMany();
+          await UserProfilePhoto.create(
+            { userId, publicId: stored.publicId, width: stored.width, height: stored.height },
+            { transaction },
+          );
+        });
+      } catch (error) {
+        await destroyQuietly(stored.publicId, 'rollback');
+        throw error;
+      }
+      return buildMyProfile(userId);
+    },
+
+    async deletePhoto(userId, photoId) {
+      // Scoped to the owner: another member's photo ID is simply not found.
+      const photo = await UserProfilePhoto.findOne({ where: { id: photoId, userId } });
+      if (!photo) throw new AppError('NOT_FOUND', { message: 'Photo not found.' });
+      await photo.destroy();
+      await destroyQuietly(photo.publicId, 'deleted');
+      return buildMyProfile(userId);
+    },
+
     async getPreview(userId) {
-      const [user, profile, preferences] = await Promise.all([
+      const [user, profile, preferences, photos] = await Promise.all([
         User.findByPk(userId, { attributes: ['id', 'photoVerifiedAt', 'identityVerifiedAt'] }),
         loadProfile(userId),
         UserPreference.findOne({ where: { userId } }),
+        loadPhotos(userId),
       ]);
       if (!user) throw new AppError('UNAUTHENTICATED');
       if (!profile) throw new AppError('PROFILE_NOT_STARTED');
-      return toPublicProfileDto(user, profile, preferences, media, todayInIndia());
+      return toPublicProfileDto(user, profile, preferences, media, todayInIndia(), photos);
     },
 
     async getPublicProfile(viewerId, targetUserId) {
@@ -394,7 +490,14 @@ export function createProfileService(deps: {
         const discoverable = !user.hiddenFromDiscovery && preferences?.discoveryEnabled === true;
         if (!relation?.connected && !discoverable) throw notFound();
       }
-      return toPublicProfileDto(user, profile, preferences, media, today);
+      return toPublicProfileDto(
+        user,
+        profile,
+        preferences,
+        media,
+        today,
+        await loadPhotos(user.id),
+      );
     },
   };
 }

@@ -20,6 +20,8 @@ export const LIMITS = {
   PROFILE_IMAGE_MIN_DIMENSION: 400,
   PROFILE_IMAGE_MAX_DIMENSION: 8000,
   PROFILE_IMAGE_UPLOADS_PER_HOUR: 20,
+  /** Photos besides the main one. */
+  PROFILE_EXTRA_PHOTOS_MAX: 5,
 
   // Member phone login (docs/auth/firebase-phone-auth.md). Firebase sends and checks the SMS
   // code; these describe its form and our side of the flow.
