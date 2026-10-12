@@ -4,7 +4,12 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createLogger } from '../../lib/logger.js';
-import { Notification, NotificationDelivery, User } from '../../models/index.js';
+import {
+  Notification,
+  NotificationDelivery,
+  NotificationPreference,
+  User,
+} from '../../models/index.js';
 import type {
   MessageProvider,
   MessageProviders,
@@ -61,6 +66,8 @@ describe.skipIf(!hasTestDatabase)('SMS and WhatsApp notification channels (integ
     media = createFakeMediaStorage();
     app = createTestApp({ sequelize: db(), media });
     member = await createMember(app);
+    // WhatsApp needs consent; most tests are about delivery, so the member has given it.
+    await NotificationPreference.upsert({ userId: member.userId, whatsappOptIn: true });
   });
 
   const notifierWith = (providers: MessageProviders): ChannelNotifier =>
@@ -161,6 +168,38 @@ describe.skipIf(!hasTestDatabase)('SMS and WhatsApp notification channels (integ
       ['sms', 'failed', 'SMS gateway down'],
       ['whatsapp', 'failed', 'WhatsApp gateway down'],
     ]);
+  });
+
+  it('WhatsApp is sent only to members who opted in; withdrawing consent stops it', async () => {
+    const sms = fakeProvider('sms');
+    const whatsapp = fakeProvider('whatsapp');
+    const notifier = notifierWith({ sms: sms.provider, whatsapp: whatsapp.provider });
+
+    await NotificationPreference.update(
+      { whatsappOptIn: false },
+      { where: { userId: member.userId } },
+    );
+    expect(await notifier.sendNotification(input())).toEqual([
+      { channel: 'sms', status: 'sent' },
+      { channel: 'whatsapp', status: 'skipped' },
+    ]);
+    expect(await notifier.sendWhatsApp(input())).toEqual({
+      channel: 'whatsapp',
+      status: 'skipped',
+    });
+
+    // No preferences row at all (a member who never opened the settings) also means no consent.
+    await NotificationPreference.destroy({ where: { userId: member.userId } });
+    expect(await notifier.sendWhatsApp(input())).toEqual({
+      channel: 'whatsapp',
+      status: 'skipped',
+    });
+    expect(whatsapp.sent).toHaveLength(0);
+    expect((await deliveries()).map((row) => row.channel)).toEqual(['sms']);
+
+    await NotificationPreference.upsert({ userId: member.userId, whatsappOptIn: true });
+    expect(await notifier.sendWhatsApp(input())).toEqual({ channel: 'whatsapp', status: 'sent' });
+    expect(whatsapp.sent).toHaveLength(1);
   });
 
   it('sends the same reference only once per channel, even when called at the same time', async () => {

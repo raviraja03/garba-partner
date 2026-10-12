@@ -5,26 +5,14 @@ import type { IconName } from '../../components/ui/Icon';
  * so it can be edited without touching markup.
  *
  * Honesty rules for this file: no user counts, city counts, testimonials, ratings, dates,
- * funding or founders. Only describe what the product does today; anything not built yet is
- * marked `comingSoon`. Never promise safety ("100% safe", "everyone is verified").
+ * funding or founders. Only describe what the product does today, and say so plainly when
+ * something is not built yet. Never promise safety ("100% safe", "everyone is verified").
  */
 
 export const HERO = {
   eyebrow: 'The social platform for Garba lovers',
   body: 'GarbaMates is a social platform built for Garba lovers to find partners, make friends, join groups, and discover Garba events.',
   note: 'For adults (18+) only.',
-} as const;
-
-export const ABOUT = {
-  heading: 'More Than Just Garba.',
-  paragraphs: [
-    'Garba is more than a dance.',
-    'It’s the music, the energy, the colors, the celebrations — and most importantly, the people you share it with.',
-    'GarbaMates brings Garba lovers together in one social platform where they can find Garba partners, make new friends, join groups, and discover Garba events.',
-  ],
-  statement: 'One community. Endless Garba connections.',
-  /** The four things in one glance, beside the text. */
-  tiles: ['Partners', 'Friends', 'Groups', 'Events'],
 } as const;
 
 export interface LandingPhoto {
@@ -121,79 +109,6 @@ export const HOW_IT_WORKS = {
 } as const;
 
 export type Tint = 'purple' | 'pink' | 'orange' | 'yellow';
-
-export interface Feature {
-  title: string;
-  text: string;
-  icon: IconName;
-  tint: Tint;
-  /** Not in the product yet: shown with a "Coming soon" badge. */
-  comingSoon?: boolean;
-  link?: { to: string; label: string };
-}
-
-export const FEATURES_HEADING = 'Everything You Love About Garba. In One Place.';
-
-export const FEATURES: Feature[] = [
-  {
-    title: 'Find Garba Partners',
-    text: 'Find someone who matches your Garba vibe.',
-    icon: 'heart',
-    tint: 'pink',
-  },
-  {
-    title: 'Make Garba Friends',
-    text: 'Meet new people who share your passion for Garba and Dandiya.',
-    icon: 'chat',
-    tint: 'purple',
-  },
-  {
-    title: 'Join Garba Groups',
-    text: 'Find your community and celebrate together.',
-    icon: 'users',
-    tint: 'orange',
-    comingSoon: true,
-  },
-  {
-    title: 'Discover Garba Events',
-    text: 'Explore Garba and Dandiya events happening around you.',
-    icon: 'calendar',
-    tint: 'yellow',
-    link: { to: '/events', label: 'Explore events' },
-  },
-];
-
-export const PERSONAS = {
-  heading: 'Made for Every Garba Lover',
-  body: 'Whether you’re coming with friends or coming alone, there’s a place for you at GarbaMates.',
-  cards: [
-    { emoji: '🕺', title: 'The Solo Dancer', text: 'Looking for someone to dance with?' },
-    { emoji: '💃', title: 'The Newcomer', text: 'New city? Find your Garba circle.' },
-    { emoji: '👯', title: 'The Friend Group', text: 'Meet more people who match your vibe.' },
-    { emoji: '🎉', title: 'The Event Explorer', text: 'Discover what’s happening around you.' },
-  ],
-} as const;
-
-export const STORY = {
-  heading: 'Why We Built GarbaMates',
-  intro: [
-    'Garba is more than a dance.',
-    'It’s the music, the energy, the colors, the late-night celebrations — and most importantly, the people you share it with.',
-    'But finding the right people to dance with isn’t always easy.',
-  ],
-  maybes: [
-    'Maybe your friends aren’t available.',
-    'Maybe you’re new to the city.',
-    'Maybe you’re looking for a Garba partner.',
-    'Maybe you simply want to meet people who share the same passion.',
-  ],
-  turn: 'That’s why we created GarbaMates.',
-  outro: [
-    'A place where Garba lovers can connect, make new friends, find their Garba partners, join communities, and discover events around them.',
-    'Because the best Garba memories aren’t just about the dance.',
-  ],
-  closing: 'They’re about the people you meet along the way.',
-} as const;
 
 export const COMMUNITY = {
   heading: 'It’s Not Just About Finding a Dance Partner.',

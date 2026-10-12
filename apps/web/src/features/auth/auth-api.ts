@@ -1,18 +1,12 @@
-import type {
-  MeDto,
-  MemberSessionDto,
-  SendOtpInput,
-  SendOtpResultDto,
-  VerifyOtpInput,
-} from '@garba-partner/shared';
+import type { MeDto, MemberSessionDto, PhoneLoginInput } from '@garba-partner/shared';
 import { api } from '../../lib/api-client';
 
-export function sendOtp(input: SendOtpInput): Promise<SendOtpResultDto> {
-  return api<SendOtpResultDto>('/auth/send-otp', { method: 'POST', body: input });
-}
-
-export function verifyOtp(input: VerifyOtpInput): Promise<MemberSessionDto> {
-  return api<MemberSessionDto>('/auth/verify-otp', { method: 'POST', body: input });
+/**
+ * Exchanges a Firebase ID token (proof that the member just verified their number by SMS) for
+ * our own session. Only the token is sent: the API reads the number from it after verifying it.
+ */
+export function loginWithPhone(input: PhoneLoginInput): Promise<MemberSessionDto> {
+  return api<MemberSessionDto>('/auth/phone', { method: 'POST', body: input });
 }
 
 export function fetchMe(): Promise<MeDto> {

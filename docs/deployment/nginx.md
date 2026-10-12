@@ -16,7 +16,7 @@ The configuration has **not been tested with `nginx -t` yet** (no Nginx on the d
 | [`deploy/nginx/garba-partner-http.conf.template`](../../deploy/nginx/garba-partner-http.conf.template) | same path (bootstrap only) | Port 80 only: answers Let's Encrypt challenges before a certificate exists |
 | [`snippets/gp-tls.conf`](../../deploy/nginx/snippets/gp-tls.conf) | `/etc/nginx/snippets/` | TLS 1.2/1.3, ciphers, session cache |
 | [`snippets/gp-proxy.conf`](../../deploy/nginx/snippets/gp-proxy.conf) | `/etc/nginx/snippets/` | `proxy_pass` to the API with the forwarded headers |
-| [`snippets/gp-web-headers.conf.template`](../../deploy/nginx/snippets/gp-web-headers.conf.template) | `/etc/nginx/snippets/gp-web-headers.conf` | Security headers and CSP of the web app |
+| [`snippets/gp-web-headers.conf.template`](../../deploy/nginx/snippets/gp-web-headers.conf.template) | `/etc/nginx/snippets/gp-web-headers.conf` | Security headers and CSP (allows Razorpay Checkout, and Google reCAPTCHA + Firebase Auth for sign-in) of the web app |
 | [`snippets/gp-admin-headers.conf.template`](../../deploy/nginx/snippets/gp-admin-headers.conf.template) | `/etc/nginx/snippets/gp-admin-headers.conf` | Stricter headers and CSP of the admin panel |
 
 Never edit the installed files: change the template in the repository and render again.

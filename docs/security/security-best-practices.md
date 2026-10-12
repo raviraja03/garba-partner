@@ -10,7 +10,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 
 ### 2.1 Every endpoint
 
-1. **Authenticate:** `authenticateMember` or `authenticateAdmin`. An unauthenticated endpoint must be justified in its doc (like `send-otp`) and rate-limited.
+1. **Authenticate:** `authenticateMember` or `authenticateAdmin`. An unauthenticated endpoint must be justified in its doc (like `auth/phone`) and rate-limited.
 2. **Authorize:** members → `requireActiveMember` (or `requireMemberStatus` for the few routes suspended members may use); admins → `requirePermission('<permission>')`. Check **permissions**, never role names.
 3. **Validate** every body, query and path parameter with a strict shared zod schema through `parseInput`. Never read `req.body.x` directly.
 4. **Scope every query by the caller** (`WHERE user_id = :me`, or a membership check). For someone else's resource return `404`, not `403`, so IDs can't be probed.
@@ -38,7 +38,7 @@ These are the rules for everyone who writes code for, deploys or operates Garba 
 ### 2.4 Logging
 
 - Log events, not data: IDs and codes, never phone numbers, OTPs, tokens, passwords, message text or search terms. The request log (`[API]` lines, `api_logs`) holds the path, status and timing only: no bodies, headers, cookies or query strings ([logging](../development/logging.md)).
-- **One deliberate exception:** `LOG_OTP=true` prints login codes to the server log for debugging. It is off by default, warns at start-up, and `preflight.sh` warns about it. Leave it off in production.
+- Login codes never reach the API (Firebase sends and checks them). The Firebase ID token posted at sign-in is a credential: it is never logged or stored, and `preflight.sh` fails a deploy whose env file contains a private key or service-account JSON (sign-in needs none).
 - The logger redacts known keys (`lib/logger.ts`) and query parameters (`redactUrl`). When you add a sensitive field or query parameter, **add it to the redaction list** in the same PR.
 - Database errors are logged without SQL text, bind values or constraint details. Don't log a Sequelize error's `sql` yourself.
 - Client IPs are stored as HMACs in the audit log and for OTP limits. The exception is `api_logs.ip_address`, which holds the real address for debugging and is deleted after `API_LOG_RETENTION_DAYS`.

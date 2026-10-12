@@ -8,6 +8,7 @@ import { maskPhone, sanitizeLogText } from '../../lib/log-sanitize.js';
 import {
   NOTIFICATION_CHANNELS,
   NotificationDelivery,
+  NotificationPreference,
   User,
   type DeliveryStatus,
   type Notification,
@@ -32,8 +33,8 @@ export interface ChannelMessageInput {
 export interface DeliveryOutcome {
   channel: NotificationChannel;
   /**
-   * `skipped`: channel off, no template for this type, already sent for this reference, or the
-   * member has no number.
+   * `skipped`: channel off, no WhatsApp consent, no template for this type, already sent for
+   * this reference, or the member has no number.
    */
   status: Extract<DeliveryStatus, 'sent' | 'failed'> | 'skipped';
 }
@@ -191,6 +192,18 @@ export function createChannelNotifier(deps: {
     }
   }
 
+  /**
+   * WhatsApp needs the member's consent (`whatsapp_opt_in`); without it nothing is attempted.
+   * No row means they never opted in.
+   */
+  async function consented(channel: NotificationChannel, userId: string): Promise<boolean> {
+    if (channel !== 'whatsapp') return true;
+    const preference = await NotificationPreference.findByPk(userId, {
+      attributes: ['whatsappOptIn'],
+    });
+    return preference?.whatsappOptIn === true;
+  }
+
   /** `attempt` with the guarantee that nothing escapes (database down, bad key, …). */
   async function send(
     channel: NotificationChannel,
@@ -200,6 +213,7 @@ export function createChannelNotifier(deps: {
     const provider = providers[channel];
     if (!provider) return { channel, status: 'skipped' };
     try {
+      if (!(await consented(channel, input.userId))) return { channel, status: 'skipped' };
       const phone = knownPhone === undefined ? await phoneOf(input.userId) : knownPhone;
       if (!phone) return { channel, status: 'skipped' };
       return await attempt(provider, input, phone);

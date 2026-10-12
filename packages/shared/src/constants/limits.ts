@@ -21,14 +21,14 @@ export const LIMITS = {
   PROFILE_IMAGE_MAX_DIMENSION: 8000,
   PROFILE_IMAGE_UPLOADS_PER_HOUR: 20,
 
-  // Member OTP login (docs/auth/otp-flow.md)
+  // Member phone login (docs/auth/firebase-phone-auth.md). Firebase sends and checks the SMS
+  // code; these describe its form and our side of the flow.
   OTP_LENGTH: 6,
-  OTP_TTL_SECONDS: 300,
-  OTP_MAX_ATTEMPTS: 5,
+  /** How long the web app waits before offering "Resend code". */
   OTP_RESEND_COOLDOWN_SECONDS: 30,
-  OTP_MAX_PER_PHONE_PER_HOUR: 5,
-  OTP_MAX_PER_PHONE_PER_DAY: 10,
-  OTP_MAX_PER_IP_PER_HOUR: 20,
+  /** A Firebase ID token must be exchanged for a session within this long of the SMS check. */
+  PHONE_TOKEN_MAX_AGE_SECONDS: 300,
+  PHONE_LOGINS_PER_IP_PER_15_MIN: 30,
 
   // Sessions (docs/auth/session-management.md)
   REFRESH_REUSE_GRACE_SECONDS: 15,

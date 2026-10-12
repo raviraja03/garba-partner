@@ -7,7 +7,7 @@ declare global {
       auth?: MemberAuthContext;
       /** Authenticated admin (set by the admin authentication middleware). */
       admin?: AdminAuthContext;
-      /** Raw request body, kept only for signed webhooks (Razorpay). */
+      /** Raw request body, kept only for signed webhooks (Razorpay, Meta WhatsApp). */
       rawBody?: Buffer;
     }
   }

@@ -1,25 +1,19 @@
 import { Link } from 'react-router';
 import { APP_NAME, APP_TAGLINE } from '@garba-partner/shared';
-import { Logo, LogoIcon } from '../components/Logo';
-import { Badge } from '../components/ui/Badge';
+import { Logo } from '../components/Logo';
 import { LinkButton } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Icon } from '../components/ui/Icon';
 import { TEXT_LINK } from '../components/ui/link-styles';
 import { PhotoPanel, Reveal, Section, Sparkle, Tile } from '../features/landing/components';
 import {
-  ABOUT,
   COMMUNITY,
-  FEATURES,
-  FEATURES_HEADING,
   FINAL_CTA,
   FIND,
   HERO,
   HOW_IT_WORKS,
   JOURNEY,
   PARTNER,
-  PERSONAS,
-  STORY,
   TRUST,
   VISION,
   type Tint,
@@ -83,51 +77,6 @@ export function LandingPage() {
             </div>
           </div>
         </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- What is GarbaMates? */}
-      <section
-        aria-labelledby="about-heading"
-        className="grid items-center gap-8 lg:grid-cols-2 lg:gap-14"
-      >
-        <Reveal>
-          <h2 id="about-heading" className="text-h1 text-balance">
-            {ABOUT.heading}
-          </h2>
-          <div className="mt-4 space-y-3 text-muted">
-            {ABOUT.paragraphs.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
-          <p className="mt-5 border-l-4 border-accent-500 pl-4 text-h3 text-primary">
-            {ABOUT.statement}
-          </p>
-        </Reveal>
-        <Reveal delayMs={120}>
-          <ul className="grid grid-cols-2 gap-3 sm:gap-4">
-            {ABOUT.tiles.map((label, index) => {
-              const feature = FEATURES[index];
-              return (
-                <li
-                  key={label}
-                  className={`flex aspect-[4/3] flex-col justify-between rounded-card p-4 sm:p-5 ${
-                    index % 2 === 1 ? 'lg:translate-y-5' : ''
-                  } ${
-                    [
-                      'bg-accent-100 text-accent-700',
-                      'bg-brand-100 text-brand-700',
-                      'bg-accent-orange-soft text-primary',
-                      'bg-accent-yellow-soft text-primary',
-                    ][index] ?? ''
-                  }`}
-                >
-                  {feature && <Icon name={feature.icon} className="size-7" />}
-                  <span className="text-h3 text-primary">{label}</span>
-                </li>
-              );
-            })}
-          </ul>
-        </Reveal>
       </section>
 
       {/* ---------------------------------------------------------------- Find your partner */}
@@ -222,106 +171,6 @@ export function LandingPage() {
             Join {APP_NAME}
           </LinkButton>
         </div>
-      </section>
-
-      {/* ---------------------------------------------------------------- Core features */}
-      <Section heading={FEATURES_HEADING}>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((feature, index) => (
-            <li key={feature.title}>
-              <Reveal delayMs={index * 80} className="h-full">
-                <Card interactive className="flex h-full flex-col">
-                  <div className="flex items-start justify-between gap-2">
-                    <Tile tint={feature.tint}>
-                      <Icon name={feature.icon} className="size-6" />
-                    </Tile>
-                    {feature.comingSoon && <Badge tone="orange">Coming soon</Badge>}
-                  </div>
-                  <h3 className="mt-4 text-h3">{feature.title}</h3>
-                  <p className="mt-1.5 text-small text-muted">{feature.text}</p>
-                  {feature.link && (
-                    <Link
-                      to={feature.link.to}
-                      className={`mt-auto inline-flex min-h-11 items-center gap-1 pt-2 text-small ${TEXT_LINK}`}
-                    >
-                      {feature.link.label}
-                      <Icon name="chevron-right" className="size-4" />
-                    </Link>
-                  )}
-                </Card>
-              </Reveal>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      {/* ---------------------------------------------------------------- Made for every Garba lover */}
-      <Section heading={PERSONAS.heading} intro={PERSONAS.body}>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {PERSONAS.cards.map((persona, index) => (
-            <li key={persona.title}>
-              <Reveal delayMs={index * 80} className="h-full">
-                <Card className="h-full text-center">
-                  <Tile tint={tintAt(index)} className="mx-auto size-16 rounded-full text-3xl">
-                    {persona.emoji}
-                  </Tile>
-                  <h3 className="mt-4 text-h3">{persona.title}</h3>
-                  <p className="mt-1.5 text-small text-muted">{persona.text}</p>
-                </Card>
-              </Reveal>
-            </li>
-          ))}
-        </ul>
-      </Section>
-
-      {/* ---------------------------------------------------------------- Why we built GarbaMates */}
-      <section
-        aria-labelledby="story-heading"
-        className="relative overflow-hidden rounded-card bg-card px-5 py-10 shadow-card ring-1 ring-brand-900/5 sm:px-10 sm:py-14"
-      >
-        <span
-          aria-hidden="true"
-          className="absolute -top-24 -left-24 size-72 rounded-full bg-accent-yellow/25 blur-3xl"
-        />
-        <span
-          aria-hidden="true"
-          className="absolute -right-24 -bottom-24 size-72 rounded-full bg-secondary/15 blur-3xl"
-        />
-        <Reveal className="relative mx-auto max-w-2xl">
-          <p className="text-label tracking-widest text-accent-700 uppercase">Our story</p>
-          <h2 id="story-heading" className="mt-2 text-h1 text-balance">
-            {STORY.heading}
-          </h2>
-          <div className="mt-5 space-y-3">
-            {STORY.intro.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
-          <ul className="mt-6 grid gap-3 sm:grid-cols-2">
-            {STORY.maybes.map((maybe) => (
-              <li
-                key={maybe}
-                className="rounded-control bg-brand-50 px-4 py-3 text-small font-semibold text-primary ring-1 ring-brand-100"
-              >
-                {maybe}
-              </li>
-            ))}
-          </ul>
-          <p className="mt-8 text-h2 text-accent-700">{STORY.turn}</p>
-          <div className="mt-4 space-y-3">
-            {STORY.outro.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
-          <p className="mt-3 text-h3 text-primary">{STORY.closing}</p>
-          <div className="mt-8 flex items-center gap-3 border-t border-line pt-6">
-            <LogoIcon decorative className="size-12" />
-            <p>
-              <span className="block text-h3">{APP_NAME}</span>
-              <span className="text-small font-semibold text-accent-700">{APP_TAGLINE}</span>
-            </p>
-          </div>
-        </Reveal>
       </section>
 
       {/* ---------------------------------------------------------------- Community connection */}

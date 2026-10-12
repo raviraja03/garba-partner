@@ -115,7 +115,7 @@ npm run db:seed -- dev-fixtures     # fake data, development only
 npm run dev                         # api :4000, web :5173, admin :5174
 ```
 
-- Log in locally with any Indian-looking mobile number: with `SMS_PROVIDER=dev` no SMS is sent and the OTP screen shows the code (development only, see [OTP flow §4](../auth/otp-flow.md#4-development-otp-mechanism)). Dev admins: see [authentication §5](../auth/authentication.md#5-local-development).
+- Log in locally with a **Firebase test phone number** and its fixed code (no SMS is sent; see [Firebase guide §7](../auth/firebase-phone-auth.md#7-local-development)). There is no on-screen development code. Dev admins: see [authentication §5](../auth/authentication.md#5-local-development).
 - The first admin: `npm run db:seed -- bootstrap-admin -w apps/api`.
 
 ### 4.3 Test data

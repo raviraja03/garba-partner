@@ -15,7 +15,6 @@ import { NotificationDelivery } from './notification-delivery.model.js';
 import { NotificationPreference } from './notification-preference.model.js';
 import { Notification } from './notification.model.js';
 import { Order } from './order.model.js';
-import { OtpRequest } from './otp-request.model.js';
 import { PartnerInterest } from './partner-interest.model.js';
 import { PaymentWebhookEvent } from './payment-webhook-event.model.js';
 import { Payment } from './payment.model.js';
@@ -55,7 +54,6 @@ export {
 export { NotificationPreference } from './notification-preference.model.js';
 export { Notification, type NotificationData } from './notification.model.js';
 export { Order } from './order.model.js';
-export { OtpRequest } from './otp-request.model.js';
 export { PartnerInterest } from './partner-interest.model.js';
 export { PaymentWebhookEvent } from './payment-webhook-event.model.js';
 export { Payment } from './payment.model.js';
@@ -75,7 +73,6 @@ export const MODELS = [
   UserPreference,
   UserSession,
   UserVerification,
-  OtpRequest,
   AdminUser,
   AdminSession,
   AdminAuditLog,

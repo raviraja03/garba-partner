@@ -68,6 +68,7 @@ describe('Razorpay signatures', () => {
 describe('payment environment rules', () => {
   const base = {
     DATABASE_URL: 'postgres://u:p@localhost:5432/app',
+    FIREBASE_PROJECT_ID: 'garbamates-test',
     PHONE_HASH_SECRET: 'x'.repeat(40),
     PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
     OTP_HMAC_SECRET: 'y'.repeat(40),

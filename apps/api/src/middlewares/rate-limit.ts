@@ -1,3 +1,4 @@
+import { LIMITS } from '@garba-partner/shared';
 import type { RequestHandler } from 'express';
 import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
 import { AppError } from '../lib/app-error.js';
@@ -44,8 +45,12 @@ const MINUTE_MS = 60 * 1000;
 /** Named limiters for the auth endpoints (docs/auth/authentication.md#rate-limits). */
 export function createAuthRateLimiters() {
   return {
-    sendOtp: createIpRateLimiter({ windowMs: MINUTE_MS, limit: 10 }),
-    verifyOtp: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 30 }),
+    // Sending the SMS is rate-limited by Firebase (reCAPTCHA, quotas); this caps how often one
+    // address may exchange a token for a session.
+    phoneLogin: createIpRateLimiter({
+      windowMs: 15 * MINUTE_MS,
+      limit: LIMITS.PHONE_LOGINS_PER_IP_PER_15_MIN,
+    }),
     refresh: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 60 }),
     adminLogin: createIpRateLimiter({ windowMs: 15 * MINUTE_MS, limit: 10 }),
   };

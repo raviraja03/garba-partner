@@ -27,12 +27,15 @@ garba-partner/
 │   │   │   ├── middlewares/         authenticate, authorize, csrf, rate-limit, not-found, error-handler
 │   │   │   ├── modules/
 │   │   │   │   ├── health/          GET /api/v1/health (API + database)
-│   │   │   │   ├── auth/            member OTP auth: routes, controller, service, otp.service, token.service
+│   │   │   │   ├── auth/            member phone sign-in: routes, controller, service, token.service
 │   │   │   │   ├── profiles/        own profile, preferences, image upload, public profile (allow-list mappers)
 │   │   │   │   ├── locations/       cities and areas (reference data)
 │   │   │   │   ├── events/          public event list/detail, event mappers, slug
 │   │   │   │   └── admin/           auth/ (login…), users/ (list, detail, suspend/reactivate), events/, organizers/, audit/ (audit log)
-│   │   │   ├── providers/sms/       SmsProvider interface + development provider
+│   │   │   ├── providers/firebase/  verifies Firebase phone sign-in ID tokens (Google public keys)
+│   │   │   ├── providers/meta/      Meta WhatsApp Cloud API client (send template, verify webhook)
+│   │   │   ├── providers/messaging/ notification channels: log (development), Meta WhatsApp
+│   │   │   ├── modules/whatsapp/    Meta webhook: delivery reports
 │   │   │   ├── providers/media/     MediaStorage: Cloudinary + local (development only)
 │   │   │   ├── scripts/             db.ts (db CLI), create-admin.ts
 │   │   │   ├── test/                test helpers + global setup (migrates the test DB once)

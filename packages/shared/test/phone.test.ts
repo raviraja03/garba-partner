@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sendOtpSchema, verifyOtpSchema } from '../src/schemas/auth.schema.js';
+import { phoneLoginSchema } from '../src/schemas/auth.schema.js';
 import { maskPhone, normalizeIndianMobile } from '../src/utils/phone.js';
 
 describe('normalizeIndianMobile', () => {
@@ -29,14 +29,20 @@ describe('maskPhone', () => {
 });
 
 describe('auth schemas', () => {
-  it('normalises the phone and rejects unknown keys', () => {
-    expect(sendOtpSchema.parse({ phone: '98765 43210' })).toEqual({ phone: '+919876543210' });
-    expect(sendOtpSchema.safeParse({ phone: '9876543210', extra: true }).success).toBe(false);
-  });
-
-  it('requires a 6-digit code', () => {
-    expect(verifyOtpSchema.safeParse({ phone: '9876543210', code: '123456' }).success).toBe(true);
-    expect(verifyOtpSchema.safeParse({ phone: '9876543210', code: '12345' }).success).toBe(false);
-    expect(verifyOtpSchema.safeParse({ phone: '9876543210', code: '12345a' }).success).toBe(false);
+  it('accepts only a Firebase ID token, and rejects anything else in the body', () => {
+    const idToken = 'a'.repeat(900);
+    expect(phoneLoginSchema.parse({ idToken })).toEqual({ idToken });
+    expect(phoneLoginSchema.safeParse({}).success).toBe(false);
+    expect(phoneLoginSchema.safeParse({ idToken: 'short' }).success).toBe(false);
+    expect(phoneLoginSchema.safeParse({ idToken: 'a'.repeat(5000) }).success).toBe(false);
+    // A browser cannot supply its own identity or role alongside the token.
+    for (const extra of [
+      { phone: '+919876543210' },
+      { uid: 'x' },
+      { role: 'admin' },
+      { isAdmin: true },
+    ]) {
+      expect(phoneLoginSchema.safeParse({ idToken, ...extra }).success).toBe(false);
+    }
   });
 });

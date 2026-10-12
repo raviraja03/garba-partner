@@ -173,8 +173,9 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `PHONE_HASH_SECRET` | api | ≥ 32 random bytes. **Never rotate without a re-hash migration** |
 | `PHONE_ENCRYPTION_KEY` | api | 32-byte key, base64 (AES-256-GCM) |
 | `PHONE_ENCRYPTION_KEY_VERSION` | api | `1` |
-| `SMS_PROVIDER` | api | `dev` today (no SMS; code returned in the response, **only accepted when `APP_ENV=development`**). A real provider (e.g. `msg91`) is added before launch |
-| `SMS_PROVIDER`, `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID` | api | SMS provider, its credential and the DLT-approved login-code template ([MSG91 setup](../notifications/msg91.md)) |
+| `FIREBASE_PROJECT_ID` | api | The Firebase project whose phone sign-in tokens are accepted ([Firebase Phone Authentication](../auth/firebase-phone-auth.md)). Public, not a secret |
+| `VITE_FIREBASE_*` | web | Firebase web configuration for phone sign-in. Public by design |
+| `META_WHATSAPP_*` | api | WhatsApp **notifications** through Meta: token, Phone Number ID, app secret, verify token and templates ([Meta WhatsApp](../notifications/meta-whatsapp.md)). Not used for sign-in |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | api | Cloudinary credentials |
 | `CLOUDINARY_FOLDER_PREFIX` | api | `garba-partner/production` |
 | `LOG_LEVEL` | api | `info` in production |
@@ -194,7 +195,7 @@ All jobs are **idempotent**, process rows in batches (≤ 500 per run) and log c
 | `lift-suspensions` | every 5 min | Suspensions with `ends_at < now()` and no other active sanction → user `status = active` |
 | `expire-verification-requests` | hourly | `pending` > 7 days → `expired`. `initiated` > 24 h → `expired` |
 | `purge-verification-selfies` | daily 03:00 IST | Delete Cloudinary selfie assets where the decision is > 30 days old. Set `user_verifications.evidence_deleted_at` and null `evidence_reference` |
-| `purge-otp-requests` | hourly | Delete `otp_requests` older than 24 h |
+| ~~`purge-otp-requests`~~ | — | Not needed: `otp_requests` is no longer written (sign-in moved to Firebase) |
 | `purge-sessions` | daily | Delete sessions expired or revoked > 7 days ago |
 | `purge-ended-match-messages` | daily | Delete messages of matches ended > 90 days ago, **except** messages referenced by report snapshots (snapshots are copies, so the originals can go) |
 | `process-account-deletions` | daily 02:00 IST | Accounts `pending_deletion` > 30 days → purge/anonymise ([user flows §11](../product/user-flows.md#11-account-settings-and-deletion-flow)) |
@@ -230,7 +231,7 @@ A `job_runs` table isn't needed for the MVP. Jobs log start/end/count to the str
 | **Socket routing by user room** | Emits target `user:{userId}` rooms. This works unchanged across nodes once the Redis adapter is added |
 | **Worker separated** | Jobs never run in the API process |
 | **Domain modules** | Code organised by domain (`auth`, `profiles`, `events`, `discovery`, `interests`, `matches`, `chat`, `safety`, `admin`…). A domain could be extracted later without rewriting it |
-| **Provider interfaces** | `SmsProvider`, `MediaStorage` (Cloudinary), later `PaymentProvider`. Swappable without touching business logic |
+| **Provider interfaces** | `OtpProvider` and `MessageProvider` (Meta WhatsApp), `MediaStorage` (Cloudinary), later `PaymentProvider`. Swappable without touching business logic |
 | **Rate-limit store abstraction** | `express-rate-limit` with the in-memory store in the MVP. It can switch to a Redis store with no code changes in routes. OTP limits are DB-backed from day one, so restarts can't reset them |
 | **Cursor pagination everywhere** | No `OFFSET` scans on growing tables |
 

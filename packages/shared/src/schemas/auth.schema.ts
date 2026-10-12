@@ -1,39 +1,17 @@
 // zod/mini keeps browser bundles small; the API uses the same schemas for validation.
 import * as z from 'zod/mini';
-import { LIMITS } from '../constants/limits.js';
-import { normalizeIndianMobile } from '../utils/phone.js';
 
-/** Any common way of writing an Indian mobile number; normalised to E.164 on parse. */
-const indianMobile = z.pipe(
-  z.string().check(z.maxLength(20, 'Enter a valid mobile number.')),
-  z.transform((value, ctx) => {
-    const normalized = normalizeIndianMobile(value);
-    if (!normalized) {
-      ctx.issues.push({
-        code: 'custom',
-        message: 'Enter a valid 10-digit Indian mobile number.',
-        input: value,
-      });
-      return z.NEVER;
-    }
-    return normalized;
-  }),
-);
-
-const otpCode = z
-  .string()
-  .check(
-    z.regex(
-      new RegExp(`^\\d{${String(LIMITS.OTP_LENGTH)}}$`),
-      `Enter the ${String(LIMITS.OTP_LENGTH)}-digit code.`,
-    ),
-  );
-
-export const sendOtpSchema = z.strictObject({ phone: indianMobile });
-export type SendOtpInput = z.input<typeof sendOtpSchema>;
-
-export const verifyOtpSchema = z.strictObject({ phone: indianMobile, code: otpCode });
-export type VerifyOtpInput = z.input<typeof verifyOtpSchema>;
+/**
+ * `POST /api/v1/auth/phone`: the Firebase ID token the browser received after the member
+ * verified their number by SMS. Nothing else is accepted: the phone number, the user ID and any
+ * role come from the verified token and the database, never from the request body.
+ */
+export const phoneLoginSchema = z.strictObject({
+  idToken: z
+    .string()
+    .check(z.minLength(100, 'Invalid token.'), z.maxLength(4096, 'Invalid token.')),
+});
+export type PhoneLoginInput = z.input<typeof phoneLoginSchema>;
 
 export const logoutSchema = z.strictObject({
   /** Also revoke every other session of the account ("log out of all devices"). */

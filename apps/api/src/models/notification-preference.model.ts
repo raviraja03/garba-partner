@@ -41,6 +41,16 @@ export class NotificationPreference extends Model<
   @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: true })
   eventReminder!: CreationOptional<boolean>;
 
+  /**
+   * Consent to be sent notifications on WhatsApp. Off until the member turns it on (WhatsApp
+   * requires opt-in). Unlike the type switches above, a missing row means OFF.
+   */
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  whatsappOptIn!: CreationOptional<boolean>;
+
+  @Column({ type: DataType.DATE, allowNull: true })
+  whatsappOptInAt!: CreationOptional<Date | null>;
+
   @CreatedAt
   override createdAt!: CreationOptional<Date>;
 

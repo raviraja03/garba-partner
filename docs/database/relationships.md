@@ -4,7 +4,7 @@
 
 ## 1. Overview
 
-Member tables belong to a user (`users` is the aggregate root). Admin tables belong to an admin (`admin_users`). `otp_requests` is keyed by phone hash only, with no FK, because a code can be requested before an account exists.
+Member tables belong to a user (`users` is the aggregate root). Admin tables belong to an admin (`admin_users`). `otp_requests` is keyed by phone hash only, with no FK, because a code can be requested before an account exists. (It is no longer written: sign-in moved to Firebase Phone Authentication. The table is kept.)
 
 ```mermaid
 flowchart LR

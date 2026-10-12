@@ -5,6 +5,7 @@ import { serverEnvSchema } from '@garba-partner/config/server';
 describe('security environment rules', () => {
   const base = {
     DATABASE_URL: 'postgres://u:p@localhost:5432/app',
+    FIREBASE_PROJECT_ID: 'garbamates-test',
     PHONE_HASH_SECRET: 'x'.repeat(40),
     PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 1).toString('base64'),
     OTP_HMAC_SECRET: 'y'.repeat(40),
@@ -39,8 +40,16 @@ describe('security environment rules', () => {
 
   it('refuses development-only mechanisms outside development', () => {
     const staging = issues({ ...production, APP_ENV: 'staging', MEDIA_STORAGE: 'local' });
-    expect(staging).toContain('SMS_PROVIDER'); // the dev provider returns OTPs in responses
     expect(staging).toContain('MEDIA_STORAGE');
+  });
+
+  it('needs the Firebase project that sign-in tokens must come from', () => {
+    // Without it the server could not tell our project's tokens from anyone else's.
+    expect(issues({ FIREBASE_PROJECT_ID: undefined })).toContain('FIREBASE_PROJECT_ID');
+    expect(issues({ FIREBASE_PROJECT_ID: '' })).toContain('FIREBASE_PROJECT_ID');
+    expect(issues({ FIREBASE_PROJECT_ID: 'https://garbamates.firebaseapp.com' })).toContain(
+      'FIREBASE_PROJECT_ID',
+    );
   });
 
   it('requires https origins and NODE_ENV=production in production', () => {

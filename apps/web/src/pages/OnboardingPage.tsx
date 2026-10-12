@@ -6,6 +6,7 @@ import { Card } from '../components/ui/Card';
 import { cx } from '../components/ui/cx';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
+import { updateNotificationPreferences } from '../features/notifications/notifications-api';
 import { ImageUpload } from '../features/profile/components/ImageUpload';
 import { PreferencesForm } from '../features/profile/components/PreferencesForm';
 import { ProfileForm } from '../features/profile/components/ProfileForm';
@@ -106,8 +107,13 @@ export function OnboardingPage() {
         <ProfileForm
           mode="create"
           submitLabel="Continue"
-          onCreate={async (input) => {
+          onCreate={async (input, { whatsappOptIn }) => {
             await createProfile.mutateAsync(input);
+            // Best effort: the profile is what matters here, and the member can still turn
+            // WhatsApp on later in notification settings.
+            if (whatsappOptIn) {
+              await updateNotificationPreferences({ whatsapp: true }).catch(() => undefined);
+            }
             setStep('photo');
           }}
         />

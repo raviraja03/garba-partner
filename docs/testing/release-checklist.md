@@ -35,7 +35,8 @@ Run on staging (test keys, test SMS) with the release build.
 - [ ] `APP_ENV=production`, `NODE_ENV=production`; the API refuses to start otherwise-invalid config (env schema).
 - [ ] Secrets set in the secret store only: JWT secrets (different for member/admin), `PHONE_HASH_SECRET`, `PHONE_ENCRYPTION_KEY`, `OTP_HMAC_SECRET`, Cloudinary, SMS, **Razorpay live keys** (`rzp_live_`) and webhook secret.
 - [ ] Razorpay live webhook configured to `https://<api>/api/v1/webhooks/razorpay` with the events in [webhook §3](../payments/webhook.md#3-events-handled); auto-capture on.
-- [ ] MSG91 configured with DLT-approved templates and a real login code received on a phone ([MSG91 setup](../notifications/msg91.md)). The dev provider is refused outside development.
+- [ ] Firebase phone sign-in set up (phone provider enabled, domain authorized, SMS region, billing) and a real SMS code signed a member in on a phone ([Firebase guide §9](../auth/firebase-phone-auth.md#9-first-login-check-manual-on-the-live-site)). There is no development bypass.
+- [ ] If WhatsApp notifications are on: approved Utility templates, the webhook registered, and a real notification received ([Meta WhatsApp](../notifications/meta-whatsapp.md)).
 - [ ] `MEDIA_STORAGE=cloudinary` (local storage is refused outside development).
 - [ ] The [deployment checklist](../deployment/production-setup.md#11-deployment-checklist) is complete: `preflight.sh` and the full `healthcheck.sh` pass on the server (TLS, HSTS, CSP including the Razorpay entries, WebSocket upgrade, CORS for both app origins, API bound to `127.0.0.1`).
 - [ ] `WEB_ORIGIN` / `ADMIN_ORIGIN` are the `https://` production origins (CORS and CSRF depend on them).
