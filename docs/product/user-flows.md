@@ -25,49 +25,19 @@ This document defines each journey step by step, including states, business rule
 ## 1. End-to-end member journey
 
 ```mermaid
-flowchart LR
-    A[Landing page] --> B[Enter mobile number]
-    B --> C[Verify OTP]
-    C -->|new user| D[Onboarding: 18+ check, profile, photos, terms]
-    C -->|existing user| H
-    D --> E[Safety centre intro]
-    E --> H[Home: events in my city]
-    H --> I[Event detail]
-    I --> J[Mark Going + Looking for partner]
-    J --> K[Discover partners at this event]
-    K --> L[Send interest]
-    L --> M{Receiver accepts?}
-    M -->|yes| N[Match → chat unlocked]
-    M -->|declines / expires| K
-    N --> O[Plan to meet at the event]
-    H --> P[Optional: get photo verified]
-```
-
-**Primary navigation (web, mobile-first bottom bar):** Events · Discover · Interests · Chats · Profile.
-
----
-
-## 2. Authentication flow
-
-### 2.1 Login / sign-up (a single flow)
-
-There is no separate "sign up". A phone number that has never been seen before creates an account after OTP verification.
-
-```mermaid
 sequenceDiagram
     actor U as User
     participant W as Web app
+    participant F as Firebase (Google)
     participant A as API
-    participant S as SMS provider
     U->>W: Enter phone (+91 default)
-    W->>A: POST /api/v1/auth/send-otp {phone}
-    A->>A: Normalise to E.164, rate-limit (phone hash + IP), ban-list check
-    A->>A: Generate 6-digit OTP, store HMAC(otp) with 5-min TTL
-    A->>S: Send OTP via DLT-approved template
-    A-->>W: 200 {resendAvailableInSec, expiresInSec}
-    U->>W: Enter OTP
-    W->>A: POST /api/v1/auth/verify-otp {phone, code}
-    A->>A: Verify HMAC, attempts < 5, not expired, not consumed
+    W->>F: reCAPTCHA check, then signInWithPhoneNumber(+91…)
+    F-->>U: SMS with a 6-digit code
+    U->>W: Enter code
+    W->>F: confirm(code)
+    F-->>W: Firebase ID token
+    W->>A: POST /api/v1/auth/phone {idToken}
+    A->>A: Verify the token (Google signature, our project, phone sign-in, ≤ 5 min old)
     A->>A: Find or create user by phone hash, create session
     A-->>W: 200 {accessToken, user{id, status, onboardingStatus}} + Set-Cookie refresh token (httpOnly)
     W->>W: Route: onboarding if incomplete, else Home
@@ -77,20 +47,20 @@ sequenceDiagram
 
 | Rule | Value |
 |---|---|
-| OTP length / TTL | 6 digits / `LIMITS.OTP_TTL_SECONDS` = 300 |
-| Wrong attempts per OTP | `LIMITS.OTP_MAX_ATTEMPTS` = 5, after which the OTP is invalidated and a new one must be requested |
+| Code length | 6 digits |
+| Code lifetime, wrong attempts, sends per number | Firebase's limits |
 | Resend cooldown | `LIMITS.OTP_RESEND_COOLDOWN_SECONDS` = 30 |
-| Sends per phone | 5 per hour, 10 per 24 h |
-| Sends per IP | 20 per hour |
-| Supported numbers | Indian mobile numbers (+91) at MVP. Validate format server-side |
-| Requesting a new OTP | Invalidates any previous unconsumed OTP for that phone |
+| Token exchanges per IP | 30 per 15 minutes |
+| Supported numbers | Indian mobile numbers (+91) at MVP. Checked in the browser and again by the API |
+| Requesting a new code | Only the newest code works |
+
 
 **Responses and edge cases**
 
-- **The `send-otp` response is the same** whether the number is new, existing, suspended or banned. This prevents account enumeration. Ban handling happens after verification.
-- Banned account: `send-otp` still returns 200 but **no SMS is sent** (saves cost and gives nothing away). `verify-otp` fails with `ACCOUNT_BANNED` and creates no session.
-- Wrong code → `OTP_INVALID` with remaining attempts. Expired → `OTP_EXPIRED`. Too many attempts → `OTP_ATTEMPTS_EXCEEDED`.
-- Account `status = banned` after a successful OTP: no session is created. The user sees `ACCOUNT_BANNED` with a support/grievance link.
+- The API does not reveal whether a number already has an account: sign-up and login are the same call.
+- Wrong code, expired code and "too many attempts" are reported by Firebase and shown as plain messages ([sign-in flow §5](../auth/otp-flow.md#5-messages-the-member-can-see)).
+- Banned account: Firebase still sends the code (it does not know our accounts), but the API refuses the exchange with `ACCOUNT_BANNED` and creates no session.
+- Account `status = banned` after a successful code: no session is created. The user sees `ACCOUNT_BANNED` with a support/grievance link.
 - Account `status = suspended`: a session is created, but the app shows a suspension screen (reason category + end date). Every social API returns `ACCOUNT_SUSPENDED`.
 - Account `status = pending_deletion` (inside the 30-day grace window): logging in shows "Your account is scheduled for deletion on <date>. Restore it?". Restoring sets `status = active`.
 - The OTP is never logged, never returned in any API response and never stored in plain text.

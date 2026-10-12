@@ -109,4 +109,4 @@ With both `false` (the default) nothing changes: notifications are in-app only a
 - A row can stay `pending` if the process dies between claiming the reference and the provider answering. It is not retried automatically.
 - Failed sends are not retried. Retrying needs a queue and a retry policy, which this project does not have yet.
 - WhatsApp is all-or-nothing per member (the opt-in); the per-type switches then apply to it as they do in the app.
-- Login codes do not go through this pipeline. They use the separate `OtpProvider` (`OTP_PROVIDER`), on the same Meta client.
+- Login codes do not go through this pipeline, or through Meta at all: Firebase Phone Authentication sends them by SMS ([guide](../auth/firebase-phone-auth.md)).

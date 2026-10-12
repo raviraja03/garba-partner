@@ -68,7 +68,7 @@ function Preferences() {
       />
       <p className="mt-1 text-caption text-muted">
         Off unless you turn it on. We only send the kinds of notification switched on above, to the
-        mobile number you log in with. Login codes are always sent on WhatsApp.
+        mobile number you log in with. Login codes are sent by SMS, not on WhatsApp.
       </p>
       {update.isError && (
         <Alert tone="error" className="mt-3">

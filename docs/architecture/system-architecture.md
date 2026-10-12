@@ -173,7 +173,9 @@ There's one root `.env` (git-ignored) and `.env.example` (committed, with no sec
 | `PHONE_HASH_SECRET` | api | ≥ 32 random bytes. **Never rotate without a re-hash migration** |
 | `PHONE_ENCRYPTION_KEY` | api | 32-byte key, base64 (AES-256-GCM) |
 | `PHONE_ENCRYPTION_KEY_VERSION` | api | `1` |
-| `OTP_PROVIDER`, `META_WHATSAPP_*` | api | Login-code delivery: `dev` (code returned in the response, **only accepted when `APP_ENV=development`**) or `meta_whatsapp`, with the Meta token, Phone Number ID, app secret, verify token and templates ([Meta WhatsApp](../notifications/meta-whatsapp.md)) |
+| `FIREBASE_PROJECT_ID` | api | The Firebase project whose phone sign-in tokens are accepted ([Firebase Phone Authentication](../auth/firebase-phone-auth.md)). Public, not a secret |
+| `VITE_FIREBASE_*` | web | Firebase web configuration for phone sign-in. Public by design |
+| `META_WHATSAPP_*` | api | WhatsApp **notifications** through Meta: token, Phone Number ID, app secret, verify token and templates ([Meta WhatsApp](../notifications/meta-whatsapp.md)). Not used for sign-in |
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | api | Cloudinary credentials |
 | `CLOUDINARY_FOLDER_PREFIX` | api | `garba-partner/production` |
 | `LOG_LEVEL` | api | `info` in production |
@@ -193,7 +195,7 @@ All jobs are **idempotent**, process rows in batches (≤ 500 per run) and log c
 | `lift-suspensions` | every 5 min | Suspensions with `ends_at < now()` and no other active sanction → user `status = active` |
 | `expire-verification-requests` | hourly | `pending` > 7 days → `expired`. `initiated` > 24 h → `expired` |
 | `purge-verification-selfies` | daily 03:00 IST | Delete Cloudinary selfie assets where the decision is > 30 days old. Set `user_verifications.evidence_deleted_at` and null `evidence_reference` |
-| `purge-otp-requests` | hourly | Delete `otp_requests` older than 24 h |
+| ~~`purge-otp-requests`~~ | — | Not needed: `otp_requests` is no longer written (sign-in moved to Firebase) |
 | `purge-sessions` | daily | Delete sessions expired or revoked > 7 days ago |
 | `purge-ended-match-messages` | daily | Delete messages of matches ended > 90 days ago, **except** messages referenced by report snapshots (snapshots are copies, so the originals can go) |
 | `process-account-deletions` | daily 02:00 IST | Accounts `pending_deletion` > 30 days → purge/anonymise ([user flows §11](../product/user-flows.md#11-account-settings-and-deletion-flow)) |

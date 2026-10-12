@@ -70,10 +70,11 @@ if grep -qE '^NODE_ENV=' "$GP_ENV_FILE"; then
 else
   pass "NODE_ENV is not set in the env file"
 fi
-if [ "$(env_get LOG_OTP)" = "true" ]; then
-  fail "LOG_OTP=true is refused outside development (it writes login codes to the server log)"
+# Sign-in verifies Firebase's public tokens: a service-account key is never needed here.
+if grep -qE 'PRIVATE KEY|"type": *"service_account"' "$GP_ENV_FILE"; then
+  fail "the env file contains a private key / service-account JSON (remove it; sign-in does not use one)"
 else
-  pass "LOG_OTP is off"
+  pass "no service-account key in the env file"
 fi
 if grep -q 'REPLACE_ME' "$GP_ENV_FILE"; then
   fail "placeholder REPLACE_ME is still present"
@@ -100,9 +101,14 @@ done
 [ "$(env_get MEDIA_STORAGE)" = cloudinary ] && pass "MEDIA_STORAGE=cloudinary" || fail "MEDIA_STORAGE=cloudinary"
 
 for name in DATABASE_URL PHONE_HASH_SECRET PHONE_ENCRYPTION_KEY OTP_HMAC_SECRET JWT_ACCESS_SECRET \
-  JWT_ADMIN_ACCESS_SECRET CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET OTP_PROVIDER; do
+  JWT_ADMIN_ACCESS_SECRET CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET \
+  FIREBASE_PROJECT_ID VITE_FIREBASE_API_KEY VITE_FIREBASE_AUTH_DOMAIN VITE_FIREBASE_PROJECT_ID; do
   [ -n "$(env_get "$name")" ] && pass "$name is set" || fail "$name is set"
 done
+# The browser signs in with one Firebase project and the API accepts tokens from one: the same.
+[ "$(env_get FIREBASE_PROJECT_ID)" = "$(env_get VITE_FIREBASE_PROJECT_ID)" ] &&
+  pass "FIREBASE_PROJECT_ID matches VITE_FIREBASE_PROJECT_ID" ||
+  fail "FIREBASE_PROJECT_ID and VITE_FIREBASE_PROJECT_ID must be the same project"
 if [ -n "$(env_get DATABASE_MIGRATION_URL)" ] &&
   [ "$(env_get DATABASE_MIGRATION_URL)" != "$(env_get DATABASE_URL)" ]; then
   pass "migrations use a separate owner role (DATABASE_MIGRATION_URL)"

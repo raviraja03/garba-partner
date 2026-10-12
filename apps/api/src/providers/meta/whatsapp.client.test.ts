@@ -4,7 +4,6 @@ import { loadServerEnv } from '@garba-partner/config/server';
 import { createTestEnv } from '../../test/helpers.js';
 import { createMessageProviders } from '../messaging/index.js';
 import { parseTemplateMap } from '../messaging/template-map.js';
-import { createOtpProvider } from '../otp/index.js';
 import {
   MetaWhatsAppError,
   createMetaClientFromEnv,
@@ -212,61 +211,6 @@ describe('Meta WhatsApp client', () => {
   });
 });
 
-describe('login-code message (authentication template)', () => {
-  const env = createTestEnv({
-    OTP_PROVIDER: 'meta_whatsapp',
-    ...META_ENV,
-    META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
-    META_WHATSAPP_TEMPLATE_LANGUAGE: 'en_US',
-  });
-
-  it('puts the code in the body and in the button, as Meta requires', async () => {
-    const meta = fakeMeta(accepted());
-    const provider = createOtpProvider(env, meta.client);
-    expect(provider).toMatchObject({ name: 'meta_whatsapp', exposesCodeInResponse: false });
-
-    const delivery = await provider.sendOtp('+919876543210', '482913');
-
-    expect(meta.calls[0]?.body).toEqual({
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: '919876543210',
-      type: 'template',
-      template: {
-        name: 'garbamates_login_code',
-        language: { code: 'en_US' },
-        components: [
-          { type: 'body', parameters: [{ type: 'text', text: '482913' }] },
-          {
-            type: 'button',
-            sub_type: 'url',
-            index: '0',
-            parameters: [{ type: 'text', text: '482913' }],
-          },
-        ],
-      },
-    });
-    // What is kept is a hash of Meta's ID, which embeds the number: never the ID or the code.
-    expect(delivery.providerMessageId).toBe(metaMessageRef(WAMID));
-    expect(delivery.providerMessageId).toMatch(/^[0-9a-f]{64}$/);
-  });
-
-  it('rejects when Meta refuses, and cannot be built without the Meta settings', async () => {
-    const meta = fakeMeta(refused(132001, 'Template name does not exist in the translation'));
-    await expect(
-      createOtpProvider(env, meta.client).sendOtp('+919876543210', '482913'),
-    ).rejects.toBeInstanceOf(MetaWhatsAppError);
-    expect(() => createOtpProvider(env, null)).toThrow('Meta WhatsApp settings');
-  });
-
-  it('the development provider needs no Meta client', () => {
-    expect(createOtpProvider(createTestEnv(), null)).toMatchObject({
-      name: 'dev',
-      exposesCodeInResponse: true,
-    });
-  });
-});
-
 describe('notification message (utility template)', () => {
   const logger = pino({ level: 'silent' });
   const env = createTestEnv({
@@ -380,25 +324,8 @@ describe('webhook signature and message reference', () => {
 describe('environment rules', () => {
   const base = (extra: Record<string, string>) => () => createTestEnv(extra);
 
-  it('OTP_PROVIDER=meta_whatsapp needs the token, number ID, webhook secrets and the template', () => {
-    expect(base({ OTP_PROVIDER: 'meta_whatsapp' })).toThrow(
-      /META_WHATSAPP_OTP_TEMPLATE[\s\S]*META_WHATSAPP_ACCESS_TOKEN[\s\S]*META_WHATSAPP_PHONE_NUMBER_ID[\s\S]*META_WHATSAPP_APP_SECRET[\s\S]*META_WHATSAPP_VERIFY_TOKEN/,
-    );
-    expect(base({ OTP_PROVIDER: 'meta_whatsapp', ...META_ENV })).toThrow(
-      'META_WHATSAPP_OTP_TEMPLATE',
-    );
-    expect(
-      base({
-        OTP_PROVIDER: 'meta_whatsapp',
-        ...META_ENV,
-        META_WHATSAPP_OTP_TEMPLATE: 'Not A Name',
-      }),
-    ).toThrow('META_WHATSAPP_OTP_TEMPLATE');
-    const env = createTestEnv({
-      OTP_PROVIDER: 'meta_whatsapp',
-      ...META_ENV,
-      META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
-    });
+  it('the Meta client exists only when its credentials are set, with sensible defaults', () => {
+    const env = createTestEnv({ ...META_ENV });
     expect(env).toMatchObject({
       META_WHATSAPP_API_VERSION: 'v25.0',
       META_WHATSAPP_TEMPLATE_LANGUAGE: 'en',
@@ -420,12 +347,8 @@ describe('environment rules', () => {
     expect(base({ MESSAGING_PROVIDER: 'meta' })).not.toThrow();
   });
 
-  it('rejects malformed values and the old variable name', () => {
-    const ok = {
-      OTP_PROVIDER: 'meta_whatsapp',
-      ...META_ENV,
-      META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
-    };
+  it('rejects malformed values', () => {
+    const ok = { ...META_ENV };
     expect(base({ ...ok, META_WHATSAPP_API_VERSION: '25' })).toThrow('META_WHATSAPP_API_VERSION');
     expect(base({ ...ok, META_WHATSAPP_PHONE_NUMBER_ID: '+918769795033' })).toThrow(
       'META_WHATSAPP_PHONE_NUMBER_ID',
@@ -433,15 +356,28 @@ describe('environment rules', () => {
     expect(base({ ...ok, META_WHATSAPP_TEMPLATE_LANGUAGE: 'english' })).toThrow(
       'META_WHATSAPP_TEMPLATE_LANGUAGE',
     );
-    expect(base({ SMS_PROVIDER: 'dev' })).toThrow(/SMS_PROVIDER: was renamed: use OTP_PROVIDER/);
-    expect(base({ OTP_PROVIDER: 'msg91' })).toThrow('OTP_PROVIDER');
   });
 
-  it('production: accepts Meta, refuses the development provider and OTP logging', () => {
+  it('login no longer depends on Meta: the retired login-code settings are ignored', () => {
+    // Sign-in is Firebase Phone Authentication. A leftover line in an old .env must not stop
+    // the server, and must not switch anything on.
+    const env = createTestEnv({
+      OTP_PROVIDER: 'meta_whatsapp',
+      LOG_OTP: 'true',
+      META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
+    });
+    expect(env).not.toHaveProperty('OTP_PROVIDER');
+    expect(env).not.toHaveProperty('LOG_OTP');
+    expect(env).not.toHaveProperty('META_WHATSAPP_OTP_TEMPLATE');
+    expect(createMetaClientFromEnv(env)).toBeNull();
+  });
+
+  it('production: needs the Firebase project, and Meta only when WhatsApp is on', () => {
     const production = {
       NODE_ENV: 'production',
       APP_ENV: 'production',
       DATABASE_URL: 'postgres://unused@127.0.0.1:5432/unused',
+      FIREBASE_PROJECT_ID: 'garbamates',
       PHONE_HASH_SECRET: 'test-phone-hash-secret-000000000000000000',
       PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       OTP_HMAC_SECRET: 'test-otp-hmac-secret-0000000000000000000000',
@@ -453,18 +389,17 @@ describe('environment rules', () => {
       CLOUDINARY_CLOUD_NAME: 'x',
       CLOUDINARY_API_KEY: 'x',
       CLOUDINARY_API_SECRET: 'x',
-      OTP_PROVIDER: 'meta_whatsapp',
-      ...META_ENV,
-      META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
     };
+    // No Meta settings at all: sign-in works without them.
     expect(loadServerEnv({ source: { ...production } })).toMatchObject({
-      OTP_PROVIDER: 'meta_whatsapp',
+      FIREBASE_PROJECT_ID: 'garbamates',
       WHATSAPP_ENABLED: false,
     });
-    expect(() => loadServerEnv({ source: { ...production, OTP_PROVIDER: 'dev' } })).toThrow(
-      'OTP_PROVIDER',
-    );
-    expect(() => loadServerEnv({ source: { ...production, LOG_OTP: 'true' } })).toThrow('LOG_OTP');
+    const { FIREBASE_PROJECT_ID: _omitted, ...withoutFirebase } = production;
+    expect(() => loadServerEnv({ source: withoutFirebase })).toThrow('FIREBASE_PROJECT_ID');
+    expect(() =>
+      loadServerEnv({ source: { ...production, FIREBASE_PROJECT_ID: 'Not A Project' } }),
+    ).toThrow('FIREBASE_PROJECT_ID');
     expect(() => loadServerEnv({ source: { ...production, SMS_ENABLED: 'true' } })).toThrow(
       'SMS_ENABLED',
     );
@@ -472,6 +407,7 @@ describe('environment rules', () => {
       loadServerEnv({
         source: {
           ...production,
+          ...META_ENV,
           WHATSAPP_ENABLED: 'true',
           MESSAGING_PROVIDER: 'meta',
           META_WHATSAPP_TEMPLATES: 'match_created:garba_new_match',

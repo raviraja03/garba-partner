@@ -15,11 +15,9 @@ export const ERROR_CODES = {
   SERVICE_UNAVAILABLE: { httpStatus: 503, message: 'The service is temporarily unavailable.' },
 
   // Authentication (docs/auth/authentication.md)
-  OTP_INVALID: { httpStatus: 400, message: 'That code is not correct. Please try again.' },
-  OTP_EXPIRED: { httpStatus: 400, message: 'That code has expired. Please request a new one.' },
-  OTP_ATTEMPTS_EXCEEDED: {
-    httpStatus: 400,
-    message: 'Too many incorrect attempts. Please request a new code.',
+  PHONE_VERIFICATION_FAILED: {
+    httpStatus: 401,
+    message: 'We could not verify your phone number. Please request a new code.',
   },
   REFRESH_INVALID: { httpStatus: 401, message: 'Your session has ended. Please log in again.' },
   INVALID_CREDENTIALS: { httpStatus: 401, message: 'Incorrect email or password.' },

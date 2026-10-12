@@ -126,7 +126,7 @@ packages/config/
 
 `loadServerEnv()` also enforces cross-field rules:
 
-- `OTP_PROVIDER=dev` (codes returned in API responses) is only accepted when `APP_ENV=development`.
+- `FIREBASE_PROJECT_ID` is required: member sign-in tokens are accepted only from that Firebase project. There is no development bypass.
 - `JWT_ACCESS_SECRET !== JWT_ADMIN_ACCESS_SECRET`, and each secret is ≥ 32 bytes.
 - Keys decode to exactly 32 bytes.
 
@@ -184,7 +184,6 @@ apps/api/src/
 │   │   ├── auth.routes.ts
 │   │   ├── auth.controller.ts
 │   │   ├── auth.service.ts
-│   │   ├── otp.service.ts
 │   │   ├── token.service.ts
 │   │   └── auth.test.ts
 │   ├── users/                 # /me, account deletion
@@ -288,7 +287,7 @@ Defined in `packages/shared/src/errors/error-codes.ts`.
 | `CONFLICT` | 409 | Uniqueness conflict (e.g. duplicate pending interest) |
 | `MATCH_NOT_ACTIVE` | 409 | Chat action on an ended match |
 | `EVENT_NOT_OPEN` | 409 | Attendance/discovery on a draft, cancelled or ended event |
-| `OTP_INVALID` / `OTP_EXPIRED` / `OTP_ATTEMPTS_EXCEEDED` | 400 | OTP verification failures |
+| `PHONE_VERIFICATION_FAILED` | 401 | The Firebase sign-in token could not be verified |
 | `RATE_LIMITED` | 429 | Any rate limit (includes a `Retry-After` header) |
 | `INTEREST_LIMIT_REACHED` | 429 | Daily interest cap |
 | `VERIFICATION_LIMIT_REACHED` | 429 | Verification attempt cap |
@@ -374,17 +373,16 @@ All paths are prefixed with `/api/v1`.
 
 | Method | Path | Auth | Rate limit | Description |
 |---|---|---|---|---|
-| POST | `/auth/send-otp` ✅ | P | per phone hash + per IP (DB-backed) | `{ phone }` → `{ expiresInSeconds, resendAvailableInSeconds, devOtp? }` |
-| POST | `/auth/verify-otp` ✅ | P | per IP | `{ phone, code }` → `{ accessToken, accessTokenExpiresAt, user: MeDto }` + refresh cookie |
+| POST | `/auth/phone` ✅ | P | per IP | `{ idToken }` (Firebase ID token) → `{ accessToken, accessTokenExpiresAt, user: MeDto }` + refresh cookie |
 | POST | `/auth/refresh` ✅ | cookie | per IP | Rotates the refresh token → `{ accessToken, accessTokenExpiresAt, user: MeDto }`. Requires the `X-Requested-With: gp-web` header |
 | POST | `/auth/logout` ✅ | U | — | `{ allDevices?: boolean }`. Revokes the current session (or all sessions), clears the cookie |
 | GET | `/auth/me` ✅ | U | — | `MeDto` |
 
-Example: `POST /api/v1/auth/verify-otp`
+Example: `POST /api/v1/auth/phone`
 
 ```json
 // request
-{ "phone": "+919812345678", "code": "482913" }
+{ "idToken": "<Firebase ID token>" }
 // 200 response (Set-Cookie: gp_rt=...; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth; Max-Age=2592000)
 {
   "success": true,

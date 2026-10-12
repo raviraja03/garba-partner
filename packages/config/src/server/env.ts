@@ -6,12 +6,6 @@ export const NODE_ENVS = ['development', 'test', 'production'] as const;
 export const APP_ENVS = ['development', 'staging', 'production'] as const;
 export const LOG_LEVELS = ['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'] as const;
 /**
- * Who delivers login codes. `dev` sends nothing and returns the code in the send-otp response;
- * it is only accepted when APP_ENV=development. `meta_whatsapp` sends the code as a WhatsApp
- * message through the Meta WhatsApp Cloud API (docs/notifications/meta-whatsapp.md).
- */
-export const OTP_PROVIDERS = ['dev', 'meta_whatsapp'] as const;
-/**
  * Who delivers notifications outside the app. `log` writes them to the server log instead of
  * sending (development only). `meta` sends WhatsApp messages through the Meta Cloud API.
  */
@@ -37,7 +31,6 @@ export const PAYMENT_PROVIDERS = ['disabled', 'razorpay'] as const;
 export type NodeEnv = (typeof NODE_ENVS)[number];
 export type AppEnv = (typeof APP_ENVS)[number];
 export type LogLevel = (typeof LOG_LEVELS)[number];
-export type OtpProviderKind = (typeof OTP_PROVIDERS)[number];
 export type MessagingProviderKind = (typeof MESSAGING_PROVIDERS)[number];
 export type MediaStorageKind = (typeof MEDIA_STORAGES)[number];
 export type IdentityProviderKind = (typeof IDENTITY_PROVIDERS)[number];
@@ -86,13 +79,6 @@ export const serverEnvSchema = z
     LOG_API_TO_DATABASE: z.stringbool().default(true),
     /** `api_logs` rows older than this are deleted daily. */
     API_LOG_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(30),
-    /**
-     * Prints each one-time code to the server log (`[OTP]` line, phone masked). Local debugging
-     * only: refused unless APP_ENV=development, because anyone who can read the log could sign in
-     * as that member.
-     */
-    LOG_OTP: z.stringbool().default(false),
-
     DATABASE_URL: postgresUrlSchema,
     /** Optional owner role used by the db CLI (migrations); defaults to DATABASE_URL. */
     DATABASE_MIGRATION_URL: postgresUrlSchema.optional(),
@@ -107,11 +93,19 @@ export const serverEnvSchema = z
     PHONE_ENCRYPTION_KEY: aes256KeySchema,
     PHONE_ENCRYPTION_KEY_VERSION: z.coerce.number().int().min(1).max(32_767).default(1),
 
-    /** HMAC key for OTP codes and client IP hashes. */
+    /** HMAC key for client IP hashes (sessions, rate limits, audit and safety logs). */
     OTP_HMAC_SECRET: secretSchema,
-    OTP_PROVIDER: z.enum(OTP_PROVIDERS).default('dev'),
-    /** Renamed to OTP_PROVIDER. Still read only to say so clearly at start-up. */
-    SMS_PROVIDER: z.string().optional(),
+    /**
+     * The Firebase project whose Phone Authentication signs members in
+     * (docs/auth/firebase-phone-auth.md). The API accepts ID tokens issued for this project
+     * only. It is the same value as VITE_FIREBASE_PROJECT_ID, and it is not a secret.
+     */
+    FIREBASE_PROJECT_ID: z
+      .string()
+      .regex(
+        /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/,
+        'must be a Firebase project ID, e.g. my-project-123',
+      ),
 
     /**
      * Send member notifications outside the app as well
@@ -148,11 +142,6 @@ export const serverEnvSchema = z
       .string()
       .regex(/^[a-z]{2}(_[A-Z]{2})?$/, 'e.g. en or en_US')
       .default('en'),
-    /** Name of the approved "Authentication" template that carries the login code. */
-    META_WHATSAPP_OTP_TEMPLATE: z
-      .string()
-      .regex(/^[a-z0-9_]{1,512}$/, 'lowercase letters, digits and underscores (a template name)')
-      .optional(),
     /** Approved "Utility" template name per notification type. */
     META_WHATSAPP_TEMPLATES: templateMapSchema.optional(),
 
@@ -268,30 +257,6 @@ export const serverEnvSchema = z
         message: 'must differ from JWT_ACCESS_SECRET (member and admin tokens are separate)',
       });
     }
-    if (env.SMS_PROVIDER !== undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['SMS_PROVIDER'],
-        message: 'was renamed: use OTP_PROVIDER (dev | meta_whatsapp) and remove this line',
-      });
-    }
-    // The dev OTP mechanism returns codes in API responses: never outside local development.
-    if (env.OTP_PROVIDER === 'dev' && env.APP_ENV !== 'development') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['OTP_PROVIDER'],
-        message: '"dev" is only allowed when APP_ENV=development; use "meta_whatsapp"',
-      });
-    }
-    // Codes in a log file let anyone who can read it sign in as a member.
-    if (env.LOG_OTP && env.APP_ENV !== 'development') {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['LOG_OTP'],
-        message: 'is only allowed when APP_ENV=development',
-      });
-    }
-
     // The log provider writes to the log instead of sending: recording those as "sent" outside
     // local development would be false.
     if (env.WHATSAPP_ENABLED && env.MESSAGING_PROVIDER === 'log' && env.APP_ENV !== 'development') {
@@ -313,14 +278,9 @@ export const serverEnvSchema = z
         ctx.addIssue({ code: 'custom', path: [key], message: `is required when ${when}` });
       }
     };
-    const metaForOtp = env.OTP_PROVIDER === 'meta_whatsapp';
-    const metaForNotifications = env.MESSAGING_PROVIDER === 'meta' && env.WHATSAPP_ENABLED;
-    if (metaForOtp) required('META_WHATSAPP_OTP_TEMPLATE', 'OTP_PROVIDER=meta_whatsapp');
-    if (metaForNotifications) {
-      required('META_WHATSAPP_TEMPLATES', 'WHATSAPP_ENABLED=true with MESSAGING_PROVIDER=meta');
-    }
-    if (metaForOtp || metaForNotifications) {
-      const when = 'Meta WhatsApp is used';
+    if (env.MESSAGING_PROVIDER === 'meta' && env.WHATSAPP_ENABLED) {
+      const when = 'WHATSAPP_ENABLED=true with MESSAGING_PROVIDER=meta';
+      required('META_WHATSAPP_TEMPLATES', when);
       required('META_WHATSAPP_ACCESS_TOKEN', when);
       required('META_WHATSAPP_PHONE_NUMBER_ID', when);
       // Delivery results only arrive through the signed webhook.

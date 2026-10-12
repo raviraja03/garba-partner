@@ -106,7 +106,8 @@ export const PRIVACY_POLICY: LegalDocument = {
       blocks: [
         'We use other companies to run parts of the service. They receive only what they need:',
         [
-          'Meta (WhatsApp): your mobile number and the message, to deliver login codes and, if you opted in, notifications on WhatsApp.',
+          'Google (Firebase Authentication and reCAPTCHA): your mobile number, to send your login code by SMS and confirm it, and information about your device and browser (such as IP address and cookies set by Google), to check that sign-in requests are not automated.',
+          'Meta (WhatsApp): your mobile number and the message, to deliver notifications on WhatsApp if you opted in.',
           'Cloudinary: profile and event images, for storage and delivery.',
           'Razorpay: your payment, when you buy an event pass. Razorpay collects your payment details directly.',
           'Our hosting provider: the servers and database the service runs on.',
@@ -119,7 +120,7 @@ export const PRIVACY_POLICY: LegalDocument = {
       id: 'whatsapp',
       heading: 'WhatsApp messages',
       blocks: [
-        'Login codes are sent to your mobile number on WhatsApp each time you ask to sign in.',
+        'Login codes are sent by SMS, not on WhatsApp.',
         'Other notifications (such as a new interest, a match or a pass update) are sent on WhatsApp only if you have turned on “Also notify me on WhatsApp”. It is off by default, and you can turn it off at any time in notification settings.',
         'These messages never contain chat text, another member’s name or contact details, or your location.',
       ],
@@ -220,7 +221,7 @@ export const TERMS: LegalDocument = {
       id: 'your-account',
       heading: 'Your account',
       blocks: [
-        'You sign in with a one-time code sent to your mobile number on WhatsApp. Never share that code with anyone: we will never ask you for it. You are responsible for what happens through your account.',
+        'You sign in with a one-time code sent to your mobile number by SMS. Your mobile operator may charge for messages. Never share that code with anyone: we will never ask you for it. You are responsible for what happens through your account.',
       ],
     },
     {

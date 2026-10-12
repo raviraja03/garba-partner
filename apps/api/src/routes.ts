@@ -86,13 +86,13 @@ import type { RealtimeHub } from './realtime/hub.js';
 import { createWhatsAppWebhookRouter } from './modules/whatsapp/whatsapp-webhook.routes.js';
 import { createWhatsAppWebhookService } from './modules/whatsapp/whatsapp-webhook.service.js';
 import type { MessageProviders } from './providers/messaging/index.js';
-import type { OtpProvider } from './providers/otp/index.js';
+import type { PhoneTokenVerifier } from './providers/firebase/index.js';
 
 /** External dependencies, injected so tests can supply their own (test database, fake SMS). */
 export interface ApiDependencies extends HealthDependencies {
   sequelize: Sequelize;
-  /** Delivers login codes. */
-  otpProvider: OtpProvider;
+  /** Verifies Firebase Phone Authentication ID tokens (member sign-in). */
+  phoneTokens: PhoneTokenVerifier;
   /** SMS / WhatsApp notification channels. Omitted or `null` per channel = switched off. */
   messaging?: MessageProviders;
   /** Receives one entry per finished request for the `api_logs` table. Omitted = not stored. */
@@ -111,14 +111,14 @@ export function createApiRouter(options: {
   dependencies: ApiDependencies;
 }): Router {
   const { env, logger, dependencies } = options;
-  const { sequelize, otpProvider, media, realtime: hub } = dependencies;
+  const { sequelize, phoneTokens, media, realtime: hub } = dependencies;
 
   const tokens = createTokenService(env);
   const limiters = createAuthRateLimiters();
   const authenticateMember = createAuthenticateMember(tokens);
   const authenticateAdmin = createAuthenticateAdmin(tokens);
 
-  const memberAuth = createMemberAuthService({ sequelize, env, otpProvider, tokens, logger });
+  const memberAuth = createMemberAuthService({ sequelize, env, phoneTokens, tokens, logger });
   const adminAuth = createAdminAuthService({ sequelize, env, tokens, logger });
   const profileController = createProfileController(
     createProfileService({ sequelize, media, logger }),

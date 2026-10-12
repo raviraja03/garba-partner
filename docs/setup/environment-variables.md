@@ -25,7 +25,6 @@
 | `LOG_API_REQUESTS` | no | `true` | `true`, `false` | api | One `[API]` line per request in the server log ([logging](../development/logging.md)) |
 | `LOG_API_TO_DATABASE` | no | `true` | `true`, `false` | api | Also store each request in the `api_logs` table (batched, never blocks a request) |
 | `API_LOG_RETENTION_DAYS` | no | `30` | `1`–`365` | api | `api_logs` rows older than this are deleted daily |
-| `LOG_OTP` | no | `false` | `true`, `false` | api | Prints each one-time login code to the server log (phone masked). **Local debugging only: refused unless `APP_ENV=development`** |
 
 ### API
 
@@ -62,15 +61,14 @@ Details: [docs/auth/](../auth/authentication.md).
 
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
-| `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for stored OTP codes and client-IP hashes |
-| `OTP_PROVIDER` | no | `dev` | api | Who delivers login codes. `dev` = nothing is sent, and the code is returned in the send-otp response; **only accepted when `APP_ENV=development`** (boot fails otherwise). `meta_whatsapp` = a WhatsApp message through the Meta Cloud API ([setup](../notifications/meta-whatsapp.md)). Was `SMS_PROVIDER` |
+| `OTP_HMAC_SECRET` | **yes** | — | api | ≥ 32 characters. HMAC key for client-IP hashes in session, audit and safety records (the name is historical: the API no longer stores login codes) |
+| `FIREBASE_PROJECT_ID` | **yes** | — | api | The Firebase project whose phone sign-in tokens the API accepts ([Firebase Phone Authentication](../auth/firebase-phone-auth.md)). Lower-case project ID, e.g. `garbamates`. **Public, not a secret.** No service-account key is used: never add one |
 | `META_WHATSAPP_ACCESS_TOKEN` | if Meta is used | — | api | **Secret.** System-user access token. Sent only in a request header |
 | `META_WHATSAPP_PHONE_NUMBER_ID` | if Meta is used | — | api | The Phone Number ID from the Meta dashboard (not the phone number) |
 | `META_WHATSAPP_APP_SECRET` | if Meta is used | — | api | **Secret.** Verifies webhook signatures |
 | `META_WHATSAPP_VERIFY_TOKEN` | if Meta is used | — | api | **Secret.** A random string you also enter when registering the webhook |
 | `META_WHATSAPP_API_VERSION` | no | `v25.0` | api | Graph API version for every call |
 | `META_WHATSAPP_TEMPLATE_LANGUAGE` | no | `en` | api | Language code of the approved templates |
-| `META_WHATSAPP_OTP_TEMPLATE` | if `OTP_PROVIDER=meta_whatsapp` | — | api | Name of the approved "Authentication" template for login codes |
 | `META_WHATSAPP_TEMPLATES` | if `WHATSAPP_ENABLED` with Meta | — | api | `type:templateName` pairs, comma-separated. Unlisted notification types are not sent |
 | `MESSAGING_PROVIDER` | no | `log` | api | Who delivers notifications outside the app. `log` writes them to the server log (development only); `meta` sends WhatsApp messages through Meta |
 | `SMS_ENABLED` | no | `false` | api | Send notifications by SMS. **Development only** (the `log` provider): there is no SMS provider |
@@ -113,6 +111,10 @@ Details: [Razorpay](../payments/razorpay.md).
 | Variable | Required | Default | Used by | Notes |
 |---|---|---|---|---|
 | `VITE_API_BASE_URL` | no | `/api/v1` | web, admin | A same-origin path in development (the Vite dev server proxies it), or the absolute URL on the API domain in production (`https://<API_DOMAIN>/api/v1`). Baked into the bundles at build time. Socket.IO connects to the same origin. Trailing slashes are removed. **Public: never put secrets in `VITE_*` variables** |
+| `VITE_FIREBASE_API_KEY` | for sign-in | — | web | `apiKey` from the Firebase web configuration. **Public by design** (it identifies the project; it is not a credential) |
+| `VITE_FIREBASE_AUTH_DOMAIN` | for sign-in | — | web | `authDomain`, e.g. `<project>.firebaseapp.com` |
+| `VITE_FIREBASE_PROJECT_ID` | for sign-in | — | web | `projectId`. Must equal `FIREBASE_PROJECT_ID` |
+| `VITE_FIREBASE_APP_ID` | no | — | web | `appId` |
 
 ## 3. Planned variables (later phases)
 
@@ -183,7 +185,9 @@ Check a file before starting anything: `npm run env:check -w @garba-partner/api`
 
 - `NODE_ENV` is **not** in the file: PM2 sets `NODE_ENV=production` ([`ecosystem.config.cjs`](../../ecosystem.config.cjs)), and the scripts set it for the CLI commands.
 - Format: one `KEY=value` per line, no quotes, no spaces around `=`; URL-encode special characters in database passwords. The deploy scripts read single keys from the file and never execute it.
-- `OTP_PROVIDER`: must be `meta_whatsapp`, with the access token, Phone Number ID, app secret, verify token and login-code template; `dev` is refused outside development. See [Meta WhatsApp setup](../notifications/meta-whatsapp.md).
-- `LOG_OTP` and `SMS_ENABLED` must be `false`.
+- `FIREBASE_PROJECT_ID` and the `VITE_FIREBASE_*` variables must be set, and both project IDs must match (`preflight.sh` checks this). The web app must be rebuilt after changing a `VITE_*` value. See [Firebase Phone Authentication](../auth/firebase-phone-auth.md).
+- Meta WhatsApp variables are needed only when `WHATSAPP_ENABLED=true` ([setup](../notifications/meta-whatsapp.md)).
+- No private key or service-account JSON may be in the file.
+- `SMS_ENABLED` must be `false` (the app has no SMS provider of its own; Firebase sends login codes).
 - Razorpay: live keys (`rzp_live_`) are required in production and refused elsewhere.
 - Optional path overrides for the scripts (environment of the shell, not the file): `GP_ENV_FILE`, `GP_ROOT` (`/srv/garba-partner`), `GP_LOG_DIR` (`/var/log/garba-partner`), `GP_CERT_NAME`, `GP_ACME_ROOT`, `GP_KEEP_RELEASES` (5).

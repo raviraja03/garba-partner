@@ -35,7 +35,7 @@ router.post(
 
 | Endpoint group | active | suspended | pending_deletion | banned |
 |---|:-:|:-:|:-:|:-:|
-| `send-otp` / `verify-otp` | ✅ | ✅ | ✅ | ❌ (403 at verify) |
+| `auth/phone` (sign-in) | ✅ | ✅ | ✅ | ❌ (403) |
 | `refresh`, `logout`, `me` | ✅ | ✅ | ✅ | ❌ |
 | Social endpoints (`requireActiveMember`) | ✅ (and onboarded) | ❌ | ❌ | ❌ |
 
@@ -88,7 +88,7 @@ The [admin dashboard](../admin/dashboard.md) is open to every role (`dashboard:v
 
 ## 6. Rules for new endpoints
 
-1. Choose the authentication middleware (member or admin). Unauthenticated endpoints must be explicitly justified (like `send-otp`).
+1. Choose the authentication middleware (member or admin). Unauthenticated endpoints must be explicitly justified (like `auth/phone`).
 2. Member endpoints that involve another member → add `requireActiveMember`, **and** apply the interaction gate (blocks) in the service.
 3. Admin endpoints → add `requirePermission('<specific permission>')`. Add a new permission to the shared matrix when needed (and to this table).
 4. Scope every query by the caller (`WHERE user_id = :userId`) to prevent IDOR.

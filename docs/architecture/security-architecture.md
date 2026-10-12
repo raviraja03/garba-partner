@@ -84,14 +84,14 @@ Principles: deny by default, validate at the boundary, authorise in the service,
 |---|---|
 | Phone normalisation | Parse to E.164 (`libphonenumber-js`). Only `+91` mobile numbers at MVP |
 | Phone storage | `phone_hash = HMAC-SHA256(PHONE_HASH_SECRET, e164)` for lookup. `phone_encrypted = AES-256-GCM` for audited break-glass reveal only |
-| OTP generation | `crypto.randomInt(0, 1_000_000)`, zero-padded to 6 digits |
-| OTP storage | `HMAC-SHA256(OTP_HMAC_SECRET, phone_hash ‖ code)`. Plaintext is never stored or logged |
-| OTP comparison | `crypto.timingSafeEqual` |
-| Expiry / attempts | 5 min / 5 attempts. A new request invalidates older OTPs |
-| Send limits | DB-backed: 5/h and 10/day per phone hash, 20/h per IP hash, 30 s resend cooldown |
-| Enumeration | `send-otp` always returns the same shape and timing class. Banned numbers silently get no SMS |
-| SMS content | DLT-approved template. Contains only the code, the app name and "Do not share this code" |
-| Dev/test | `OTP_PROVIDER=dev` returns the code in the send-otp response; the env schema refuses it unless `APP_ENV=development` (boot fails otherwise). There is **no** OTP logging in any environment ([OTP flow §4](../auth/otp-flow.md#4-development-otp-mechanism)) |
+| Code generation, delivery, expiry, attempt limits | Done by **Firebase Phone Authentication** (SMS). Our API never sees a login code ([guide](../auth/firebase-phone-auth.md)) |
+| Bot protection | Google reCAPTCHA, run by Firebase before any SMS is sent. Never disabled |
+| Proof of verification | A Firebase ID token. The API verifies its RS256 signature against Google's public keys, the issuer and audience (our project), expiry, `sign_in_provider = phone`, and that the code was verified at most 5 minutes ago |
+| Identity | Taken only from the verified token's `phone_number`. The request body may contain nothing but the token |
+| Credentials | None on the server: only Google's public keys are used. No service-account key exists |
+| Enumeration | The API does not reveal whether a number has an account: sign-up and login are one endpoint |
+| Dev/test | No bypass. Local sign-in uses Firebase test phone numbers; automated tests use a stand-in for Firebase |
+
 
 ### 3.2 Tokens and sessions
 
@@ -304,9 +304,7 @@ Two tiers: Nginx `limit_req` (coarse, per IP) and application limiters (fine, pe
 | Target | Key | Limit | Store |
 |---|---|---|---|
 | All `/api/` (Nginx) | IP | 20 r/s burst 40 | Nginx |
-| `POST /auth/send-otp` | phone hash | 5/h, 10/day, 30 s cooldown | DB (`otp_requests`) |
-| `POST /auth/send-otp` | IP hash | 20/h | DB |
-| `POST /auth/verify-otp` | IP | 30/15 min | memory |
+| `POST /auth/phone` | IP | 30/15 min (Firebase limits sends per number, device and project) | memory |
 | `POST /auth/refresh` | IP | 60/15 min | memory |
 | `POST /admin/auth/*` | IP + email | 10/15 min, plus account lockout | memory + DB |
 | `GET /discovery` | user | 60/min | memory |
@@ -408,7 +406,7 @@ A runbook (`docs/runbooks/incident-response.md`, Phase 6) covers:
 
 Authentication & sessions
 - [ ] OTP never logged, stored hashed, constant-time compare, TTL/attempt/send limits enforced (DB-backed).
-- [ ] `send-otp` responses are identical for new/existing/banned numbers.
+- [ ] `auth/phone` accepts nothing but a verified Firebase ID token for our project (forged, expired, wrong-project and replayed tokens are refused).
 - [ ] Test OTP mode impossible in production (boot fails).
 - [ ] Access token in memory only. Refresh cookie `HttpOnly; Secure; SameSite=Strict`, path-scoped. Rotation + reuse detection tested.
 - [ ] Member and admin tokens use different secrets and audiences. Cross-use rejected (test).

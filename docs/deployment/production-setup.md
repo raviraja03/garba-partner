@@ -10,7 +10,8 @@ Two things block a production start today:
 
 | Blocker | Why | What is needed |
 |---|---|---|
-| **Meta WhatsApp is not configured or verified** | Members sign in with a code sent on WhatsApp. The API **will not start** with `APP_ENV=production` unless `OTP_PROVIDER=meta_whatsapp` and its variables are set. The integration has only been tested against a stand-in | Follow [Meta WhatsApp](../notifications/meta-whatsapp.md): the number on the Cloud API, a system-user token, the approved login-code template, the webhook, then the first-send check |
+| **Firebase phone sign-in is not verified with a real SMS** | Members sign in with an SMS code from Firebase Phone Authentication. The API **will not start** without `FIREBASE_PROJECT_ID`, and the login page is disabled without the `VITE_FIREBASE_*` build variables. The flow has only been tested against a stand-in | Follow [Firebase Phone Authentication](../auth/firebase-phone-auth.md): enable phone sign-in, authorized domains, SMS region, billing; re-render Nginx (the CSP changed); then the first-login check |
+| **Meta WhatsApp notifications are not verified** (optional feature) | WhatsApp is used for notifications only, and only when `WHATSAPP_ENABLED=true`. Tested against a stand-in | Follow [Meta WhatsApp](../notifications/meta-whatsapp.md) before turning it on |
 | **The deployment checklist (§11) has never been run on a server** | Nginx, PM2, certbot and the deploy script could not be run on the Windows development machine | Run §3–§9 on the VPS; the deployment is complete only when `healthcheck.sh` passes there |
 
 Also open before launch: admins sign in with a password only (no second factor), see [security checklist §5](../security/security-checklist.md#5-before-launch-open-items).
@@ -274,7 +275,8 @@ A deployment is **complete only when every box is ticked on the server**. Items 
 
 **Before the first deploy**
 
-- [ ] Meta WhatsApp is configured (`OTP_PROVIDER=meta_whatsapp`, token, Phone Number ID, app secret, verify token, login-code template), the webhook is registered, and a real login code arrived and was reported `delivered` ([first-send check](../notifications/meta-whatsapp.md#8-first-send-check-production)). Without the configuration the API cannot start.
+- [ ] Firebase phone sign-in is configured (`FIREBASE_PROJECT_ID` and the four `VITE_FIREBASE_*` variables, phone sign-in enabled, the site's domain authorized, billing active), Nginx was re-rendered for the new Content-Security-Policy, and a real SMS code signed a member in on the live site ([first-login check](../auth/firebase-phone-auth.md#9-first-login-check-manual-on-the-live-site)).
+- [ ] If WhatsApp notifications are turned on: Meta is configured, the webhook is registered, and a real notification arrived and was reported `delivered` ([first-send check](../notifications/meta-whatsapp.md#8-first-send-check-production)).
 - [ ] `npm run check` is green on the commit to deploy, with the integration tests running (not skipped).
 - [ ] The [release checklist](../testing/release-checklist.md) and the open items in the [security checklist §5](../security/security-checklist.md#5-before-launch-open-items) are closed or explicitly accepted.
 - [ ] DNS records for the three domains point at the server.

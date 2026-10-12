@@ -2,12 +2,7 @@ import type { Logger } from 'pino';
 import { Op, type Transaction } from 'sequelize';
 import type { Sequelize } from 'sequelize-typescript';
 import type { ServerEnv } from '@garba-partner/config/server';
-import {
-  LIMITS,
-  type MeDto,
-  type MemberSessionDto,
-  type SendOtpResultDto,
-} from '@garba-partner/shared';
+import { LIMITS, type MeDto, type MemberSessionDto } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
 import {
   encryptString,
@@ -17,9 +12,7 @@ import {
   sha256Hex,
 } from '../../lib/crypto.js';
 import { User, UserProfile, UserSession } from '../../models/index.js';
-import type { OtpProvider } from '../../providers/otp/index.js';
-import { logOtp } from './otp-log.js';
-import { createOtpService } from './otp.service.js';
+import { PhoneTokenError, type PhoneTokenVerifier } from '../../providers/firebase/index.js';
 import type { TokenService } from './token.service.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -29,8 +22,6 @@ const USER_AGENT_MAX = 255;
 export interface ClientContext {
   ip: string;
   userAgent: string | undefined;
-  /** For log lines that belong to this request (see `logOtp`). */
-  requestId?: string | undefined;
 }
 
 export interface IssuedMemberSession {
@@ -41,8 +32,11 @@ export interface IssuedMemberSession {
 }
 
 export interface MemberAuthService {
-  sendOtp(phone: string, client: ClientContext): Promise<SendOtpResultDto>;
-  verifyOtp(phone: string, code: string, client: ClientContext): Promise<IssuedMemberSession>;
+  /**
+   * Signs a member in (or up) with a Firebase ID token from phone verification. The phone
+   * number is taken from the verified token, never from the caller.
+   */
+  loginWithPhoneToken(idToken: string, client: ClientContext): Promise<IssuedMemberSession>;
   refresh(refreshToken: string, client: ClientContext): Promise<IssuedMemberSession>;
   logout(userId: string, sessionId: string, allDevices: boolean): Promise<void>;
   getMe(userId: string): Promise<MeDto>;
@@ -51,8 +45,8 @@ export interface MemberAuthService {
 export interface MemberAuthServiceDeps {
   sequelize: Sequelize;
   env: ServerEnv;
-  /** Delivers login codes (the development stub, or WhatsApp through Meta). */
-  otpProvider: OtpProvider;
+  /** Verifies Firebase Phone Authentication ID tokens. */
+  phoneTokens: PhoneTokenVerifier;
   tokens: TokenService;
   logger: Logger;
 }
@@ -77,8 +71,7 @@ export function toMeDto(user: User): MeDto {
 }
 
 export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuthService {
-  const { sequelize, env, otpProvider, tokens, logger } = deps;
-  const otp = createOtpService({ sequelize, env });
+  const { sequelize, env, phoneTokens, tokens, logger } = deps;
 
   const hashIp = (ip: string) => hmacSha256Hex(env.OTP_HMAC_SECRET, `ip:${ip}`);
   const truncateUserAgent = (userAgent: string | undefined) =>
@@ -126,88 +119,38 @@ export function createMemberAuthService(deps: MemberAuthServiceDeps): MemberAuth
   }
 
   return {
-    async sendOtp(phone, client) {
+    async loginWithPhoneToken(idToken, client) {
+      let phone: string;
+      try {
+        ({ phone } = await phoneTokens.verify(idToken));
+      } catch (err) {
+        const reason = err instanceof PhoneTokenError ? err.reason : 'malformed';
+        // The reason only. Never the token: it is a credential until it expires.
+        logger.warn({ reason }, 'Phone sign-in token rejected');
+        if (reason === 'keys_unavailable') {
+          throw new AppError('SERVICE_UNAVAILABLE', {
+            message: 'We could not verify your number right now. Please try again.',
+          });
+        }
+        if (reason === 'unsupported_number') {
+          throw new AppError('PHONE_VERIFICATION_FAILED', {
+            message: 'Only Indian mobile numbers are supported.',
+          });
+        }
+        // One message for every other reason: a caller learns nothing about why.
+        throw new AppError('PHONE_VERIFICATION_FAILED');
+      }
       const phoneHash = hashPhone(phone, env.PHONE_HASH_SECRET);
 
-      const { code, requestId, deliver } = await sequelize.transaction(async (transaction) => {
-        const issued = await otp.issue(phoneHash, hashIp(client.ip), transaction);
-        const existing = await User.findOne({
-          where: { phoneHash },
-          attributes: ['id', 'status'],
+      const outcome = await sequelize.transaction(async (transaction): Promise<VerifyOutcome> => {
+        // Two sign-ins for the same new number at once must not both create the account.
+        await sequelize.query('SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))', {
+          replacements: { key: `phone-login:${phoneHash}` },
           transaction,
         });
-        // Banned numbers get the same response but no message (no cost, no signal).
-        return { ...issued, deliver: existing?.status !== 'banned' };
-      });
 
-      if (deliver) {
-        if (env.LOG_OTP) {
-          logOtp(logger, {
-            purpose: 'LOGIN',
-            phone,
-            code,
-            expiresAt: new Date(Date.now() + LIMITS.OTP_TTL_SECONDS * 1000),
-            requestId: client.requestId,
-          });
-        }
-        let delivery;
-        try {
-          delivery = await otpProvider.sendOtp(phone, code);
-        } catch (err) {
-          logger.error({ err, provider: otpProvider.name }, 'OTP delivery failed');
-          throw new AppError('SERVICE_UNAVAILABLE', {
-            message: 'We could not send the code. Please try again.',
-          });
-        }
-        if (delivery.providerMessageId) {
-          // Only for matching the delivery report later. The code is already on its way, so a
-          // failure here must not fail the request.
-          await otp.recordDelivery(requestId, delivery.providerMessageId).catch((err: unknown) => {
-            logger.error({ err }, 'OTP delivery reference could not be stored');
-          });
-        }
-      }
-
-      return {
-        expiresInSeconds: LIMITS.OTP_TTL_SECONDS,
-        resendAvailableInSeconds: LIMITS.OTP_RESEND_COOLDOWN_SECONDS,
-        // Double guard: the env schema already forbids the dev provider outside development.
-        ...(otpProvider.exposesCodeInResponse && env.APP_ENV === 'development'
-          ? { devOtp: code }
-          : {}),
-      };
-    },
-
-    async verifyOtp(phone, code, client) {
-      const phoneHash = hashPhone(phone, env.PHONE_HASH_SECRET);
-
-      // Failed attempts must be persisted, so the transaction returns an outcome and errors are
-      // thrown only after it commits.
-      const outcome = await sequelize.transaction(async (transaction): Promise<VerifyOutcome> => {
-        const result = await otp.check(phoneHash, code, transaction);
-        switch (result.kind) {
-          case 'no_active_code':
-            return {
-              kind: 'rejected',
-              error: new AppError('OTP_INVALID', {
-                message: 'There is no active code for this number. Please request a new one.',
-              }),
-            };
-          case 'expired':
-            return { kind: 'rejected', error: new AppError('OTP_EXPIRED') };
-          case 'attempts_exceeded':
-            return { kind: 'rejected', error: new AppError('OTP_ATTEMPTS_EXCEEDED') };
-          case 'invalid':
-            return {
-              kind: 'rejected',
-              error: new AppError('OTP_INVALID', {
-                message: `That code is not correct. ${String(result.attemptsRemaining)} attempt(s) left.`,
-              }),
-            };
-          case 'valid':
-            break;
-        }
-
+        // Existing members are found by the same phone hash as before, so their ID, profile,
+        // matches and history are untouched by the change of verification method.
         let user = await User.findOne({ where: { phoneHash }, transaction });
         user ??= await User.create(
           {

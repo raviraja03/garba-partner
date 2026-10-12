@@ -8,10 +8,12 @@ Key test cases per area. **Auto** = automated in the named suite (under `apps/ap
 
 | ID | Case | Expected | Type |
 |---|---|---|---|
-| AUTH-01 | Send OTP to a valid Indian number | `200`, same response for new and existing numbers; dev only: `devOtp` | Auto `auth.int.test.ts` |
-| AUTH-02 | Verify with the right code | Access token + `HttpOnly SameSite=Strict` refresh cookie; account created on first login | Auto |
-| AUTH-03 | Wrong code 5 times, then the right one | `OTP_ATTEMPTS_EXCEEDED`; the code is burnt | Auto `auth`, `security` |
-| AUTH-04 | OTP resend cooldown and hourly/daily per-phone limits, even from rotating IPs | `429` | Auto `auth`, `security` |
+| AUTH-01 | Sign in with a valid Firebase phone token (new number) | `200`; account created; number stored as hash + ciphertext only | Auto `auth.int.test.ts` |
+| AUTH-02 | Sign in again with the same number (also for accounts created before Firebase) | Access token + `HttpOnly SameSite=Strict` refresh cookie; the **same** account | Auto |
+| AUTH-03 | Forged, expired, wrong-project, no-phone or replayed token; `phone` / `uid` / `role` in the body | `401 PHONE_VERIFICATION_FAILED` / `400`; no session, no account | Auto `auth`, `phone-token.verifier` |
+| AUTH-04 | More than 30 token exchanges from one address in 15 min | `429`; other addresses unaffected | Auto `auth`, `security` |
+| AUTH-04b | Browser flow: wrong code, expired code, resend with one reCAPTCHA, reCAPTCHA failure and retry | Plain messages; no raw Firebase errors | Auto `phone-sign-in.test.ts` (fake SDK) |
+| AUTH-04c | Real SMS sign-in on the live site | Code arrives; member signed in | **Manual**, not yet done |
 | AUTH-05 | Refresh rotates the token; reuse of a rotated token after the grace window | New token; reuse revokes the session | Auto |
 | AUTH-06 | Refresh without the CSRF header / from a foreign origin | `403` | Auto `security` |
 | AUTH-07 | Logout, then use the old access token | `401` | Auto `security` |

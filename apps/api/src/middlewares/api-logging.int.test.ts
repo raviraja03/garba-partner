@@ -9,10 +9,12 @@ import {
   purgeOldApiLogs,
   type ApiLogStore,
 } from '../modules/api-logs/api-log.store.js';
-import type { OtpProvider } from '../providers/otp/index.js';
+import type { PhoneTokenVerifier } from '../providers/firebase/index.js';
+import { createFirebaseTestIssuer } from '../test/firebase-tokens.js';
 import {
   createTestApp,
   createTestEnv,
+  fakePhoneToken,
   hasTestDatabase,
   loginAdmin,
   loginMember,
@@ -59,13 +61,13 @@ describe.skipIf(!hasTestDatabase)('central API logging (integration)', () => {
   let app: Express;
   let ip: string;
 
-  const build = (overrides: Record<string, string> = {}, otpProvider?: OtpProvider) =>
+  const build = (overrides: Record<string, string> = {}, phoneTokens?: PhoneTokenVerifier) =>
     createTestApp({
       sequelize: db(),
       env: createTestEnv({ ...overrides }),
       logger: log.logger,
       apiLogs: store,
-      ...(otpProvider ? { otpProvider } : {}),
+      ...(phoneTokens ? { phoneTokens } : {}),
     });
 
   beforeEach(async () => {
@@ -113,38 +115,41 @@ describe.skipIf(!hasTestDatabase)('central API logging (integration)', () => {
     );
   });
 
-  it('logs a successful POST without the phone number or the code', async () => {
+  it('logs a successful sign-in without the phone number or the token', async () => {
     const phone = newTestPhone();
+    const idToken = fakePhoneToken(phone);
     const res = await request(app)
-      .post('/api/v1/auth/send-otp')
+      .post('/api/v1/auth/phone')
       .set('X-Forwarded-For', ip)
       .set('User-Agent', 'api-logging-test')
-      .send({ phone })
+      .send({ idToken })
       .expect(200);
-    const code = (res.body as { data: { devOtp: string } }).data.devOtp;
+    const { accessToken } = (res.body as { data: { accessToken: string } }).data;
 
-    expect(apiLines()[0]?.msg).toMatch(/^\[API\] POST \/api\/v1\/auth\/send-otp \| 200 \|/);
+    expect(apiLines()[0]?.msg).toMatch(/^\[API\] POST \/api\/v1\/auth\/phone \| 200 \|/);
     const [row] = await rows();
     expect(row).toMatchObject({ method: 'POST', statusCode: 200, userAgent: 'api-logging-test' });
 
-    // Nothing sensitive in the log text or in the stored row.
-    expect(log.text()).not.toContain(phone);
-    expect(log.text()).not.toContain(code);
-    expect(JSON.stringify(row?.toJSON())).not.toContain(phone);
-    expect(JSON.stringify(row?.toJSON())).not.toContain(code);
+    // Nothing sensitive in the log text or in the stored row: no number, no Firebase token,
+    // no application token.
+    const stored = JSON.stringify(row?.toJSON());
+    for (const secret of [phone, idToken, accessToken]) {
+      expect(log.text()).not.toContain(secret);
+      expect(stored).not.toContain(secret);
+    }
   });
 
   it('logs a 400 validation error with the public message', async () => {
     await request(app)
-      .post('/api/v1/auth/send-otp')
+      .post('/api/v1/auth/phone')
       .set('X-Forwarded-For', ip)
-      .send({ phone: 'not-a-phone' })
+      .send({ idToken: 'not-a-token' })
       .expect(400);
 
     const [line] = apiLines();
     expect(line?.level).toBe(40);
     expect(line?.msg).toMatch(
-      /^\[API ERROR\] POST \/api\/v1\/auth\/send-otp \| 400 \| \d+ms \|.*\| error=.+/,
+      /^\[API ERROR\] POST \/api\/v1\/auth\/phone \| 400 \| \d+ms \|.*\| error=.+/,
     );
     expect(line?.result).toBe('FAILURE');
     const [row] = await rows();
@@ -316,70 +321,46 @@ describe.skipIf(!hasTestDatabase)('central API logging (integration)', () => {
     expect((await ApiLog.findAll()).map((row) => row.endpoint)).toEqual(['/api/v1/cities']);
   });
 
-  describe('OTP logging', () => {
-    /** Stands in for a real delivery provider: sends nothing, and never returns the code. */
-    const realSms = (): OtpProvider & { sent: string[] } => {
-      const sent: string[] = [];
-      return {
-        name: 'fake-real',
-        exposesCodeInResponse: false,
-        sent,
-        sendOtp: (_phone, code) => {
-          sent.push(code);
-          return Promise.resolve({ providerMessageId: null });
-        },
-      };
-    };
-    const otpLines = () => log.lines().filter((line) => line.msg.startsWith('[OTP]'));
-
-    it('LOG_OTP=true prints the code (masked number) and it is the code that signs in', async () => {
-      const sms = realSms();
-      app = build({ LOG_OTP: 'true' }, sms);
+  describe('phone sign-in logging', () => {
+    it('a refused Firebase token is logged by reason only, never the token itself', async () => {
+      const firebase = await createFirebaseTestIssuer();
+      app = build({}, firebase.verifier());
       const phone = newTestPhone();
-      const res = await request(app)
-        .post('/api/v1/auth/send-otp')
-        .set('X-Forwarded-For', ip)
-        .send({ phone })
-        .expect(200);
-
-      // Never in the API response.
-      expect(JSON.stringify(res.body)).not.toContain(sms.sent[0]);
-      expect((res.body as { data: { devOtp?: string } }).data.devOtp).toBeUndefined();
-
-      const [line] = otpLines();
-      expect(line?.msg).toMatch(
-        new RegExp(
-          `^\\[OTP\\] LOGIN \\| mobile=\\+91XXXXXX${phone.slice(-4)} \\| OTP=\\d{6} \\| expiresAt=\\S+ \\| requestId=${String(res.headers['x-request-id'])}$`,
-        ),
-      );
-      const code = /OTP=(\d{6})/.exec(line?.msg ?? '')?.[1] ?? '';
-      expect(code).toBe(sms.sent[0]);
-      expect(
-        new Date(/expiresAt=(\S+)/.exec(line?.msg ?? '')?.[1] ?? '').getTime(),
-      ).toBeGreaterThan(Date.now());
-      // The full number is not in the log, and the code is only in the [OTP] line.
-      expect(log.text()).not.toContain(phone);
-      expect(apiLines().every((l) => !l.msg.includes(code))).toBe(true);
-      expect(JSON.stringify((await rows()).map((row) => row.toJSON()))).not.toContain(code);
+      const forged = await firebase.forgedIdToken({ phone: `+91${phone}` });
 
       await request(app)
-        .post('/api/v1/auth/verify-otp')
+        .post('/api/v1/auth/phone')
         .set('X-Forwarded-For', ip)
-        .send({ phone, code })
-        .expect(200);
+        .send({ idToken: forged })
+        .expect(401);
+
+      expect(log.text()).toContain('"reason":"bad_signature"');
+      expect(log.text()).not.toContain(forged);
+      // Not even a recognisable part of it (header, claims or signature).
+      for (const part of forged.split('.')) expect(log.text()).not.toContain(part);
+      expect(log.text()).not.toContain(phone);
+      const stored = JSON.stringify((await rows()).map((row) => row.toJSON()));
+      expect(stored).not.toContain(forged);
+      expect(stored).not.toContain(phone);
+      expect(await rows()).toMatchObject([
+        { statusCode: 401, success: false, errorCode: 'PHONE_VERIFICATION_FAILED' },
+      ]);
     });
 
-    it('LOG_OTP=false (the default) writes no code anywhere', async () => {
-      const sms = realSms();
-      app = build({}, sms);
-      const res = await request(app)
-        .post('/api/v1/auth/send-otp')
+    it('a genuine Firebase token is never written to the log either', async () => {
+      const firebase = await createFirebaseTestIssuer();
+      app = build({}, firebase.verifier());
+      const phone = newTestPhone();
+      const idToken = await firebase.idToken({ phone: `+91${phone}` });
+
+      await request(app)
+        .post('/api/v1/auth/phone')
         .set('X-Forwarded-For', ip)
-        .send({ phone: newTestPhone() })
+        .send({ idToken })
         .expect(200);
-      expect(otpLines()).toHaveLength(0);
-      expect(log.text()).not.toContain(sms.sent[0]);
-      expect(JSON.stringify(res.body)).not.toContain(sms.sent[0]);
+
+      for (const part of idToken.split('.')) expect(log.text()).not.toContain(part);
+      expect(log.text()).not.toContain(phone);
     });
   });
 });

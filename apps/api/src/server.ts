@@ -1,6 +1,6 @@
 import { createServer } from 'node:http';
 import type { ServerEnv } from '@garba-partner/config/server';
-import { API_PREFIX } from '@garba-partner/shared';
+import { API_PREFIX, LIMITS } from '@garba-partner/shared';
 import { createApp } from './app.js';
 import { createSequelize, databaseConfigFromEnv, pingDatabase } from './config/database.js';
 import { readEnv } from './config/env.js';
@@ -20,7 +20,7 @@ import { createMediaStorage } from './providers/media/index.js';
 import { createMessageProviders } from './providers/messaging/index.js';
 import { createPaymentGateway } from './providers/payments/index.js';
 import { createMetaClientFromEnv } from './providers/meta/index.js';
-import { createOtpProvider } from './providers/otp/index.js';
+import { createFirebasePhoneTokenVerifier } from './providers/firebase/index.js';
 import { createRealtimeHub } from './realtime/hub.js';
 import { attachSocketServer } from './realtime/socket-server.js';
 
@@ -37,11 +37,6 @@ function start(): void {
   }
 
   const logger = createLogger(env);
-  if (env.LOG_OTP) {
-    logger.warn(
-      '[OTP] LOG_OTP is on: one-time codes are written to this log. Anyone who can read it can sign in as a member. Turn it off when you are done debugging.',
-    );
-  }
   const sequelize = createSequelize(databaseConfigFromEnv(env));
 
   // The API starts even if the database is down; /health reports 503 until it recovers.
@@ -57,7 +52,7 @@ function start(): void {
   const media = createMediaStorage(env);
   const realtime = createRealtimeHub();
   const paymentGateway = createPaymentGateway(env, logger);
-  // One Meta client for login codes and notifications (null when Meta is not configured).
+  // The Meta client for WhatsApp notifications (null when Meta is not configured).
   const meta = createMetaClientFromEnv(env);
   const messaging = createMessageProviders(env, logger, meta);
   // `api_logs` rows are queued and written in the background (docs/development/logging.md).
@@ -68,7 +63,10 @@ function start(): void {
       logger,
       dependencies: {
         sequelize,
-        otpProvider: createOtpProvider(env, meta),
+        phoneTokens: createFirebasePhoneTokenVerifier({
+          projectId: env.FIREBASE_PROJECT_ID,
+          maxAgeSeconds: LIMITS.PHONE_TOKEN_MAX_AGE_SECONDS,
+        }),
         messaging,
         ...(apiLogs ? { apiLogs } : {}),
         media,

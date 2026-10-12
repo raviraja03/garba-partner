@@ -8,7 +8,7 @@ How the API logs requests, where to find the logs, and the two debugging switche
 | --- | --- | --- |
 | One line per API request (`[API]` / `[API ERROR]`) | Server log | `LOG_API_REQUESTS` (default `true`) |
 | One row per API request | `api_logs` table | `LOG_API_TO_DATABASE` (default `true`) |
-| One-time login codes (`[OTP]`) | Server log only | `LOG_OTP` (default `false`, development only) |
+| One-time login codes | **Never logged.** The API does not see them: Firebase sends and checks them | — |
 | SMS / WhatsApp notification attempts (`[NOTIFICATION]`) | Server log and `notification_deliveries` | See [notification channels](../notifications/notification-channels.md) |
 
 The logger is [pino](https://getpino.io) (already a dependency; no library was added). In development the output is pretty-printed; in production each line is JSON with the same text in `msg`, so `grep '\[API'` works on both.
@@ -18,7 +18,7 @@ The logger is [pino](https://getpino.io) (already a dependency; no library was a
 Implemented in `apps/api/src/middlewares/api-logger.ts` and mounted first in `apps/api/src/app.ts`, so every request passes through it, including ones that fail before reaching a route (bad JSON, unknown path, rate limit).
 
 ```text
-[API] POST /api/v1/auth/send-otp | 200 | 80ms | requestId=1d451d4b-… | userId=-
+[API] POST /api/v1/auth/phone | 200 | 80ms | requestId=1d451d4b-… | userId=-
 [API] GET /api/v1/auth/me | 200 | 17ms | requestId=3cf9f202-… | userId=a1f0c3de-…
 [API ERROR] GET /api/v1/auth/me | 401 | 2ms | requestId=4f11dd97-… | userId=- | error=Please log in to continue.
 [API ERROR] GET /api/v1/cities | 500 | 12ms | requestId=… | userId=- | error=Error: Database connection failed
@@ -76,22 +76,23 @@ SELECT endpoint, count(*), round(avg(response_time_ms)) AS avg_ms, max(response_
   FROM api_logs WHERE created_at > current_date GROUP BY endpoint ORDER BY avg_ms DESC LIMIT 10;
 ```
 
-## 3. OTP logging
+## 3. Sign-in logging
+
+Login codes are sent and checked by Firebase, so the API has no code to log. The old `LOG_OTP` switch and the `[OTP]` log line were removed.
+
+What the API does log about a sign-in:
+
+- The normal `[API]` line for `POST /api/v1/auth/phone` (no request body).
+- When a Firebase token is refused, one warning with the reason only:
 
 ```text
-[OTP] LOGIN | mobile=+91XXXXXX0005 | OTP=123456 | expiresAt=2026-10-08T07:14:52.370Z | requestId=1d451d4b-…
+WARN: Phone sign-in token rejected  { "reason": "bad_signature" }
 ```
 
-Implemented in `apps/api/src/modules/auth/otp-log.ts`, called from `sendOtp` in `apps/api/src/modules/auth/auth.service.ts` right after the code is generated.
+Reasons: `malformed`, `bad_signature`, `expired`, `wrong_project`, `not_phone_sign_in`, `no_phone_number`, `unsupported_number`, `too_old`, `keys_unavailable` ([troubleshooting](../auth/firebase-phone-auth.md#11-troubleshooting)).
 
-- **Off by default, and local only.** The API refuses `LOG_OTP=true` unless `APP_ENV=development`, so it cannot be turned on in staging or production. It prints only when `LOG_OTP=true`. Set it in the env file and restart the API; set it back to `false` (or remove the line) and restart to turn it off.
-- When it is on, the API writes a warning at start-up saying so.
-- The phone number is masked. The code appears only in this line: not in the `[API]` lines, not in `api_logs`, not in the API response.
-- Nothing is printed for a banned number (no code is delivered to it either).
+**Never logged:** the Firebase ID token (it is a credential until it expires), the phone number, our access and refresh tokens, cookies. Tests in `api-logging.int.test.ts` check the log text and the `api_logs` rows for this.
 
-**Why local only.** Anyone who can read the server log could sign in as the member whose code is printed, so outside local development the rule "never log OTPs" has no exception.
-
-**The development banner is separate.** With `OTP_PROVIDER=dev` (accepted only when `APP_ENV=development`) the send-otp response contains `devOtp` and the web app shows it on the code screen. That behaviour is unchanged and cannot be enabled in staging or production.
 
 ## 4. Reading the logs
 
@@ -112,7 +113,6 @@ Implemented in `apps/api/src/modules/auth/otp-log.ts`, called from `sendOtp` in 
 | `LOG_API_REQUESTS` | `true` | Write the `[API]` line for each request |
 | `LOG_API_TO_DATABASE` | `true` | Store each request in `api_logs` |
 | `API_LOG_RETENTION_DAYS` | `30` | Delete `api_logs` rows older than this (1–365) |
-| `LOG_OTP` | `false` | Print one-time codes to the server log. Refused unless `APP_ENV=development` |
 | `LOG_LEVEL` | `info` | Existing. `warn` hides successful `[API]` lines but keeps `[API ERROR]` and `[OTP]` |
 
 ## 6. Tests

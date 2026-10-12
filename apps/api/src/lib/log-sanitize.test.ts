@@ -46,37 +46,33 @@ describe('logging and channel settings', () => {
     CLOUDINARY_API_SECRET: 'x',
   };
 
-  it('defaults: API logging on, OTP logging and both channels off', () => {
+  it('defaults: API logging on, both channels off', () => {
     const env = createTestEnv();
     expect(env.LOG_API_REQUESTS).toBe(true);
     expect(env.LOG_API_TO_DATABASE).toBe(true);
     expect(env.API_LOG_RETENTION_DAYS).toBe(30);
-    expect(env.LOG_OTP).toBe(false);
     expect(env.SMS_ENABLED).toBe(false);
     expect(env.WHATSAPP_ENABLED).toBe(false);
   });
 
   it('reads the switches from the environment', () => {
-    const env = createTestEnv({ LOG_OTP: 'true', LOG_API_REQUESTS: 'false', SMS_ENABLED: 'true' });
-    // (Both LOG_OTP and SMS_ENABLED are development-only switches; tests run as development.)
-    expect(env.LOG_OTP).toBe(true);
+    const env = createTestEnv({ LOG_API_REQUESTS: 'false', SMS_ENABLED: 'true' });
+    // (SMS_ENABLED is a development-only switch; tests run as development.)
     expect(env.LOG_API_REQUESTS).toBe(false);
     expect(env.SMS_ENABLED).toBe(true);
   });
 
-  it('development-only switches are refused elsewhere: LOG_OTP, SMS, and WhatsApp with the log provider', () => {
+  it('development-only switches are refused elsewhere: SMS, and WhatsApp with the log provider', () => {
     const source = {
       ...createTestEnvSource(),
       ...production,
-      OTP_PROVIDER: 'meta_whatsapp',
       META_WHATSAPP_ACCESS_TOKEN: 'test-meta-access-token-000000',
       META_WHATSAPP_PHONE_NUMBER_ID: '100000000000001',
       META_WHATSAPP_APP_SECRET: 'test-meta-app-secret-0000',
       META_WHATSAPP_VERIFY_TOKEN: 'test-meta-verify-token-00',
-      META_WHATSAPP_OTP_TEMPLATE: 'garbamates_login_code',
     };
     expect(() => loadServerEnv({ source: { ...source } })).not.toThrow();
-    for (const key of ['LOG_OTP', 'SMS_ENABLED', 'WHATSAPP_ENABLED']) {
+    for (const key of ['SMS_ENABLED', 'WHATSAPP_ENABLED']) {
       expect(() => loadServerEnv({ source: { ...source, [key]: 'true' } })).toThrow(key);
     }
   });
@@ -86,6 +82,7 @@ describe('logging and channel settings', () => {
 function createTestEnvSource(): Record<string, string> {
   return {
     DATABASE_URL: 'postgres://unused@127.0.0.1:5432/unused',
+    FIREBASE_PROJECT_ID: 'garbamates-test',
     PHONE_HASH_SECRET: 'test-phone-hash-secret-000000000000000000',
     PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
     OTP_HMAC_SECRET: 'test-otp-hmac-secret-0000000000000000000000',

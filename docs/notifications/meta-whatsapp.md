@@ -1,11 +1,12 @@
 # Meta WhatsApp Cloud API
 
-GarbaMates sends two things on WhatsApp, both through Meta's official Cloud API:
+GarbaMates sends **notifications** on WhatsApp through Meta's official Cloud API:
 
 | What | Template category | Switch |
 | --- | --- | --- |
-| Login codes (OTP) | Authentication | `OTP_PROVIDER=meta_whatsapp` |
 | Notifications (interest, match, message, booking, …) | Utility | `WHATSAPP_ENABLED=true` + `MESSAGING_PROVIDER=meta` |
+
+> **Login codes are no longer sent on WhatsApp.** Members sign in with an SMS code from Firebase Phone Authentication ([guide](../auth/firebase-phone-auth.md)). Nothing in this document is needed for sign-in, and the API starts without any Meta settings while WhatsApp notifications are off.
 
 Delivery results (sent, delivered, read, failed) come back through a signed webhook.
 
@@ -47,94 +48,61 @@ In `.env` locally, `/etc/garba-partner/production.env` on the server. Never comm
 
 | Variable | Needed when | Value |
 | --- | --- | --- |
-| `OTP_PROVIDER` | Always | `meta_whatsapp` to send login codes on WhatsApp. `dev` only works in development |
 | `META_WHATSAPP_ACCESS_TOKEN` | Meta is used | The system-user token. **Secret** |
 | `META_WHATSAPP_PHONE_NUMBER_ID` | Meta is used | The Phone Number ID (digits) |
 | `META_WHATSAPP_APP_SECRET` | Meta is used | The app secret. **Secret.** Verifies webhook calls |
 | `META_WHATSAPP_VERIFY_TOKEN` | Meta is used | Any long random string you make up. You type the same string into Meta when registering the webhook. **Secret** |
 | `META_WHATSAPP_API_VERSION` | Optional | Graph API version, default `v25.0` |
 | `META_WHATSAPP_TEMPLATE_LANGUAGE` | Optional | Language code of your templates exactly as WhatsApp Manager shows it, default `en` (often `en_US`) |
-| `META_WHATSAPP_OTP_TEMPLATE` | `OTP_PROVIDER=meta_whatsapp` | Name of the approved login-code template |
 | `MESSAGING_PROVIDER` | WhatsApp notifications | `meta` (default `log` sends nothing and is development-only) |
 | `WHATSAPP_ENABLED` | | `true` to send notifications on WhatsApp |
 | `META_WHATSAPP_TEMPLATES` | `WHATSAPP_ENABLED=true` with Meta | `type:templateName` pairs, comma-separated (§5) |
 
 The business account ID is not needed: the app only sends messages and reads delivery reports.
 
-The API checks these at start-up and names anything missing. Minimal production setup (login codes only):
+The API checks these at start-up and names anything missing. They are required only when `WHATSAPP_ENABLED=true` with `MESSAGING_PROVIDER=meta`:
 
 ```env
-OTP_PROVIDER=meta_whatsapp
+WHATSAPP_ENABLED=true
+MESSAGING_PROVIDER=meta
 META_WHATSAPP_ACCESS_TOKEN=<system-user token>
 META_WHATSAPP_PHONE_NUMBER_ID=<phone number id>
 META_WHATSAPP_APP_SECRET=<app secret>
 META_WHATSAPP_VERIFY_TOKEN=<a long random string>
-META_WHATSAPP_OTP_TEMPLATE=<template name>
+META_WHATSAPP_TEMPLATES=<type:templateName pairs, §5>
 ```
 
 Generate the verify token with `node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"`.
 
-`SMS_PROVIDER` was renamed to `OTP_PROVIDER`. If the old line is still in the env file the API stops at start-up and says so.
+The old lines `OTP_PROVIDER`, `LOG_OTP` and `META_WHATSAPP_OTP_TEMPLATE` are ignored. Delete them from your env files.
 
-## 4. Login codes
+## 4. Login codes (moved to Firebase)
 
-**Create the template.** WhatsApp Manager → Message templates → Create template:
+Login codes are not sent through Meta any more. Sign-in is described in [Firebase Phone Authentication](../auth/firebase-phone-auth.md).
 
-- Category **Authentication**. WhatsApp does not allow one-time codes in any other category, and a plain text message cannot be used.
-- Meta writes the body itself ("<code> is your verification code."). You choose the options: the security line ("For your security, do not share this code.") and, if you add the expiry line, set it to **5 minutes**, which is how long a GarbaMates code is valid.
-- Code delivery: **Copy code** is the simplest and works for a website.
-- Name it, for example, `garbamates_login_code`, submit it, and wait for **Active** status.
-
-Put its name in `META_WHATSAPP_OTP_TEMPLATE`, and its language code in `META_WHATSAPP_TEMPLATE_LANGUAGE` if it is not `en`.
-
-**Flow.**
-
-```text
-Member enters mobile number            web: /login
-        ↓
-POST /api/v1/auth/send-otp             validated, normalised to +91…; IP limit; 30s cooldown;
-        ↓                              5/hour and 10/day per phone; 20/hour per IP
-API generates a 6-digit code           secure random; only an HMAC is stored; valid 5 minutes;
-        ↓                              any earlier code for that number is cancelled
-API → Meta  POST /<version>/<phone number id>/messages
-        ↓                              authentication template, the code in the body AND the button
-Meta → WhatsApp → member's phone
-        ↓
-Member enters the code                 web: /login/verify
-        ↓
-POST /api/v1/auth/verify-otp           row locked; expiry and 5 attempts checked; constant-time
-        ↓                              compare; the code is consumed
-Session issued                         only now
-```
-
-- GarbaMates generates and checks the code. Meta only delivers it.
-- The code is never in an API response, never logged and never stored in readable form. (`LOG_OTP` exists for local debugging and is refused outside `APP_ENV=development`.)
-- If Meta refuses or cannot be reached, the member sees "We could not send the code. Please try again." (HTTP 503). Meta's reason is in the server log under the request ID.
-- If the number is not on WhatsApp, Meta accepts the request and reports the failure later through the webhook. The member sees the code screen and nothing arrives; `otp_requests.delivery_status` becomes `failed` with the reason. There is no SMS fallback.
-- A banned number gets the same response but no message is sent.
-- Two simultaneous attempts with the right code: one signs in, the others are refused.
-
-Code: `apps/api/src/providers/otp/meta-whatsapp.otp.ts`, called from `sendOtp` in `apps/api/src/modules/auth/auth.service.ts`.
+- The "Authentication" template that carried the code is no longer used. You can leave it or delete it in WhatsApp Manager; the app never refers to it.
+- The code that sent and checked WhatsApp login codes was removed (`providers/otp/`, `modules/auth/otp.service.ts`). The Meta client, the notification provider, the notification templates, the opt-in and the webhook are unchanged.
+- The `otp_requests` table is no longer written. A delivery report for a login code sent before the change matches nothing and is ignored.
 
 ## 5. Notifications
 
 A business may only start a WhatsApp conversation with an approved template, so each notification type needs one. Category **Utility**, fixed text, **no variables, no buttons**. Suggested wording (it matches what the app records in the delivery history):
 
-| Type | When | Template text |
-| --- | --- | --- |
-| `interest_received` | Someone sends the member an interest | GarbaMates: someone would like to be your Garba partner. Open the app to respond. |
-| `interest_accepted` | The member's interest is accepted | GarbaMates: your interest was accepted. Open the app to start chatting. |
-| `match_created` | Two members match | GarbaMates: you have a new Garba match. Open the app to say hello. |
-| `new_message` | A chat message arrives (once per unread chat) | GarbaMates: you have new messages. Open the app to read them. |
-| `verification_completed` | A verification is reviewed | GarbaMates: your verification has been reviewed. Open the app to see the result. |
-| `event_reminder` | An event the member is going to starts soon | GarbaMates: an event you are going to starts soon. Open the app for details. |
-| `safety` | A moderator acts on the account or a report | GarbaMates: there is an important notice about your account. Open the app to read it. |
-| `booking` | A pass is confirmed, cancelled or refunded | GarbaMates: there is an update on your event pass. Open the app to see it. |
+| Type | Suggested template name | When | Template text |
+| --- | --- | --- | --- |
+| `interest_received` | `garba_new_interest` | Someone sends the member an interest | GarbaMates: someone would like to be your Garba partner. Open the app to respond. |
+| `interest_accepted` | `garba_interest_accepted` | The member's interest is accepted | GarbaMates: your interest was accepted. Open the app to start chatting. |
+| `match_created` | `garba_new_match` | Two members match | GarbaMates: you have a new Garba match. Open the app to say hello. |
+| `new_message` | `garba_new_messages` | A chat message arrives (once per unread chat) | GarbaMates: you have new messages. Open the app to read them. |
+| `verification_completed` | `garba_verification_update` | A verification is reviewed | GarbaMates: your verification has been reviewed. Open the app to see the result. |
+| `event_reminder` | `garba_event_reminder` | An event the member is going to starts soon | GarbaMates: an event you are going to starts soon. Open the app for details. |
+| `safety` | `garba_account_notice` | A moderator acts on the account or a report | GarbaMates: there is an important notice about your account. Open the app to read it. |
+| `booking` | `garba_pass_update` | A pass is confirmed, cancelled or refunded | GarbaMates: there is an update on your event pass. Open the app to see it. |
 
 ```env
 MESSAGING_PROVIDER=meta
 WHATSAPP_ENABLED=true
-META_WHATSAPP_TEMPLATES=interest_received:garba_new_interest,match_created:garba_new_match,booking:garba_pass_update
+META_WHATSAPP_TEMPLATES=interest_received:garba_new_interest,interest_accepted:garba_interest_accepted,match_created:garba_new_match,new_message:garba_new_messages,verification_completed:garba_verification_update,event_reminder:garba_event_reminder,safety:garba_account_notice,booking:garba_pass_update
 ```
 
 - **Meta decides the category, not you.** It may reclassify a template as *Marketing* (interest, match and event reminders are the likeliest). Marketing templates cost more, have stricter limits, and must not be presented as utility. If that happens, either reword the template so it only reports on something the member did, or leave that type out.
@@ -159,19 +127,19 @@ Full pipeline: [notification channels](notification-channels.md).
 - A status only moves forward: pending → sent → delivered → read, with `failed` between sent and delivered. So the same report twice, or reports arriving out of order, change nothing.
 - If the database is down the endpoint answers 500 and Meta sends the report again (for up to 36 hours).
 
-**What is stored.** For notifications, `notification_deliveries.status` with `delivered_at`, `read_at`, `failed_at` and the failure reason. For login codes, `otp_requests.delivery_status` and `delivery_error`. Messages are matched by a SHA-256 of Meta's message ID, not the ID itself, because Meta's IDs embed the recipient's phone number.
+**What is stored.** For notifications, `notification_deliveries.status` with `delivered_at`, `read_at`, `failed_at` and the failure reason. Messages are matched by a SHA-256 of Meta's message ID, not the ID itself, because Meta's IDs embed the recipient's phone number.
 
 `sent` means Meta accepted the message. Only `delivered` means it reached the phone, and `read` depends on the member's read-receipt setting.
 
 ## 7. Local testing
 
-Local development needs nothing from Meta: `OTP_PROVIDER=dev` shows the code on screen and `MESSAGING_PROVIDER=log` writes notifications to the server log.
+Local development needs nothing from Meta: `MESSAGING_PROVIDER=log` writes notifications to the server log instead of sending them.
 
 ```bash
 npm run test -w @garba-partner/api     # Meta is replaced by a stand-in in every test
 ```
 
-To try the real API from your machine, use Meta's **test number** with its temporary token and Phone Number ID, add your own phone as a recipient in API Setup, and run with `OTP_PROVIDER=meta_whatsapp`. Meta provides a `hello_world` template on the test number, but a login code needs your own authentication template. The webhook needs a public HTTPS address, so test delivery reports on the deployed server.
+To try the real API from your machine, use Meta's **test number** with its temporary token and Phone Number ID, add your own phone as a recipient in API Setup, and run with `WHATSAPP_ENABLED=true` and `MESSAGING_PROVIDER=meta`. You need an approved Utility template on that account. The webhook needs a public HTTPS address, so test delivery reports on the deployed server.
 
 ## 8. First-send check (production)
 
@@ -180,28 +148,21 @@ Do this once after configuring, with your approval at each step:
 1. `NODE_ENV=production npm run env:check:prod -w @garba-partner/api` lists any missing variable.
 2. Deploy, run the migration (`npm run db:migrate:prod -w @garba-partner/api`) and restart: `pm2 restart gp-api --update-env`.
 3. Register the webhook (§6). Meta shows a green tick when the GET check passes.
-4. **Login code:** sign in on the website with your own number. If it does not arrive:
-   ```bash
-   pm2 logs gp-api --lines 200 --nostream | grep -A4 'OTP delivery failed'
-   ```
-   ```sql
-   SELECT created_at, delivery_status, delivery_error FROM otp_requests ORDER BY created_at DESC LIMIT 5;
-   ```
-5. **Delivery report:** a few seconds after the message arrives, `delivery_status` should change from `sent` to `delivered`. That proves the webhook and its signature check work.
-   ```bash
-   pm2 logs gp-api --lines 200 --nostream | grep '\[WHATSAPP\]'
-   ```
-6. **Notification:** turn on "Also notify me on WhatsApp" for your account, have a second account send you an interest, then:
+4. **Notification:** turn on "Also notify me on WhatsApp" for your account, have a second account send you an interest, then:
    ```sql
    SELECT created_at, notification_type, status, delivered_at, read_at, error_message
      FROM notification_deliveries ORDER BY created_at DESC LIMIT 10;
+   ```
+5. **Delivery report:** a few seconds after the message arrives, `status` should change from `sent` to `delivered`. That proves the webhook and its signature check work.
+   ```bash
+   pm2 logs gp-api --lines 200 --nostream | grep '\[WHATSAPP\]'
    ```
 
 ## 9. Token security and rotation
 
 - The access token and app secret are read from the environment by the API only. They are sent to Meta in the `Authorization` header over HTTPS, and never appear in a URL, a log line, an error message, the database or the web apps.
 - Use a **system-user** token, not a personal one, so it does not die when someone leaves or changes their password. Give the system user only this app and this WABA.
-- **Rotate** by generating a new token for the same system user, putting it in the env file, running `pm2 restart gp-api --update-env`, checking a login code arrives, then revoking the old token in Business Settings.
+- **Rotate** by generating a new token for the same system user, putting it in the env file, running `pm2 restart gp-api --update-env`, checking a notification arrives, then revoking the old token in Business Settings.
 - **If a token or the app secret leaks:** revoke the token (or reset the app secret) in Meta immediately, set the new value, restart. Resetting the app secret invalidates webhook signatures until the API has the new one; Meta retries reports for 36 hours.
 - Changing the verify token only matters the next time you edit the webhook in Meta.
 
@@ -212,11 +173,10 @@ Failure reasons are stored and logged as `[E<code>] <Meta's text>`.
 | Symptom | Likely cause |
 | --- | --- |
 | API will not start: "META_WHATSAPP_… is required when Meta WhatsApp is used" | A variable from §3 is missing |
-| API will not start: "SMS_PROVIDER: was renamed" | Replace that line with `OTP_PROVIDER=…` |
 | `[E190]` | Access token expired or revoked. Generate a new system-user token |
 | `[E10]` / `[E200]`–`[E299]` | The token lacks permission, or the system user is not assigned the WABA |
 | `[E132001]` | Template name or language code does not match an approved template |
-| `[E132000]` / `[E132012]` | The template's parameters do not match: a login-code template must have exactly the code in the body and the code button; a notification template must have no variables |
+| `[E132000]` / `[E132012]` | The template's parameters do not match: a notification template must have no variables |
 | `[E132015]` / `[E132016]` | Template paused or disabled by Meta for low quality. Edit it or create a new one |
 | `[E133010]` | The number is not registered for the Cloud API (§2) |
 | `[E131026]` (in a delivery report) | Recipient cannot receive it: not on WhatsApp, very old app version, or has not accepted WhatsApp's terms |
@@ -240,7 +200,7 @@ Failure reasons are stored and logged as `[E<code>] <Meta's text>`.
 
 | Before (MSG91) | Now (Meta) |
 | --- | --- |
-| `SMS_PROVIDER=msg91` (SMS login codes) | `OTP_PROVIDER=meta_whatsapp` (WhatsApp login codes) |
+| `SMS_PROVIDER=msg91` (SMS login codes) | Firebase Phone Authentication (SMS login codes): [guide](../auth/firebase-phone-auth.md) |
 | `MESSAGING_PROVIDER=msg91` (SMS and WhatsApp notifications) | `MESSAGING_PROVIDER=meta` (WhatsApp notifications) |
 | `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID`, `MSG91_SMS_TEMPLATE_IDS`, `MSG91_WHATSAPP_NUMBER`, `MSG91_WHATSAPP_TEMPLATES`, `MSG91_WHATSAPP_LANGUAGE`, `MSG91_WHATSAPP_NAMESPACE` | Removed. See §3 |
 | No delivery results | Webhook: sent, delivered, read, failed |
@@ -248,21 +208,21 @@ Failure reasons are stored and logged as `[E<code>] <Meta's text>`.
 
 Removed: `providers/msg91/`, `providers/sms/msg91.sms.ts`, `providers/messaging/msg91.provider.ts`, their tests and `docs/notifications/msg91.md`. MSG91 was called over plain HTTP, so no package was uninstalled. `providers/sms/` became `providers/otp/`.
 
-**There is no SMS any more**, for login codes or notifications. The `sms` channel value remains in the database schema because old rows use it, and `SMS_ENABLED` still works with the development `log` provider, but no provider sends real SMS.
+**The app itself sends no SMS.** Login codes are sent by Firebase ([guide](../auth/firebase-phone-auth.md)); notifications go in the app and, for members who opted in, on WhatsApp. The `sms` channel value remains in the database schema because old rows use it, and `SMS_ENABLED` still works with the development `log` provider, but no provider sends real SMS.
 
 Old `notification_deliveries` rows with `provider = 'msg91'` are kept as history. Remove any `MSG91_*` lines from your env files: they are ignored, but the auth key is a credential you should also revoke in MSG91.
 
 ## 13. Tests
 
-- `apps/api/src/providers/meta/whatsapp.client.test.ts`: request format for both template kinds, the configured API version, refusals, rate limits and retries, no retry after a timeout, signature verification, the stored message reference, and the start-up rules.
-- `apps/api/src/modules/whatsapp/whatsapp-webhook.int.test.ts` (needs `TEST_DATABASE_URL`): a full sign-in through the stand-in, a Meta refusal, delivery reports for login codes, four simultaneous verifications, notifications with and without opt-in, the webhook GET check, valid and invalid signatures, duplicate and out-of-order reports, failure reasons, and reports that must be ignored.
-- `apps/api/src/modules/auth/auth.int.test.ts`: the existing OTP rules (expiry, wrong codes, attempt limit, cooldown, rate limits).
+- `apps/api/src/providers/meta/whatsapp.client.test.ts`: request format for notification templates, the configured API version, refusals, rate limits and retries, no retry after a timeout, signature verification, the stored message reference, and the start-up rules.
+- `apps/api/src/modules/whatsapp/whatsapp-webhook.int.test.ts` (needs `TEST_DATABASE_URL`): notifications with and without opt-in, the webhook GET check, valid and invalid signatures, duplicate and out-of-order reports, failure reasons, and reports that must be ignored.
+- `apps/api/src/modules/auth/auth.int.test.ts`: member sign-in, which no longer involves Meta ([Firebase guide §13](../auth/firebase-phone-auth.md#13-testing)).
 
 ## 14. Limitations
 
 - **Not verified with a real Meta account** (see the note at the top).
-- **No SMS fallback.** A member without WhatsApp cannot sign in.
+- **WhatsApp is not used for sign-in.** A member without WhatsApp signs in normally (SMS) and gets notifications in the app only.
 - **Failed sends are not retried later.** Only throttling and temporary Meta faults are retried, twice, straight away.
 - **Templates are managed by hand** in WhatsApp Manager; the app does not create or check them. A wrong name fails at send time, not at start-up.
-- **Incoming WhatsApp messages are ignored.** Replies to a notification or login code are not read or answered.
+- **Incoming WhatsApp messages are ignored.** Replies to a notification are not read or answered.
 - **Changing the Phone Number ID** orphans delivery reports for messages sent from the old one.

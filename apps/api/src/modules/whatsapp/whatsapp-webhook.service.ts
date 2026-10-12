@@ -112,17 +112,7 @@ export function createWhatsAppWebhookService(deps: {
         RETURNING id`,
       { type: QueryTypes.SELECT, replacements },
     );
-    const codes = await sequelize.query<{ id: string }>(
-      `UPDATE otp_requests
-          SET delivery_status = :status,
-              delivery_error = CASE WHEN :status = 'failed' THEN :error ELSE delivery_error END,
-              delivery_updated_at = :at
-        WHERE provider_message_id = :ref
-          AND ${rank("COALESCE(delivery_status, 'pending')")} < ${rank(':status')}
-        RETURNING id`,
-      { type: QueryTypes.SELECT, replacements },
-    );
-    return notifications.length + codes.length;
+    return notifications.length;
   }
 
   return {

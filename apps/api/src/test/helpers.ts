@@ -24,8 +24,8 @@ import type { MessageProviders } from '../providers/messaging/index.js';
 import type { PaymentGateway } from '../providers/payments/index.js';
 import { createRealtimeHub, type RealtimeHub } from '../realtime/hub.js';
 import { attachSocketServer } from '../realtime/socket-server.js';
-import { devOtpProvider } from '../providers/otp/dev.otp.js';
-import type { OtpProvider } from '../providers/otp/index.js';
+import { normalizeIndianMobile } from '@garba-partner/shared';
+import { PhoneTokenError, type PhoneTokenVerifier } from '../providers/firebase/index.js';
 
 /** Disposable integration-test database (see docs/database/database-setup.md). */
 export const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL ?? '';
@@ -39,6 +39,7 @@ export function createTestEnv(overrides: Record<string, string> = {}): ServerEnv
       APP_ENV: 'development',
       LOG_LEVEL: 'silent',
       DATABASE_URL: TEST_DATABASE_URL || 'postgres://unused@127.0.0.1:5432/unused',
+      FIREBASE_PROJECT_ID: 'garbamates-test',
       PHONE_HASH_SECRET: 'test-phone-hash-secret-000000000000000000',
       PHONE_ENCRYPTION_KEY: Buffer.alloc(32, 7).toString('base64'),
       OTP_HMAC_SECRET: 'test-otp-hmac-secret-0000000000000000000000',
@@ -48,6 +49,29 @@ export function createTestEnv(overrides: Record<string, string> = {}): ServerEnv
     },
   });
 }
+
+const FAKE_TOKEN_PREFIX = 'fake-firebase-id-token.';
+
+/**
+ * What Firebase would hand the browser after a member verified `phone` by SMS. Only the test
+ * verifier below accepts it; the real verifier (signature, project, age) has its own tests in
+ * `providers/firebase/phone-token.verifier.test.ts`.
+ */
+export function fakePhoneToken(phone: string): string {
+  const e164 = normalizeIndianMobile(phone) ?? phone;
+  return `${FAKE_TOKEN_PREFIX}${e164}.${'x'.repeat(120)}`;
+}
+
+/** Stands in for Firebase in integration tests: accepts `fakePhoneToken(...)`, nothing else. */
+export const fakePhoneTokens: PhoneTokenVerifier = {
+  verify(idToken) {
+    const phone = idToken.startsWith(FAKE_TOKEN_PREFIX)
+      ? normalizeIndianMobile(idToken.slice(FAKE_TOKEN_PREFIX.length).split('.')[0] ?? '')
+      : null;
+    if (!phone) return Promise.reject(new PhoneTokenError('bad_signature'));
+    return Promise.resolve({ phone, firebaseUid: `test-${phone}`, verifiedAt: new Date() });
+  },
+};
 
 /** In-memory media storage that records what was stored and deleted. */
 export interface FakeMediaStorage extends MediaStorage {
@@ -86,8 +110,8 @@ export function createFakeMediaStorage(): FakeMediaStorage {
 export function createTestApp(options: {
   sequelize: Sequelize;
   env?: ServerEnv;
-  /** Delivers login codes. Default: the development stub (code in the response). */
-  otpProvider?: OtpProvider;
+  /** Verifies phone sign-in tokens. Default: the test stand-in for Firebase. */
+  phoneTokens?: PhoneTokenVerifier;
   media?: MediaStorage;
   realtime?: RealtimeHub;
   /** Razorpay gateway (tests pass the mocked one from `razorpay-mock.ts`). Default: disabled. */
@@ -105,7 +129,7 @@ export function createTestApp(options: {
     logger: options.logger ?? pino({ level: 'silent' }),
     dependencies: {
       sequelize: options.sequelize,
-      otpProvider: options.otpProvider ?? devOtpProvider,
+      phoneTokens: options.phoneTokens ?? fakePhoneTokens,
       ...(options.messaging ? { messaging: options.messaging } : {}),
       ...(options.apiLogs ? { apiLogs: options.apiLogs } : {}),
       media: options.media ?? createFakeMediaStorage(),
@@ -221,24 +245,18 @@ export function newTestPhone(): string {
   return `99998${String(phoneCounter).padStart(5, '0')}`;
 }
 
-/** Logs in through send-otp + verify-otp (dev OTP) and returns the access token. */
+/** Signs a member in (or up) through the real phone-login endpoint and returns the access token. */
 export async function loginMember(
   app: Express,
   ip: string,
   phone: string = newTestPhone(),
 ): Promise<{ accessToken: string; userId: string; phone: string }> {
-  const sent = await request(app)
-    .post('/api/v1/auth/send-otp')
+  const res = await request(app)
+    .post('/api/v1/auth/phone')
     .set('X-Forwarded-For', ip)
-    .send({ phone });
-  const code = (sent.body as { data?: { devOtp?: string } }).data?.devOtp;
-  if (!code) throw new Error(`send-otp failed: ${String(sent.status)}`);
-  const verified = await request(app)
-    .post('/api/v1/auth/verify-otp')
-    .set('X-Forwarded-For', ip)
-    .send({ phone, code });
-  const data = (verified.body as { data?: { accessToken: string; user: { id: string } } }).data;
-  if (!data) throw new Error(`verify-otp failed: ${String(verified.status)}`);
+    .send({ idToken: fakePhoneToken(phone) });
+  const data = (res.body as { data?: { accessToken: string; user: { id: string } } }).data;
+  if (!data) throw new Error(`phone login failed: ${String(res.status)}`);
   return { accessToken: data.accessToken, userId: data.user.id, phone };
 }
 

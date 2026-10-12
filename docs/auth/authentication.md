@@ -1,6 +1,6 @@
 # Authentication
 
-> Related: [OTP flow](otp-flow.md), [Session management](session-management.md), [Authorization](authorization.md), [Security architecture](../architecture/security-architecture.md)
+> Related: [Firebase Phone Authentication](firebase-phone-auth.md), [Sign-in flow](otp-flow.md), [Session management](session-management.md), [Authorization](authorization.md), [Security architecture](../architecture/security-architecture.md)
 
 ## 1. Overview
 
@@ -9,7 +9,7 @@ Garba Partner has two completely separate identities:
 | | Members (web app) | Admins (admin panel) |
 |---|---|---|
 | Table | `users` | `admin_users` |
-| Login | Mobile number + 6-digit OTP | Email + password (Argon2id) |
+| Login | Mobile number + 6-digit SMS code (Firebase Phone Authentication) | Email + password (Argon2id) |
 | Access token | JWT HS256, 15 min, audience `garba-partner:app`, secret `JWT_ACCESS_SECRET` | JWT HS256, 15 min, audience `garba-partner:admin`, secret `JWT_ADMIN_ACCESS_SECRET` |
 | Refresh token | Random 256-bit, `gp_rt` httpOnly cookie, 30 days, rotating | Random 256-bit, `gp_admin_rt` httpOnly cookie, 12 h absolute + 30 min idle, rotating |
 | Session table | `user_sessions` | `admin_sessions` |
@@ -23,66 +23,32 @@ A member token can never authenticate an admin route, and the reverse also holds
 | Concern | File |
 |---|---|
 | Member auth routes / controller / service | `apps/api/src/modules/auth/auth.{routes,controller,service}.ts` |
-| OTP issuing, checking and rate limits | `apps/api/src/modules/auth/otp.service.ts` |
+| Firebase ID token verification (phone sign-in) | `apps/api/src/providers/firebase/phone-token.verifier.ts` |
 | JWT signing and verification (`jose`) | `apps/api/src/modules/auth/token.service.ts` |
 | Admin auth routes / controller / service | `apps/api/src/modules/admin/auth/admin-auth.*.ts` |
 | Authentication middleware | `apps/api/src/middlewares/authenticate.ts` |
 | Authorization middleware | `apps/api/src/middlewares/authorize.ts` |
 | CSRF guard for the refresh endpoints | `apps/api/src/middlewares/csrf.ts` |
 | IP rate limiters | `apps/api/src/middlewares/rate-limit.ts` |
-| Login-code providers (`dev`, `meta_whatsapp`) | `apps/api/src/providers/otp/` |
 | Shared contracts (schemas, DTOs, error codes, limits) | `packages/shared/src/{schemas/auth.schema,types/dto/auth.dto,constants/*}.ts` |
-| Web: login, OTP, auth state, guards | `apps/web/src/{pages,features/auth}/` |
+| Web: login and code screens, Firebase flow, auth state, guards | `apps/web/src/{pages,features/auth}/` |
 | Admin: login, guards, layout | `apps/admin/src/{pages,features/auth}/` |
 
 ## 2. Member endpoints
 
 All responses use the standard envelope (`{ success, message, data }` or `{ success: false, message, error: { code, details } }`). Every auth response carries `Cache-Control: no-store`.
 
-### 2.1 `POST /api/v1/auth/send-otp`
+### 2.1 `POST /api/v1/auth/phone`
 
-Sends a login code. Anyone can call it: the endpoint is the same for sign-up and login.
-
-**Request**
-
-```json
-{ "phone": "98765 43210" }
-```
-
-`phone` accepts `9876543210`, `+91 98765 43210`, `919876543210` or `09876543210`. It's normalised to E.164 (`+919876543210`). Only Indian mobile numbers (starting with 6–9) are accepted.
-
-**200 OK**
-
-```json
-{
-  "success": true,
-  "message": "If this number can receive codes, one has been sent.",
-  "data": {
-    "expiresInSeconds": 300,
-    "resendAvailableInSeconds": 30,
-    "devOtp": "482913"
-  }
-}
-```
-
-- The response is **identical for new, existing and banned numbers** (banned numbers silently get no SMS).
-- `devOtp` is present **only** with `OTP_PROVIDER=dev` and `APP_ENV=development` ([OTP flow §4](otp-flow.md#4-development-otp-mechanism)). It is never present in staging or production.
-
-**Errors**
-
-| Status | Code | When |
-|---|---|---|
-| 400 | `VALIDATION_ERROR` | Not a valid Indian mobile number (`details[0].path = "phone"`) |
-| 429 | `RATE_LIMITED` | Resend cooldown (30 s), 5/hour or 10/day per number, 20/hour per IP, 10/minute per IP burst. Includes a `Retry-After` header |
-| 503 | `SERVICE_UNAVAILABLE` | The SMS provider failed |
-
-### 2.2 `POST /api/v1/auth/verify-otp`
+Starts a session from a Firebase ID token. The browser gets that token from Firebase after the member enters the SMS code ([sign-in flow](otp-flow.md)). The endpoint is the same for sign-up and login. Full details: [Firebase Phone Authentication §3–4](firebase-phone-auth.md#3-api).
 
 **Request**
 
 ```json
-{ "phone": "9876543210", "code": "482913" }
+{ "idToken": "<Firebase ID token>" }
 ```
+
+Only `idToken` is allowed. The phone number is read from the verified token: a `phone`, `uid`, `role` or any other field in the body is rejected.
 
 **200 OK** (sets the `gp_rt` cookie)
 
@@ -108,18 +74,21 @@ Set-Cookie: gp_rt=<opaque>; Path=/api/v1/auth; Expires=<30 days>; HttpOnly; Secu
 }
 ```
 
-A first successful verification creates the account (the phone is stored only as an HMAC hash plus AES-GCM ciphertext). The phone number is never included in any response.
+A first successful sign-in creates the account (the phone is stored only as an HMAC hash plus AES-GCM ciphertext). The phone number is never included in any response. Accounts are matched by phone number, so members who joined before Firebase keep their account.
 
 **Errors**
 
 | Status | Code | When |
 |---|---|---|
-| 400 | `VALIDATION_ERROR` | Malformed phone or code (not 6 digits) |
-| 400 | `OTP_INVALID` | Wrong code (the message says how many attempts are left), or no active code for this number |
-| 400 | `OTP_EXPIRED` | The code is older than 5 minutes |
-| 400 | `OTP_ATTEMPTS_EXCEEDED` | 5 wrong attempts. The code is invalidated and a new one must be requested |
+| 400 | `VALIDATION_ERROR` | `idToken` missing or malformed, or extra fields in the body |
+| 401 | `PHONE_VERIFICATION_FAILED` | The token is forged, expired, from another Firebase project, not from a phone sign-in, older than 5 minutes, or for a non-Indian number. The response does not say which |
 | 403 | `ACCOUNT_BANNED` | The account is banned (no session is created) |
-| 429 | `RATE_LIMITED` | More than 30 verify calls per IP in 15 min |
+| 429 | `RATE_LIMITED` | More than 30 calls per IP in 15 min |
+| 503 | `SERVICE_UNAVAILABLE` | Google's signing keys could not be fetched |
+
+### 2.2 Removed endpoints
+
+`POST /api/v1/auth/send-otp` and `POST /api/v1/auth/verify-otp` no longer exist (404). The API does not send or check login codes.
 
 ### 2.3 `POST /api/v1/auth/refresh`
 
@@ -131,7 +100,7 @@ Exchanges the refresh cookie for a new access token and **rotates** the refresh 
 X-Requested-With: gp-web
 ```
 
-**200 OK**: same shape as verify-otp (new `accessToken`, new `gp_rt` cookie).
+**200 OK**: same shape as `POST /auth/phone` (new `accessToken`, new `gp_rt` cookie).
 
 **Errors**
 
@@ -240,9 +209,7 @@ Requires an admin access token. Returns `AdminMeDto` (`id`, `email`, `name`, `ro
 
 | Endpoint | Limit | Store |
 |---|---|---|
-| `send-otp` | 30 s cooldown per number; 5/hour and 10/day per number; 20/hour per IP | **PostgreSQL** (`otp_requests`), which survives restarts |
-| `send-otp` | 10/minute per IP (burst) | In-memory |
-| `verify-otp` | 5 attempts per code; 30 calls per IP / 15 min | PostgreSQL / in-memory |
+| `auth/phone` | 30 per IP / 15 min. Firebase applies its own limits per number, device and project before a token exists | In-memory (ours) |
 | `refresh` (member & admin) | 60 per IP / 15 min | In-memory |
 | `admin/auth/login` | 10 per IP / 15 min + lockout after 5 failures per account | In-memory + PostgreSQL |
 | Every `/api/v1` route except webhooks | 300 per IP / minute (global ceiling) | In-memory |
@@ -251,7 +218,7 @@ Behind Nginx, `trust proxy` is `loopback`, so the limits apply to the real clien
 
 ## 5. Local development
 
-- **Member login:** use any Indian-looking number, e.g. `98765 00123`. No SMS is sent. The OTP screen shows the code in a "Development only" banner.
+- **Member login:** add a test phone number in the Firebase console and sign in with it and its fixed code. No SMS is sent for test numbers. There is no on-screen development code ([guide §7](firebase-phone-auth.md#7-local-development)).
 - **Admin login:** `npm run db:seed` creates three development admins with the password **`garba-dev-admin-2026`**. This works only on a development database, because the seeder refuses to run unless `APP_ENV=development`. Email and password are all that is needed (§3.1).
 
 | Email | Role |
@@ -272,7 +239,9 @@ Behind Nginx, `trust proxy` is `loopback`, so the limits apply to the real clien
 
 | Test file | Covers |
 |---|---|
-| `apps/api/src/modules/auth/auth.int.test.ts` | send-otp (hash-only storage, dev code only in development, identical responses, cooldown); verify-otp (**valid**, **invalid**, **expired**, **too many attempts**, replay, banned); **unauthorized** access (no token, forged, wrong audience); **logout** (single and all devices); **refresh** (rotation, reuse detection, grace window, CSRF, expiry) |
+| `apps/api/src/modules/auth/auth.int.test.ts` | `auth/phone` with tokens from a stand-in for Firebase and the real verifier (**valid**, **forged**, **expired**, **wrong project**, **no phone**, **replayed**, non-Indian number, extra body fields, existing member keeps the account, concurrent first sign-ins, banned, keys unavailable, rate limit, old endpoints gone); **unauthorized** access (no token, forged, wrong audience); **logout** (single and all devices); **refresh** (rotation, reuse detection, grace window, CSRF, expiry) |
+| `apps/api/src/providers/firebase/phone-token.verifier.test.ts` | Every token check, including unsigned and HS256 tokens and unreachable keys |
+| `apps/web/src/features/auth/phone-sign-in.test.ts` | The browser flow against a fake Firebase SDK: send, resend, wrong and expired codes, reCAPTCHA failure and retry, error messages |
 | `apps/api/src/modules/admin/auth/admin-auth.int.test.ts` | Admin password sign-in (session, cookie flags, audit), no two-factor endpoints, lockout, generic failures, token separation, logout (audited), refresh + idle timeout, disabled admins |
 | `apps/api/src/modules/auth/token.service.test.ts` | Audience separation, tampered/unsigned/expired tokens, no personal data in claims |
 | `apps/api/src/middlewares/authorize.test.ts` | Permission matrix and member status gate |
@@ -283,6 +252,6 @@ Integration tests need `TEST_DATABASE_URL` ([database setup](../database/databas
 ## 7. Known limitations (to address before launch)
 
 - **No admin second factor.** Admin sign-in is email + password only (authenticator sign-in was removed), so a leaked or guessed admin password gives full access. A **forced password change on first login** is not implemented either: admins created with `admin:create` keep the printed password until they change it through a future admin-management screen. Deliver the password over a secure channel.
-- **Login codes go by WhatsApp and need your Meta setup.** `OTP_PROVIDER=meta_whatsapp` sends the code as a WhatsApp authentication-template message through the Meta Cloud API ([setup](../notifications/meta-whatsapp.md)); `dev` is rejected outside `APP_ENV=development`. A member whose number is not on WhatsApp cannot receive a code: there is no SMS fallback. The integration is tested against a stand-in, not with a real message: do the first-send check there before launch.
+- **Sign-in depends on Firebase and has not been verified with a real SMS.** The Firebase console must be set up (phone sign-in enabled, authorized domains, billing) and the first-login check done on the live site ([guide §5 and §9](firebase-phone-auth.md#5-firebase-console-setup)). SMS is billed per message and there is no fallback channel if one does not arrive.
 - The admin API is reachable on the API domain and is not restricted by host in the application; restrict it by IP in Nginx where possible ([nginx.md §6](../deployment/nginx.md#6-restricting-the-admin-panel)).
-- In-memory rate limiters reset on restart and aren't shared between processes. The OTP limits are DB-backed, and the rest move to Redis when scaling out.
+- In-memory rate limiters reset on restart and aren't shared between processes. They move to Redis when scaling out.

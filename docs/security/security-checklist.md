@@ -21,9 +21,9 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 
 | Control | Status | Where | Test |
 |---|---|---|---|
-| Member sign-in by phone OTP; OTP stored as an HMAC, compared in constant time, 5-minute TTL, 5 attempts, single use | ✅ | `modules/auth/otp.service.ts` | `auth.int.test.ts` |
-| OTPs are never logged (`LOG_OTP` is a local-only debugging switch, refused outside `APP_ENV=development`); the dev provider logs nothing and is refused outside development | ✅ | `providers/otp/`, env schema | `auth.int.test.ts`, `env-rules.test.ts` |
-| `send-otp` gives the same response for new, existing and banned numbers | ✅ | `auth.service.ts` | `auth.int.test.ts` |
+| Member sign-in by phone: Firebase Phone Authentication sends and checks the SMS code; the API accepts only a verified Firebase ID token for our project (signature, issuer, audience, expiry, phone sign-in, ≤ 5 min old) | ✅ | `providers/firebase/phone-token.verifier.ts`, `modules/auth/auth.service.ts` | `phone-token.verifier.test.ts`, `auth.int.test.ts` |
+| Login codes never reach the API; Firebase ID tokens are never logged or stored; no service-account key is used | ✅ | `auth.service.ts`, env schema, `preflight.sh` | `api-logging.int.test.ts`, `env-rules.test.ts` |
+| Identity comes only from the verified token: `phone`, `uid`, `role`, `isAdmin` in the request body are rejected | ✅ | `auth.schema.ts` (strict), `auth.service.ts` | `auth.int.test.ts` |
 | Admin passwords hashed with Argon2id; unknown/disabled admins run a dummy hash (same timing and response) | ✅ | `admin-auth.service.ts` | `admin-auth.int.test.ts` |
 | Admin second factor (TOTP) | ❌ **Removed** on request: admins sign in with email + password only ([authentication §3.1](../auth/authentication.md#31-post-apiv1adminauthlogin)) | migration `20261004100000-remove-admin-two-factor` | `admin-auth.int.test.ts` (no two-factor endpoints) |
 | Admin lockout: 5 failed passwords **or** codes → locked 15 min, audit-logged | ✅ | `admin-auth.service.ts` | `admin-auth.int.test.ts` |
@@ -68,7 +68,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Control | Status | Where | Test |
 |---|---|---|---|
 | **Global ceiling: 300 requests / minute / IP on every `/api/v1` route** (Razorpay webhooks exempt: signature-verified) | ✅ (new) | `routes.ts` | `security.int.test.ts` "applies a global per-IP request limit" |
-| OTP: per phone number (30 s cooldown, 5/hour, 10/day) and per IP, **in PostgreSQL**; 5 attempts per code | ✅ | `otp.service.ts` | `security.int.test.ts` rate-limit bypass |
+| Sign-in: reCAPTCHA and per-number limits at Firebase; 30 token exchanges per IP / 15 min at the API | ✅ | `rate-limit.ts` (`phoneLogin`) | `security.int.test.ts` rate-limit bypass, `auth.int.test.ts` |
 | Refresh 60 / 15 min; admin login 10 / 15 min (per IP) | ✅ | `middlewares/rate-limit.ts` | auth suites |
 | Per-member limits (interests/day, reports/day, messages, uploads) keyed by user ID | ✅ | module services | module suites |
 | `trust proxy` = loopback only, so a remote client can't spoof `X-Forwarded-For` | ✅ | `app.ts` | review |
@@ -131,7 +131,7 @@ Legend: ✅ in place and tested · 🟡 in place, but depends on deployment (Ngi
 | Requirement | How it is met |
 |---|---|
 | No secrets in source code | Env-only secrets, boot-time validation, `.env` untracked, `.env.example` placeholders only. A scan of every tracked file for key patterns (Razorpay live keys, private keys, cloud credentials, quoted `secret`/`password` literals) found only one obviously fake test value (`rzp_live_Abc123Def`, used to test that live keys are refused). The development admin password in the dev seeder is deliberate and public: the seeder refuses to run outside development |
-| No OTP logging | OTPs are never passed to the logger; `*.otp`/`*.code` redacted as a second line of defence; the dev provider logs nothing; `LOG_OTP` is refused outside development |
+| No code or token logging | The API never receives login codes. Firebase ID tokens, access tokens and cookies are never passed to the logger; a refused token is logged by reason only |
 | No sensitive information in error responses | Central error handler; generic `INTERNAL_ERROR`; tested |
 | No phone numbers in public profiles | DTO mappers + PII guards; phone reveal is an audited super-admin action only |
 | No exact user location exposed | Only city/area names (area only when the member opts in); no coordinates stored; EXIF/GPS stripped |
@@ -163,7 +163,8 @@ No critical issues were found. All high issues were fixed and covered by tests. 
 - [ ] 🟡 Server deployed and verified as in [production setup §11](../deployment/production-setup.md#11-deployment-checklist): TLS, HSTS, CSP, `limit_req`, API bound to `127.0.0.1`, admin IP allow-list (or a recorded decision not to), encrypted off-site backups, restore drill.
 - [ ] 🟡 Separate, CSPRNG-generated production secrets in a secret store (`JWT_*`, `PHONE_*`, `OTP_HMAC_SECRET`, Cloudinary, SMS, Razorpay).
 - [ ] 🟡 Database roles: DML-only API role; migrations with the owner role; TLS to the database.
-- [ ] ⏳ Meta WhatsApp configured and a real login code received (the integration exists; the dev provider is refused outside development).
+- [ ] ⏳ Firebase phone sign-in set up in the console and a real SMS sign-in completed on the live site ([first-login check](../auth/firebase-phone-auth.md#9-first-login-check-manual-on-the-live-site)).
+- [ ] ⏳ If WhatsApp notifications are on: Meta configured and a real notification received.
 - [ ] ⏳ Move in-memory rate limiters to a shared store (Redis) before running more than one API process.
 
 ## 6. Residual risks

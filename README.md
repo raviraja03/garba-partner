@@ -92,7 +92,7 @@ Step-by-step guide (roles, databases, troubleshooting): [docs/database/database-
 
 ## Logging in locally
 
-- **Web** (http://localhost:5173): enter any Indian mobile number (e.g. `98765 00123`). No SMS is sent in development. The OTP screen shows the code in a "Development only" banner. This mechanism is refused outside `APP_ENV=development`.
+- **Web**: sign in with a **Firebase test phone number** and its fixed code (set both in the Firebase console; no SMS is sent). Put the Firebase web configuration in `.env` first: [Firebase Phone Authentication §7](docs/auth/firebase-phone-auth.md#7-local-development). There is no on-screen development code.
 - **Admin** (http://localhost:5174): after `npm run db:seed`, sign in as `superadmin@garbapartner.test` (or `moderator@…`, `events@…`) with the development password `garba-dev-admin-2026`. The event manager (`events@…`) manages events and organizers; moderators can view them only.
 - **Home** (http://localhost:5173): visitors see the landing page (what GarbaMates is, why it was built, how to join); signed-in members see their own home at the same address.
 - **Events** (http://localhost:5173/events): public, no login needed. The seed adds three published events and one draft.
@@ -276,7 +276,7 @@ Details (dependency rules, TypeScript presets, where new code goes): [docs/setup
 
 | Document | Contents |
 |---|---|
-| [Logging](docs/development/logging.md) | Request logging (`[API]` lines, `api_logs` table), what is never logged, the development-only `LOG_OTP` switch, how to read the logs |
+| [Logging](docs/development/logging.md) | Request logging (`[API]` lines, `api_logs` table), what is never logged, sign-in logging, how to read the logs |
 | [Meta WhatsApp](docs/notifications/meta-whatsapp.md) | Meta prerequisites, keeping the number in the WhatsApp Business app, env variables, login-code and notification templates, the delivery webhook, first-send check, token rotation, troubleshooting, rollback |
 | [Notification channels](docs/notifications/notification-channels.md) | SMS and WhatsApp delivery pipeline, the `notification_deliveries` history table, failure handling, duplicate prevention, how to add a real provider |
 | [Notifications](docs/notifications/notifications.md) | Types and triggers, privacy rules, **API reference** (list, unread count, mark read, preferences), realtime event, jobs (event reminders, retention), admin monitoring, database, tests |
@@ -349,7 +349,7 @@ No social feature ships without **block and report**. Phase numbers follow [MVP 
 | **5e** | QA | ✅ Security QA (unauthorized access, JWT forgery, privilege escalation, IDOR, injection, XSS, uploads, CSRF, rate limits, logging), security test suite, 3 findings fixed (public profile visibility, phone numbers in logs, destructive DB commands on staging), test strategy, test cases, release checklist | ✅ Done |
 | **5f** | Security hardening | ✅ Admin sign-in/lockout/logout audit, global per-IP rate limit, `no-store` on every API response, strict CORS methods/headers, HSTS 1 year, SQL values removed from error logs, env security-rule tests, [security docs](docs/security/security-checklist.md) with threat model and Nginx config. ⏳ Forced admin password change. Admin two-factor (authenticator) sign-in was built and then removed on request (migration `20261004100000-remove-admin-two-factor`) | ✅ Done |
 | **5g** | Deployment preparation | ✅ Three configurable domains (web, admin, API) with the apps calling the API cross-origin, PM2 process file, Nginx templates rendered from env, least-privilege PostgreSQL roles and server settings, deploy / rollback / preflight / health-check / backup / restore scripts, log rotation, [deployment docs](docs/deployment/production-setup.md) with checklist. ⏳ **Not run on a server yet** | 🟡 Prepared, not deployed |
-| **6** | Launch | **Configure the Meta WhatsApp Cloud API and confirm a real login code arrives (production cannot start without it)**, run the [deployment checklist](docs/deployment/production-setup.md#11-deployment-checklist) on the VPS, load test, restore drill and rollback rehearsal, admin second factor or IP allow-list, legal pages, Redis-backed rate limits, CI/CD | Planned |
+| **6** | Launch | **Set up Firebase Phone Authentication and confirm a real SMS sign-in on the live site ([guide](docs/auth/firebase-phone-auth.md))**; if WhatsApp notifications are wanted, configure the Meta WhatsApp Cloud API, run the [deployment checklist](docs/deployment/production-setup.md#11-deployment-checklist) on the VPS, load test, restore drill and rollback rehearsal, admin second factor or IP allow-list, legal pages, Redis-backed rate limits, CI/CD | Planned |
 
 ### Post-MVP (indicative)
 
