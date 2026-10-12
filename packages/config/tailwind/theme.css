@@ -124,6 +124,8 @@
   --animate-pop-in: pop-in 180ms var(--ease-soft);
   --animate-sheet-up: sheet-up 240ms var(--ease-soft);
   --animate-drawer-in: drawer-in 240ms var(--ease-soft);
+  /* Slow drift for small decorations on the landing page. Use with `motion-safe:`. */
+  --animate-float: float 6s ease-in-out infinite;
 
   @keyframes fade-in {
     from {
@@ -139,6 +141,15 @@
   @keyframes sheet-up {
     from {
       transform: translateY(100%);
+    }
+  }
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-8px) rotate(8deg);
     }
   }
   @keyframes drawer-in {

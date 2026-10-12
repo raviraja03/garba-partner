@@ -1,0 +1,228 @@
+# Meta WhatsApp Cloud API
+
+GarbaMates sends **notifications** on WhatsApp through Meta's official Cloud API:
+
+| What | Template category | Switch |
+| --- | --- | --- |
+| Notifications (interest, match, message, booking, …) | Utility | `WHATSAPP_ENABLED=true` + `MESSAGING_PROVIDER=meta` |
+
+> **Login codes are no longer sent on WhatsApp.** Members sign in with an SMS code from Firebase Phone Authentication ([guide](../auth/firebase-phone-auth.md)). Nothing in this document is needed for sign-in, and the API starts without any Meta settings while WhatsApp notifications are off.
+
+Delivery results (sent, delivered, read, failed) come back through a signed webhook.
+
+> **Not yet verified with real messages.** The code builds the requests Meta documents, and the automated tests check them against a stand-in for Meta. Nothing has been sent through Meta: that needs your Meta app, credentials, approved templates and the number set up for the Cloud API. Do the first-send check in §8 before relying on it.
+
+This replaced MSG91 (§12).
+
+## 1. What you need from Meta
+
+All of this is done by you in Meta's dashboards. Nothing in this repository changes your Meta account, your number or your WhatsApp Business app.
+
+1. **A Meta Business portfolio**, verified (Business Settings → Security Centre). Verification is needed to raise sending limits and to use your own display name.
+2. **A Meta app** of type *Business* with the **WhatsApp** product added ([developers.facebook.com](https://developers.facebook.com/apps)).
+3. **A WhatsApp Business Account (WABA)** with the sending number, **+91 87697 95033**, added to it (§2 first: read it before touching the number).
+4. **The Phone Number ID** of that number (WhatsApp → API Setup). This is an ID Meta assigns, not the phone number.
+5. **A permanent access token.** Business Settings → Users → System users → create a system user, assign it the app and the WABA with full control, then *Generate token* with the permissions `whatsapp_business_messaging` and `whatsapp_business_management`. The temporary token shown on the API Setup page expires in about a day and is only for a first experiment.
+6. **The app secret.** App dashboard → App settings → Basic → App secret.
+7. **Approved templates** (§4 and §5).
+8. **The webhook registered** (§6), which needs the API deployed on HTTPS first.
+
+## 2. Your number and the WhatsApp Business app (coexistence)
+
+You want to keep using +91 87697 95033 in the WhatsApp Business app. Normally a number is either in the app or on the Cloud API, and moving it to the API **removes it from the app**. Meta's *coexistence* feature is the exception: it lets one number stay in the WhatsApp Business app and also be used through the Cloud API.
+
+**This cannot be checked or done from the code.** It is decided in Meta's onboarding flow. What to know before you start:
+
+- Coexistence is set up by connecting the number through **Embedded Signup** and choosing the option to *connect your existing WhatsApp Business app*, then scanning a QR code from the app on the phone. It is offered through Meta Business Partners / Tech Providers; ask the one you use (or Meta support) to enable it for you if the option does not appear.
+- Meta sets the eligibility rules (among them: a recent version of the WhatsApp Business app, the number in active use for some time, and a supported country). Check Meta's current coexistence documentation for the exact conditions before starting.
+- **Do not use "Add phone number" → register on the plain API Setup page for this number.** Registering a number for the Cloud API that way disconnects it from the WhatsApp Business app, and the chat history in the app can be lost.
+- With coexistence, messages sent through the API also appear in the app. Some app features change or are unavailable for a coexisting number; read Meta's list first.
+
+**If coexistence is not available for the number, stop and decide before going further.** The options are a second number for the API (leaving this one in the app untouched), or moving this number to the API and giving up the app. Neither is something to do by accident.
+
+Until the number is live on the Cloud API, test with the **test number** Meta gives every app (WhatsApp → API Setup): it can message up to five phone numbers you add, and needs no change to your real number.
+
+## 3. Environment variables
+
+In `.env` locally, `/etc/garba-partner/production.env` on the server. Never commit them. None of them may be given a `VITE_` name: that would publish it in the website's JavaScript.
+
+| Variable | Needed when | Value |
+| --- | --- | --- |
+| `META_WHATSAPP_ACCESS_TOKEN` | Meta is used | The system-user token. **Secret** |
+| `META_WHATSAPP_PHONE_NUMBER_ID` | Meta is used | The Phone Number ID (digits) |
+| `META_WHATSAPP_APP_SECRET` | Meta is used | The app secret. **Secret.** Verifies webhook calls |
+| `META_WHATSAPP_VERIFY_TOKEN` | Meta is used | Any long random string you make up. You type the same string into Meta when registering the webhook. **Secret** |
+| `META_WHATSAPP_API_VERSION` | Optional | Graph API version, default `v25.0` |
+| `META_WHATSAPP_TEMPLATE_LANGUAGE` | Optional | Language code of your templates exactly as WhatsApp Manager shows it, default `en` (often `en_US`) |
+| `MESSAGING_PROVIDER` | WhatsApp notifications | `meta` (default `log` sends nothing and is development-only) |
+| `WHATSAPP_ENABLED` | | `true` to send notifications on WhatsApp |
+| `META_WHATSAPP_TEMPLATES` | `WHATSAPP_ENABLED=true` with Meta | `type:templateName` pairs, comma-separated (§5) |
+
+The business account ID is not needed: the app only sends messages and reads delivery reports.
+
+The API checks these at start-up and names anything missing. They are required only when `WHATSAPP_ENABLED=true` with `MESSAGING_PROVIDER=meta`:
+
+```env
+WHATSAPP_ENABLED=true
+MESSAGING_PROVIDER=meta
+META_WHATSAPP_ACCESS_TOKEN=<system-user token>
+META_WHATSAPP_PHONE_NUMBER_ID=<phone number id>
+META_WHATSAPP_APP_SECRET=<app secret>
+META_WHATSAPP_VERIFY_TOKEN=<a long random string>
+META_WHATSAPP_TEMPLATES=<type:templateName pairs, §5>
+```
+
+Generate the verify token with `node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))"`.
+
+The old lines `OTP_PROVIDER`, `LOG_OTP` and `META_WHATSAPP_OTP_TEMPLATE` are ignored. Delete them from your env files.
+
+## 4. Login codes (moved to Firebase)
+
+Login codes are not sent through Meta any more. Sign-in is described in [Firebase Phone Authentication](../auth/firebase-phone-auth.md).
+
+- The "Authentication" template that carried the code is no longer used. You can leave it or delete it in WhatsApp Manager; the app never refers to it.
+- The code that sent and checked WhatsApp login codes was removed (`providers/otp/`, `modules/auth/otp.service.ts`). The Meta client, the notification provider, the notification templates, the opt-in and the webhook are unchanged.
+- The `otp_requests` table is no longer written. A delivery report for a login code sent before the change matches nothing and is ignored.
+
+## 5. Notifications
+
+A business may only start a WhatsApp conversation with an approved template, so each notification type needs one. Category **Utility**, fixed text, **no variables, no buttons**. Suggested wording (it matches what the app records in the delivery history):
+
+| Type | Suggested template name | When | Template text |
+| --- | --- | --- | --- |
+| `interest_received` | `garba_new_interest` | Someone sends the member an interest | GarbaMates: someone would like to be your Garba partner. Open the app to respond. |
+| `interest_accepted` | `garba_interest_accepted` | The member's interest is accepted | GarbaMates: your interest was accepted. Open the app to start chatting. |
+| `match_created` | `garba_new_match` | Two members match | GarbaMates: you have a new Garba match. Open the app to say hello. |
+| `new_message` | `garba_new_messages` | A chat message arrives (once per unread chat) | GarbaMates: you have new messages. Open the app to read them. |
+| `verification_completed` | `garba_verification_update` | A verification is reviewed | GarbaMates: your verification has been reviewed. Open the app to see the result. |
+| `event_reminder` | `garba_event_reminder` | An event the member is going to starts soon | GarbaMates: an event you are going to starts soon. Open the app for details. |
+| `safety` | `garba_account_notice` | A moderator acts on the account or a report | GarbaMates: there is an important notice about your account. Open the app to read it. |
+| `booking` | `garba_pass_update` | A pass is confirmed, cancelled or refunded | GarbaMates: there is an update on your event pass. Open the app to see it. |
+
+```env
+MESSAGING_PROVIDER=meta
+WHATSAPP_ENABLED=true
+META_WHATSAPP_TEMPLATES=interest_received:garba_new_interest,interest_accepted:garba_interest_accepted,match_created:garba_new_match,new_message:garba_new_messages,verification_completed:garba_verification_update,event_reminder:garba_event_reminder,safety:garba_account_notice,booking:garba_pass_update
+```
+
+- **Meta decides the category, not you.** It may reclassify a template as *Marketing* (interest, match and event reminders are the likeliest). Marketing templates cost more, have stricter limits, and must not be presented as utility. If that happens, either reword the template so it only reports on something the member did, or leave that type out.
+- **You do not need all eight.** A type that is not listed is simply not sent on WhatsApp.
+- **Consent.** WhatsApp requires a member's opt-in before a business messages them. Notifications go only to members who turned on "Also notify me on WhatsApp" (at sign-up or in notification settings); it is off by default. Their per-type switches still apply. Login codes are exempt: the member asks for those.
+- If your approved wording differs, change `CHANNEL_TEXT` in `apps/api/src/modules/notifications/channel-notifier.ts` to match.
+- WhatsApp delivery never affects the in-app notification, and a Meta failure never fails the member's action.
+
+Full pipeline: [notification channels](notification-channels.md).
+
+## 6. Webhook
+
+`https://<API domain>/api/v1/webhooks/meta/whatsapp`. It exists only when Meta is configured.
+
+**Register it** (after the API is deployed with the variables set): App dashboard → WhatsApp → Configuration → Webhook → Edit. Callback URL as above; Verify token = your `META_WHATSAPP_VERIFY_TOKEN`. Then under *Webhook fields* subscribe to **messages**.
+
+**How it works.**
+
+- `GET`: Meta's one-time check. The endpoint returns the challenge only if the verify token matches.
+- `POST`: delivery reports. The `X-Hub-Signature-256` header must be the HMAC-SHA256 of the exact request bytes, keyed with the app secret. A request without a valid signature gets 401 and changes nothing, whatever it contains.
+- Only reports for our own Phone Number ID are applied.
+- A status only moves forward: pending → sent → delivered → read, with `failed` between sent and delivered. So the same report twice, or reports arriving out of order, change nothing.
+- If the database is down the endpoint answers 500 and Meta sends the report again (for up to 36 hours).
+
+**What is stored.** For notifications, `notification_deliveries.status` with `delivered_at`, `read_at`, `failed_at` and the failure reason. Messages are matched by a SHA-256 of Meta's message ID, not the ID itself, because Meta's IDs embed the recipient's phone number.
+
+`sent` means Meta accepted the message. Only `delivered` means it reached the phone, and `read` depends on the member's read-receipt setting.
+
+## 7. Local testing
+
+Local development needs nothing from Meta: `MESSAGING_PROVIDER=log` writes notifications to the server log instead of sending them.
+
+```bash
+npm run test -w @garba-partner/api     # Meta is replaced by a stand-in in every test
+```
+
+To try the real API from your machine, use Meta's **test number** with its temporary token and Phone Number ID, add your own phone as a recipient in API Setup, and run with `WHATSAPP_ENABLED=true` and `MESSAGING_PROVIDER=meta`. You need an approved Utility template on that account. The webhook needs a public HTTPS address, so test delivery reports on the deployed server.
+
+## 8. First-send check (production)
+
+Do this once after configuring, with your approval at each step:
+
+1. `NODE_ENV=production npm run env:check:prod -w @garba-partner/api` lists any missing variable.
+2. Deploy, run the migration (`npm run db:migrate:prod -w @garba-partner/api`) and restart: `pm2 restart gp-api --update-env`.
+3. Register the webhook (§6). Meta shows a green tick when the GET check passes.
+4. **Notification:** turn on "Also notify me on WhatsApp" for your account, have a second account send you an interest, then:
+   ```sql
+   SELECT created_at, notification_type, status, delivered_at, read_at, error_message
+     FROM notification_deliveries ORDER BY created_at DESC LIMIT 10;
+   ```
+5. **Delivery report:** a few seconds after the message arrives, `status` should change from `sent` to `delivered`. That proves the webhook and its signature check work.
+   ```bash
+   pm2 logs gp-api --lines 200 --nostream | grep '\[WHATSAPP\]'
+   ```
+
+## 9. Token security and rotation
+
+- The access token and app secret are read from the environment by the API only. They are sent to Meta in the `Authorization` header over HTTPS, and never appear in a URL, a log line, an error message, the database or the web apps.
+- Use a **system-user** token, not a personal one, so it does not die when someone leaves or changes their password. Give the system user only this app and this WABA.
+- **Rotate** by generating a new token for the same system user, putting it in the env file, running `pm2 restart gp-api --update-env`, checking a notification arrives, then revoking the old token in Business Settings.
+- **If a token or the app secret leaks:** revoke the token (or reset the app secret) in Meta immediately, set the new value, restart. Resetting the app secret invalidates webhook signatures until the API has the new one; Meta retries reports for 36 hours.
+- Changing the verify token only matters the next time you edit the webhook in Meta.
+
+## 10. Troubleshooting
+
+Failure reasons are stored and logged as `[E<code>] <Meta's text>`.
+
+| Symptom | Likely cause |
+| --- | --- |
+| API will not start: "META_WHATSAPP_… is required when Meta WhatsApp is used" | A variable from §3 is missing |
+| `[E190]` | Access token expired or revoked. Generate a new system-user token |
+| `[E10]` / `[E200]`–`[E299]` | The token lacks permission, or the system user is not assigned the WABA |
+| `[E132001]` | Template name or language code does not match an approved template |
+| `[E132000]` / `[E132012]` | The template's parameters do not match: a notification template must have no variables |
+| `[E132015]` / `[E132016]` | Template paused or disabled by Meta for low quality. Edit it or create a new one |
+| `[E133010]` | The number is not registered for the Cloud API (§2) |
+| `[E131026]` (in a delivery report) | Recipient cannot receive it: not on WhatsApp, very old app version, or has not accepted WhatsApp's terms |
+| `[E131047]` | Not a template message. Should not happen: only templates are sent |
+| `[E131048]` | Meta is restricting the number for spam or low quality. Check quality in WhatsApp Manager |
+| `[E130429]`, `[E131056]`, `[E80007]`, `[E4]` | Rate limits. The API retries twice, then fails the send |
+| `[E131049]` (in a delivery report) | Meta chose not to deliver (per-user marketing limits). A sign the template was classed as marketing |
+| "Meta did not answer in time" | No answer in 8 seconds, or the server cannot reach `graph.facebook.com` on port 443. Not retried, because the message may already have been accepted |
+| Webhook check fails in Meta | Wrong verify token, API not reachable on HTTPS, or Meta not configured so the route does not exist (404) |
+| Messages arrive but status stays `sent` | Webhook not registered, the `messages` field not subscribed, or the app secret is wrong (look for 401s on the webhook path in `api_logs`) |
+| No row in `notification_deliveries` | WhatsApp off, the member has not opted in, no template for that type, that notification type switched off by the member, or the account is banned |
+
+## 11. Rollback and recovery
+
+- **A bad deploy:** `deploy/scripts/rollback.sh` returns to the previous release. The migration adds columns and one allowed status only, so the previous code runs against the migrated database without undoing it.
+- **Undoing the migration** is possible (`db:migrate:undo`); it turns `read` rows back into `delivered` and drops the new columns. Only needed if you abandon the feature.
+- **Meta is down or the number is restricted:** notifications keep working in the app. Login does not: there is no second channel for codes. The fastest recovery is fixing the Meta side; an SMS fallback would be new work.
+- **Going back to MSG91** is not a configuration switch: that code was removed. It is in git history (the commit before this change) and on the `feature/SMS-otp` branch.
+
+## 12. What replaced MSG91
+
+| Before (MSG91) | Now (Meta) |
+| --- | --- |
+| `SMS_PROVIDER=msg91` (SMS login codes) | Firebase Phone Authentication (SMS login codes): [guide](../auth/firebase-phone-auth.md) |
+| `MESSAGING_PROVIDER=msg91` (SMS and WhatsApp notifications) | `MESSAGING_PROVIDER=meta` (WhatsApp notifications) |
+| `MSG91_AUTH_KEY`, `MSG91_OTP_TEMPLATE_ID`, `MSG91_SMS_TEMPLATE_IDS`, `MSG91_WHATSAPP_NUMBER`, `MSG91_WHATSAPP_TEMPLATES`, `MSG91_WHATSAPP_LANGUAGE`, `MSG91_WHATSAPP_NAMESPACE` | Removed. See §3 |
+| No delivery results | Webhook: sent, delivered, read, failed |
+| No consent setting | WhatsApp opt-in per member |
+
+Removed: `providers/msg91/`, `providers/sms/msg91.sms.ts`, `providers/messaging/msg91.provider.ts`, their tests and `docs/notifications/msg91.md`. MSG91 was called over plain HTTP, so no package was uninstalled. `providers/sms/` became `providers/otp/`.
+
+**The app itself sends no SMS.** Login codes are sent by Firebase ([guide](../auth/firebase-phone-auth.md)); notifications go in the app and, for members who opted in, on WhatsApp. The `sms` channel value remains in the database schema because old rows use it, and `SMS_ENABLED` still works with the development `log` provider, but no provider sends real SMS.
+
+Old `notification_deliveries` rows with `provider = 'msg91'` are kept as history. Remove any `MSG91_*` lines from your env files: they are ignored, but the auth key is a credential you should also revoke in MSG91.
+
+## 13. Tests
+
+- `apps/api/src/providers/meta/whatsapp.client.test.ts`: request format for notification templates, the configured API version, refusals, rate limits and retries, no retry after a timeout, signature verification, the stored message reference, and the start-up rules.
+- `apps/api/src/modules/whatsapp/whatsapp-webhook.int.test.ts` (needs `TEST_DATABASE_URL`): notifications with and without opt-in, the webhook GET check, valid and invalid signatures, duplicate and out-of-order reports, failure reasons, and reports that must be ignored.
+- `apps/api/src/modules/auth/auth.int.test.ts`: member sign-in, which no longer involves Meta ([Firebase guide §13](../auth/firebase-phone-auth.md#13-testing)).
+
+## 14. Limitations
+
+- **Not verified with a real Meta account** (see the note at the top).
+- **WhatsApp is not used for sign-in.** A member without WhatsApp signs in normally (SMS) and gets notifications in the app only.
+- **Failed sends are not retried later.** Only throttling and temporary Meta faults are retried, twice, straight away.
+- **Templates are managed by hand** in WhatsApp Manager; the app does not create or check them. A wrong name fails at send time, not at start-up.
+- **Incoming WhatsApp messages are ignored.** Replies to a notification are not read or answered.
+- **Changing the Phone Number ID** orphans delivery reports for messages sent from the old one.

@@ -1,88 +1,57 @@
-# OTP Flow
+# Sign-in flow (phone number + SMS code)
 
-> Related: [Authentication](authentication.md), [Session management](session-management.md), [User flows §2](../product/user-flows.md#2-authentication-flow)
+> Related: [Firebase Phone Authentication](firebase-phone-auth.md) (setup, API, security, troubleshooting), [Authentication](authentication.md), [Session management](session-management.md)
 
-## 1. Sequence
+Members sign in with their mobile number and a 6-digit code sent by SMS. **Firebase Phone Authentication** sends and checks the code; our API then verifies Firebase's proof and starts the session. This page is the short version: the full description is in the [Firebase guide](firebase-phone-auth.md).
 
-```mermaid
-sequenceDiagram
-    actor U as Member
-    participant W as Web app
-    participant A as API
-    participant DB as PostgreSQL
-    participant S as SMS provider
+> This replaced the earlier flow in which the API generated the code and sent it on WhatsApp (and, before that, by SMS through MSG91). That code was removed. WhatsApp is still used for [notifications](../notifications/meta-whatsapp.md).
 
-    U->>W: Enter mobile number
-    W->>A: POST /auth/send-otp {phone}
-    A->>A: Normalise to E.164, phone_hash = HMAC(PHONE_HASH_SECRET)
-    A->>DB: BEGIN; pg_advisory_xact_lock(phone_hash)
-    A->>DB: Check cooldown + per-phone + per-IP windows
-    A->>DB: Invalidate previous active code
-    A->>DB: INSERT otp_requests (otp_hash = HMAC(OTP_HMAC_SECRET, phone_hash:code))
-    A->>DB: COMMIT
-    A->>S: sendOtp(phone, code) (skipped for banned numbers)
-    A-->>W: 200 {expiresInSeconds, resendAvailableInSeconds[, devOtp]}
-    U->>W: Enter 6-digit code
-    W->>A: POST /auth/verify-otp {phone, code}
-    A->>DB: BEGIN; SELECT active code FOR UPDATE
-    A->>A: Expired? attempts ≥ 5? constant-time compare
-    A->>DB: Record attempt / consume code
-    A->>DB: Find or create user; create session
-    A->>DB: COMMIT
-    A-->>W: 200 {accessToken, user} + Set-Cookie gp_rt
-```
+## 1. Steps
+
+1. **Phone screen** (`/login`). The member enters an Indian mobile number. It is validated and converted to `+91…`.
+2. **Security check.** Google reCAPTCHA runs, usually without the member seeing anything.
+3. **Code sent.** Firebase sends a 6-digit code by SMS.
+4. **Code screen** (`/login/verify`). The member enters the code. Firebase checks it and gives the browser a signed ID token.
+5. **Exchange.** The browser posts only that token to `POST /api/v1/auth/phone`. The API verifies it ([what is checked](firebase-phone-auth.md#4-what-the-api-checks)), finds or creates the account by phone number, and returns the access token and the `gp_rt` refresh cookie.
+6. The browser signs out of Firebase. From here on everything is the existing session ([session management](session-management.md)).
+
+There is one flow for sign-up and login: a number that has never been seen creates an account.
 
 ## 2. Rules
 
-| Rule | Value | Source |
+| Rule | Value | Enforced by |
 |---|---|---|
-| Code | 6 digits from `crypto.randomInt` | `LIMITS.OTP_LENGTH` |
-| Lifetime | 5 minutes | `LIMITS.OTP_TTL_SECONDS` |
-| Attempts per code | 5, after which the code is invalidated | `LIMITS.OTP_MAX_ATTEMPTS` |
-| Resend cooldown | 30 s per number | `LIMITS.OTP_RESEND_COOLDOWN_SECONDS` |
-| Per number | 5 codes/hour, 10 codes/day | `LIMITS.OTP_MAX_PER_PHONE_PER_*` |
-| Per IP | 20 codes/hour | `LIMITS.OTP_MAX_PER_IP_PER_HOUR` |
-| Active codes | At most one per number. A new code invalidates the previous one (DB partial unique index) | `otp_requests_one_active_per_phone_unique` |
-| Single use | A consumed code can never be used again | `consumed_at` |
+| Code length | 6 digits (`LIMITS.OTP_LENGTH`) | Firebase |
+| Code lifetime, wrong-attempt limit, sends per number | Firebase's own limits | Firebase |
+| Resend | Available 30 s after a send (`LIMITS.OTP_RESEND_COOLDOWN_SECONDS`); only the newest code works | Web app + Firebase |
+| Supported numbers | Indian mobile numbers (+91) | Web app, and again by the API |
+| Proof must be fresh | The code must have been verified at most 5 minutes before the exchange (`LIMITS.PHONE_TOKEN_MAX_AGE_SECONDS`) | API |
+| Exchanges per IP | 30 per 15 minutes (`LIMITS.PHONE_LOGINS_PER_IP_PER_15_MIN`) | API |
 
-Why 5 attempts × 5 codes/hour is enough: an attacker gets at most 25 guesses per hour against a 1,000,000-code space (≈ 0.0025% per hour), and every guess is logged against the number.
+## 3. What our API no longer does
 
-## 3. Storage and privacy
+- It does not generate, store, send or compare login codes. It never sees one.
+- The `otp_requests` table is no longer written or read (it is kept; see [schema](../database/schema.md)).
+- `POST /auth/send-otp` and `POST /auth/verify-otp` are gone (404).
 
-- `otp_requests` stores `phone_hash`, `otp_hash` (HMAC-SHA256 keyed with `OTP_HMAC_SECRET` over `phone_hash:code`), `attempts`, `expires_at`, `consumed_at`, `invalidated_at` and `ip_hash`. **The code and the phone number are never stored.**
-- Codes are compared with `crypto.timingSafeEqual`.
-- **Codes are never logged.** The logger has redaction paths for `otp`, `code`, `phone`, `password` and `token`, request bodies aren't logged, and the development provider logs nothing. The end-to-end check in this phase confirmed that neither the code nor the phone number appears in the API log.
-- Wrong attempts are **persisted even though the request fails**: the verification transaction returns an outcome, and the error is thrown only after it commits.
-- Rows are purged after 24 hours (scheduled job, worker phase).
+## 4. Development
 
-## 4. Development OTP mechanism
+There is no on-screen development code and no bypass: the API always requires a real Firebase token. For local work, add a **test phone number** in the Firebase console and sign in with it and its fixed code; no SMS is sent ([guide §7](firebase-phone-auth.md#7-local-development)).
 
-| | Development | Staging / Production |
-|---|---|---|
-| `SMS_PROVIDER` | `dev` | a real provider (added before launch) |
-| SMS sent | No | Yes |
-| Code in `send-otp` response (`devOtp`) | **Yes**, shown on the OTP screen in a "Development only" banner | **Never** |
-| Guards | — | 1. `loadServerEnv()` **refuses to start** with `SMS_PROVIDER=dev` unless `APP_ENV=development`. 2. The service only adds `devOtp` when the provider is the dev provider **and** `APP_ENV === 'development'`. 3. A test asserts `devOtp` is absent when a delivering provider is used, and another asserts the env guard |
+Automated tests replace Firebase with a stand-in and never send an SMS ([guide §13](firebase-phone-auth.md#13-testing)).
 
-The dev provider never writes the code to logs or files. The only place it appears is the HTTP response to the requester in local development.
+## 5. Messages the member can see
 
-## 5. Account handling at verification
-
-| Account state | Result |
+| Situation | Message |
 |---|---|
-| No account | Created (`status = active`, onboarding incomplete) and logged in |
-| `active` | Logged in |
-| `suspended` / `pending_deletion` | Logged in. The app shows the status notice, and social features are blocked by `requireActiveMember` |
-| `banned` | `403 ACCOUNT_BANNED`, no session. `send-otp` looks identical but sends no SMS |
-| Soft-deleted (erased) | Phone data is gone, so the number starts a fresh account |
+| Not a valid Indian mobile number | Enter a valid 10-digit Indian mobile number. |
+| Wrong code | That code is not correct. Please check it and try again. |
+| Code expired, or an older code after a resend | This code has expired. Please request a new one. |
+| Too many attempts | Too many attempts. Please wait a while and try again. |
+| reCAPTCHA failed, blocked or dismissed | The security check did not complete. Turn off any content blocker for this site and try again. |
+| No connection | Check your internet connection and try again. |
+| A set-up problem on our side | Sign-in is unavailable right now. Please try again later. (Code: …) |
+| The API refused the proof | We could not verify your phone number. Please request a new code. |
+| Banned account | The existing `ACCOUNT_BANNED` message |
 
-## 6. Edge cases
-
-| Case | Behaviour |
-|---|---|
-| Two send-otp requests at once for one number | Serialised by `pg_advisory_xact_lock`. The second hits the cooldown (429) |
-| Verify without ever requesting | `400 OTP_INVALID` ("request a new one") |
-| Correct code after 5 wrong attempts | Rejected. The code was invalidated |
-| Same code submitted twice concurrently | The row lock serialises them. The second finds no active code (400) |
-| Resend while a code is active | The old code is invalidated, and only the newest code works |
-| Clock | All timestamps come from the API server (`timestamptz`, UTC) |
+Firebase's own error objects are never shown ([troubleshooting](firebase-phone-auth.md#11-troubleshooting)).

@@ -100,10 +100,7 @@ export function Navbar({ tabBar = true }: { tabBar?: boolean }) {
         <div
           className={cx('mx-auto flex h-16 max-w-page items-center gap-2 lg:gap-6', PAGE_GUTTER)}
         >
-          <Link
-            to={authenticated ? '/' : '/events'}
-            className="mr-auto flex min-h-11 shrink-0 items-center rounded-lg lg:mr-0"
-          >
+          <Link to="/" className="mr-auto flex min-h-11 shrink-0 items-center rounded-lg lg:mr-0">
             <Logo className="h-9 sm:h-10" />
           </Link>
 

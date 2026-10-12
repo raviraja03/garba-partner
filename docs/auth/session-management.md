@@ -21,7 +21,7 @@
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Active: verify-otp / admin login
+    [*] --> Active: auth/phone / admin login
     Active --> Active: refresh (token rotated)
     Active --> Revoked: logout / logout all devices
     Active --> Revoked: reuse of a rotated token detected

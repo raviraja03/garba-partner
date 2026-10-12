@@ -12,8 +12,7 @@ export function createMemberAuthRouter(deps: {
   const { controller, authenticateMember, csrf, limiters } = deps;
   const router = Router();
 
-  router.post('/send-otp', limiters.sendOtp, controller.sendOtp);
-  router.post('/verify-otp', limiters.verifyOtp, controller.verifyOtp);
+  router.post('/phone', limiters.phoneLogin, controller.phoneLogin);
   router.post('/refresh', limiters.refresh, csrf, controller.refresh);
   router.post('/logout', authenticateMember, controller.logout);
   router.get('/me', authenticateMember, controller.me);

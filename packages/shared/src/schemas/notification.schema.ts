@@ -18,8 +18,9 @@ export const notificationListQuerySchema = z.strictObject({
 export type NotificationListQueryData = z.output<typeof notificationListQuerySchema>;
 
 /**
- * `PUT /api/v1/notifications/preferences`: any subset of the configurable types. `safety` is not
- * accepted: safety notifications can't be turned off.
+ * `PUT /api/v1/notifications/preferences`: any subset of the configurable types, and/or
+ * `whatsapp` (consent to be notified on WhatsApp). `safety` is not accepted: safety
+ * notifications can't be turned off.
  */
 export const updateNotificationPreferencesSchema = z
   .strictObject({
@@ -29,6 +30,8 @@ export const updateNotificationPreferencesSchema = z
     new_message: z.optional(z.boolean()),
     verification_completed: z.optional(z.boolean()),
     event_reminder: z.optional(z.boolean()),
+    /** Consent to receive notifications on WhatsApp (off by default). */
+    whatsapp: z.optional(z.boolean()),
   })
   .check(z.refine((value) => Object.keys(value).length > 0, 'Change at least one preference.'));
 export type UpdateNotificationPreferencesInput = z.input<

@@ -15,6 +15,7 @@ import {
   hasTestDatabase,
   loginAdmin,
   loginMember,
+  fakePhoneToken,
   newTestPhone,
   uniqueIp,
   useTestDatabase,
@@ -359,11 +360,11 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
         (await call('get', '/notifications?limit[$gt]=1').set(bearer(member.accessToken))).status,
       ).toBe(400);
       // Malformed and oversized JSON.
-      const bad = await call('post', '/auth/send-otp')
+      const bad = await call('post', '/auth/phone')
         .set('Content-Type', 'application/json')
-        .send('{"phone":');
+        .send('{"idToken":');
       expect(bad.status).toBe(400);
-      const huge = await call('post', '/auth/send-otp').send({ phone: 'x'.repeat(200_000) });
+      const huge = await call('post', '/auth/phone').send({ idToken: 'x'.repeat(200_000) });
       expect(huge.status).toBe(413);
     });
 
@@ -449,10 +450,9 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
   describe('CSRF', () => {
     it('protects the cookie-authenticated refresh endpoints', async () => {
       const phone = newTestPhone();
-      const sent = await call('post', '/auth/send-otp').set('X-Forwarded-For', ip).send({ phone });
-      const verified = await call('post', '/auth/verify-otp')
+      const verified = await call('post', '/auth/phone')
         .set('X-Forwarded-For', ip)
-        .send({ phone, code: sent.body.data.devOtp as string });
+        .send({ idToken: fakePhoneToken(phone) });
       const cookie = verified.headers['set-cookie'] as unknown as string[];
       expect(cookie.join(';')).toMatch(/HttpOnly/i);
       expect(cookie.join(';')).toMatch(/SameSite=Strict/i);
@@ -480,41 +480,30 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
   });
 
   describe('rate-limit bypass', () => {
-    it('limits OTPs per phone number even from rotating IP addresses', async () => {
-      const phone = newTestPhone();
-      const statuses: number[] = [];
-      for (let i = 0; i < 7; i += 1) {
-        statuses.push(
-          (await call('post', '/auth/send-otp').set('X-Forwarded-For', uniqueIp()).send({ phone }))
-            .status,
-        );
+    it('limits sign-in attempts per address, whatever the token or number', async () => {
+      const attacker = uniqueIp();
+      const attempt = (idToken: string, from = attacker) =>
+        call('post', '/auth/phone').set('X-Forwarded-For', from).send({ idToken });
+
+      // Made-up tokens never sign anyone in…
+      for (let i = 0; i < LIMITS.PHONE_LOGINS_PER_IP_PER_15_MIN; i += 1) {
+        const res = await attempt(`${'x'.repeat(200)}${String(i)}`);
+        expect(res.status).toBe(401);
+        expect(res.body.error.code).toBe('PHONE_VERIFICATION_FAILED');
       }
-      expect(statuses).toContain(429);
-      // Formatting variations are the same number.
-      const variant = await call('post', '/auth/send-otp')
-        .set('X-Forwarded-For', uniqueIp())
-        .send({ phone: `+91 ${phone.slice(0, 5)} ${phone.slice(5)}` });
-      expect(variant.status).toBe(429);
+      // …and after the limit, the address is refused even with a genuine one.
+      const blocked = await attempt(fakePhoneToken(newTestPhone()));
+      expect(blocked.status).toBe(429);
+      // Other addresses are unaffected.
+      expect((await attempt(fakePhoneToken(newTestPhone()), uniqueIp())).status).toBe(200);
     });
 
-    it('limits OTP guessing per code, whatever the IP address', async () => {
+    it('the retired code endpoints cannot be used to sign in', async () => {
       const phone = newTestPhone();
-      const sent = await call('post', '/auth/send-otp').set('X-Forwarded-For', ip).send({ phone });
-      const real = sent.body.data.devOtp as string;
-      const wrong = real === '111111' ? '222222' : '111111';
-      const codes: string[] = [];
-      for (let i = 0; i < 6; i += 1) {
-        const res = await call('post', '/auth/verify-otp')
-          .set('X-Forwarded-For', uniqueIp())
-          .send({ phone, code: wrong });
-        codes.push(res.body.error.code as string);
-      }
-      expect(codes).toContain('OTP_ATTEMPTS_EXCEEDED');
-      // The code is burnt: even the right code no longer works.
-      const late = await call('post', '/auth/verify-otp')
-        .set('X-Forwarded-For', uniqueIp())
-        .send({ phone, code: real });
-      expect(late.status).toBe(400);
+      expect((await call('post', '/auth/send-otp').send({ phone })).status).toBe(404);
+      expect((await call('post', '/auth/verify-otp').send({ phone, code: '123456' })).status).toBe(
+        404,
+      );
     });
   });
 
@@ -629,7 +618,7 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
         await call('get', '/auth/me').set(bearer(member.accessToken)),
         await call('get', '/me/profile').set(bearer(member.accessToken)),
         await call('get', '/notifications').set(bearer(member.accessToken)),
-        await call('post', '/auth/send-otp').set('X-Forwarded-For', ip).send({ phone: 'bad' }),
+        await call('post', '/auth/phone').set('X-Forwarded-For', ip).send({ idToken: 'bad' }),
         await call('get', '/admin/auth/me').set(bearer(admin.accessToken)),
         await call('get', '/admin/users').set(bearer(admin.accessToken)),
       ];
@@ -643,7 +632,7 @@ describe.skipIf(!hasTestDatabase)('security (integration)', () => {
     it('allows only our origins, methods and headers in CORS', async () => {
       const preflight = (origin: string, method = 'POST', headers = 'content-type') =>
         request(app)
-          .options('/api/v1/auth/send-otp')
+          .options('/api/v1/auth/phone')
           .set('Origin', origin)
           .set('Access-Control-Request-Method', method)
           .set('Access-Control-Request-Headers', headers);

@@ -81,6 +81,8 @@ Model `defaultScope` excludes `phone_hash`, `phone_encrypted` and `phone_key_ver
 
 #### `otp_requests`
 
+> **No longer used.** Sign-in moved to Firebase Phone Authentication ([guide](../auth/firebase-phone-auth.md)), which sends and checks the code. The table is kept but nothing writes or reads it. The description below is historical.
+
 | Column | Type | Notes |
 |---|---|---|
 | `id` | uuid PK | |

@@ -1,20 +1,23 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router';
-import { LIMITS, maskPhone, type SendOtpResultDto } from '@garba-partner/shared';
+import { LIMITS, maskPhone } from '@garba-partner/shared';
 import { AuthLayout } from '../components/AuthLayout';
 import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { INPUT_CLASS } from '../components/ui/field-utils';
-import { sendOtp, verifyOtp } from '../features/auth/auth-api';
+import { loginWithPhone } from '../features/auth/auth-api';
 import { useAuth } from '../features/auth/auth-context';
+import { phoneSignIn } from '../features/auth/firebase-phone-sdk';
+import { PhoneSignInError, type PendingCode } from '../features/auth/phone-sign-in';
 import { ApiClientError } from '../lib/api-client';
 
 /** Router state handed over by the login page (kept in memory, never in the URL). */
 export interface OtpPageState {
-  phone: string;
-  result: SendOtpResultDto;
   from?: string;
 }
+
+const secondsUntilResend = (sentAt: number) =>
+  Math.max(0, LIMITS.OTP_RESEND_COOLDOWN_SECONDS - Math.floor((Date.now() - sentAt) / 1000));
 
 function useCountdown(seconds: number) {
   const [remaining, setRemaining] = useState(seconds);
@@ -32,21 +35,22 @@ function useCountdown(seconds: number) {
 
 export function VerifyOtpPage() {
   const location = useLocation();
-  const state = location.state as OtpPageState | null;
-  if (!state?.phone) return <Navigate to="/login" replace />;
-  return <VerifyOtpForm initial={state} />;
+  // The pending code lives in memory only: after a reload there is nothing to verify.
+  const [pending] = useState(() => phoneSignIn.pending());
+  if (!pending) return <Navigate to="/login" replace />;
+  const from = (location.state as OtpPageState | null)?.from;
+  return <VerifyOtpForm pending={pending} {...(from ? { from } : {})} />;
 }
 
-function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
+function VerifyOtpForm({ pending, from }: { pending: PendingCode; from?: string }) {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [code, setCode] = useState('');
-  const [devOtp, setDevOtp] = useState(initial.result.devOtp);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [resending, setResending] = useState(false);
-  const [resendIn, setResendIn] = useCountdown(initial.result.resendAvailableInSeconds);
+  const [resendIn, setResendIn] = useCountdown(secondsUntilResend(pending.sentAt));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,17 +60,23 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
     }
     setSubmitting(true);
     setError(null);
+    setInfo(null);
     try {
-      const session = await verifyOtp({ phone: initial.phone, code });
+      // 1. Firebase checks the code. 2. Our API verifies Firebase's token and starts the session.
+      const idToken = await phoneSignIn.confirmCode(code);
+      const session = await loginWithPhone({ idToken });
       signIn(session);
-      await navigate(initial.from ?? '/', { replace: true });
+      // Firebase has done its part: sign out of it and remove the reCAPTCHA.
+      void phoneSignIn.reset();
+      await navigate(from ?? '/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
-      if (
-        err instanceof ApiClientError &&
-        (err.code === 'OTP_EXPIRED' || err.code === 'OTP_ATTEMPTS_EXCEEDED')
-      ) {
+      const needsNewCode =
+        (err instanceof PhoneSignInError && err.problem === 'code_expired') ||
+        (err instanceof ApiClientError && err.code === 'PHONE_VERIFICATION_FAILED');
+      if (needsNewCode) {
         setCode('');
+        setResendIn(0);
       }
     } finally {
       setSubmitting(false);
@@ -78,9 +88,8 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
     setError(null);
     setInfo(null);
     try {
-      const result = await sendOtp({ phone: initial.phone });
-      setDevOtp(result.devOtp);
-      setResendIn(result.resendAvailableInSeconds);
+      const sent = await phoneSignIn.requestCode(pending.phone);
+      setResendIn(secondsUntilResend(sent.sentAt));
       setCode('');
       setInfo('A new code is on its way.');
     } catch (err) {
@@ -95,20 +104,11 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
       title="Enter your code"
       subtitle={
         <>
-          We sent a {LIMITS.OTP_LENGTH}-digit code to <strong>{maskPhone(initial.phone)}</strong>.
-          Never share this code with anyone.
+          We sent a {LIMITS.OTP_LENGTH}-digit code by SMS to{' '}
+          <strong>{maskPhone(pending.phone)}</strong>. Never share this code with anyone.
         </>
       }
     >
-      {devOtp && (
-        <div className="mb-5">
-          <Alert tone="warning">
-            <strong>Development only:</strong> no SMS is sent locally. Your code is{' '}
-            <code className="font-mono font-bold tracking-widest">{devOtp}</code>
-          </Alert>
-        </div>
-      )}
-
       <form onSubmit={(event) => void handleSubmit(event)} noValidate className="space-y-5">
         <div>
           <label htmlFor="otp" className="block text-label">
@@ -140,7 +140,7 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
 
         {info && <Alert tone="success">{info}</Alert>}
 
-        <Button type="submit" size="lg" loading={submitting}>
+        <Button type="submit" size="lg" loading={submitting} disabled={resending}>
           Verify and continue
         </Button>
       </form>
@@ -148,15 +148,18 @@ function VerifyOtpForm({ initial }: { initial: OtpPageState }) {
       <div className="mt-4 flex flex-wrap items-center justify-between gap-x-4">
         <Button
           variant="link"
+          disabled={submitting}
           onClick={() => {
-            void navigate('/login', { replace: true });
+            // The login page forgets this code and removes its reCAPTCHA when it opens.
+            void navigate('/login', { replace: true, state: from ? { from } : null });
           }}
         >
           Change number
         </Button>
         <Button
           variant="link"
-          disabled={resendIn > 0 || resending}
+          disabled={resendIn > 0 || resending || submitting}
+          loading={resending}
           onClick={() => {
             void handleResend();
           }}

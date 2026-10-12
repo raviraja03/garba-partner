@@ -8,8 +8,8 @@ import {
   MEMBER_REFRESH_COOKIE,
 } from '@garba-partner/shared';
 import { encryptString, hashPhone } from '../../lib/crypto.js';
-import { OtpRequest, User, UserSession } from '../../models/index.js';
-import type { SmsProvider } from '../../providers/sms/index.js';
+import { User, UserSession } from '../../models/index.js';
+import { createFirebaseTestIssuer, type IdTokenOptions } from '../../test/firebase-tokens.js';
 import {
   createTestApp,
   createTestEnv,
@@ -34,19 +34,25 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
   const db = useTestDatabase();
   let app: Express;
   let ip: string;
+  /** Issues ID tokens the way Firebase does; the app runs the REAL verifier against its keys. */
+  let firebase: Awaited<ReturnType<typeof createFirebaseTestIssuer>>;
 
-  beforeAll(() => {
-    app = createTestApp({ sequelize: db(), env });
+  beforeAll(async () => {
+    firebase = await createFirebaseTestIssuer();
+    app = createTestApp({ sequelize: db(), env, phoneTokens: firebase.verifier() });
   });
   beforeEach(() => {
     ip = uniqueIp();
   });
 
-  const sendOtp = (phone: string) =>
-    request(app).post('/api/v1/auth/send-otp').set('X-Forwarded-For', ip).send({ phone });
-
-  const verifyOtp = (phone: string, code: string) =>
-    request(app).post('/api/v1/auth/verify-otp').set('X-Forwarded-For', ip).send({ phone, code });
+  /** What the browser does after Firebase confirms the SMS code: post the ID token, nothing else. */
+  const phoneLogin = (idToken: unknown, extra: Record<string, unknown> = {}) =>
+    request(app)
+      .post('/api/v1/auth/phone')
+      .set('X-Forwarded-For', ip)
+      .send({ idToken, ...extra });
+  const tokenFor = (phone: string, options: IdTokenOptions = {}) =>
+    firebase.idToken({ phone: `+91${phone}`, ...options });
 
   const refresh = (cookie: string | undefined) => {
     const req = request(app)
@@ -61,9 +67,7 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
 
   /** Full login; returns the access token and refresh cookie. */
   async function login(phone = newPhone()) {
-    const sent = await sendOtp(phone);
-    expect(sent.status).toBe(200);
-    const res = await verifyOtp(phone, sent.body.data.devOtp as string);
+    const res = await phoneLogin(await tokenFor(phone));
     expect(res.status).toBe(200);
     const cookie = getCookie(res, MEMBER_REFRESH_COOKIE);
     expect(cookie).toBeDefined();
@@ -75,96 +79,23 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
     };
   }
 
-  /** A syntactically valid code that is NOT the issued one. */
-  const wrongCode = (code: string) => String((Number(code) + 1) % 1_000_000).padStart(6, '0');
+  const expectRefused = async (idToken: string, message?: string) => {
+    const res = await phoneLogin(idToken);
+    expect(res.status).toBe(401);
+    expect(res.body.error.code).toBe('PHONE_VERIFICATION_FAILED');
+    expect(res.body.message).toBe(
+      message ?? 'We could not verify your phone number. Please request a new code.',
+    );
+    expect(getCookie(res, MEMBER_REFRESH_COOKIE)).toBeUndefined();
+    expect(await User.count()).toBe(0);
+    expect(await UserSession.count()).toBe(0);
+  };
 
-  describe('POST /auth/send-otp', () => {
-    it('stores only an HMAC of the code and returns the dev code in development', async () => {
+  describe('POST /auth/phone', () => {
+    it('valid token: signs a new member up, creates the session, sets a secure refresh cookie', async () => {
       const phone = newPhone();
-      const res = await sendOtp(phone);
 
-      expect(res.status).toBe(200);
-      expect(res.body.data).toMatchObject({
-        expiresInSeconds: LIMITS.OTP_TTL_SECONDS,
-        resendAvailableInSeconds: LIMITS.OTP_RESEND_COOLDOWN_SECONDS,
-      });
-      const code = res.body.data.devOtp as string;
-      expect(code).toMatch(/^\d{6}$/);
-
-      const rows = await OtpRequest.findAll();
-      expect(rows).toHaveLength(1);
-      expect(rows[0]?.otpHash).not.toContain(code);
-      expect(rows[0]?.phoneHash).toBe(hashPhone(`+91${phone}`, env.PHONE_HASH_SECRET));
-      expect(JSON.stringify(rows[0]?.toJSON())).not.toContain(phone);
-    });
-
-    it('never returns the code when a real provider delivers it', async () => {
-      const delivered: string[] = [];
-      const smsProvider: SmsProvider = {
-        name: 'recording',
-        exposesCodeInResponse: false,
-        sendOtp: (_phone, code) => {
-          delivered.push(code);
-          return Promise.resolve();
-        },
-      };
-      const smsApp = createTestApp({ sequelize: db(), env, sms: smsProvider });
-
-      const res = await request(smsApp)
-        .post('/api/v1/auth/send-otp')
-        .set('X-Forwarded-For', ip)
-        .send({ phone: newPhone() });
-
-      expect(res.status).toBe(200);
-      expect(res.body.data).not.toHaveProperty('devOtp');
-      expect(delivered).toHaveLength(1);
-      expect(JSON.stringify(res.body)).not.toContain(delivered[0]);
-    });
-
-    it('rejects the development provider outside APP_ENV=development', () => {
-      expect(() => createTestEnv({ APP_ENV: 'staging' })).toThrow(/SMS_PROVIDER/);
-    });
-
-    it('rejects an invalid phone number with VALIDATION_ERROR', async () => {
-      const res = await sendOtp('12345');
-
-      expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('VALIDATION_ERROR');
-      expect(res.body.error.details[0].path).toBe('phone');
-    });
-
-    it('enforces the resend cooldown with 429 and Retry-After', async () => {
-      const phone = newPhone();
-      expect((await sendOtp(phone)).status).toBe(200);
-
-      const res = await sendOtp(phone);
-
-      expect(res.status).toBe(429);
-      expect(res.body.error.code).toBe('RATE_LIMITED');
-      expect(Number(res.headers['retry-after'])).toBeGreaterThan(0);
-    });
-
-    it('gives the same response shape for new and existing numbers', async () => {
-      const { phone } = await login();
-      await OtpRequest.destroy({ where: {} }); // skip the cooldown for this assertion
-
-      const existing = await sendOtp(phone);
-      const fresh = await sendOtp(newPhone());
-
-      expect(existing.status).toBe(fresh.status);
-      expect(Object.keys(existing.body.data as object).sort()).toEqual(
-        Object.keys(fresh.body.data as object).sort(),
-      );
-      expect(existing.body.message).toBe(fresh.body.message);
-    });
-  });
-
-  describe('POST /auth/verify-otp', () => {
-    it('valid OTP: logs in, creates the user and session, sets a secure refresh cookie', async () => {
-      const phone = newPhone();
-      const code = (await sendOtp(phone)).body.data.devOtp as string;
-
-      const res = await verifyOtp(phone, code);
+      const res = await phoneLogin(await tokenFor(phone));
 
       expect(res.status).toBe(200);
       expect(res.body.data.accessToken).toEqual(expect.any(String));
@@ -182,75 +113,109 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
 
       expect(await User.count()).toBe(1);
       expect(await UserSession.count()).toBe(1);
+      const user = await User.scope('withPhone').findOne();
+      // Stored exactly as before: a hash to look the number up, and the number encrypted.
+      expect(user?.phoneHash).toBe(hashPhone(`+91${phone}`, env.PHONE_HASH_SECRET));
+      expect(user?.phoneEncrypted).not.toContain(phone);
       const session = await UserSession.findOne();
       const cookieValue = getCookie(res, MEMBER_REFRESH_COOKIE)?.split('=')[1] ?? '';
       expect(session?.refreshTokenHash).not.toBe(cookieValue); // only a hash is stored
     });
 
-    it('logs an existing number into the same account', async () => {
-      const first = await login();
-      await OtpRequest.destroy({ where: {} });
+    it('a member who signed up before the switch to Firebase keeps the same account', async () => {
+      // An account as the old OTP flow created it: phone hash + encrypted number, no Firebase ID.
+      const phone = newPhone();
+      const existing = await User.create({
+        phoneHash: hashPhone(`+91${phone}`, env.PHONE_HASH_SECRET),
+        phoneEncrypted: encryptString(`+91${phone}`, env.PHONE_ENCRYPTION_KEY),
+        phoneKeyVersion: 1,
+      });
 
-      const second = await login(first.phone);
+      const res = await phoneLogin(await tokenFor(phone, { uid: 'a-brand-new-firebase-uid' }));
 
-      expect(second.userId).toBe(first.userId);
+      expect(res.status).toBe(200);
+      expect(res.body.data.user.id).toBe(existing.id);
       expect(await User.count()).toBe(1);
     });
 
-    it('invalid OTP: 400 OTP_INVALID, attempt recorded, remaining attempts reported', async () => {
-      const phone = newPhone();
-      const code = (await sendOtp(phone)).body.data.devOtp as string;
-
-      const res = await verifyOtp(phone, wrongCode(code));
-
-      expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('OTP_INVALID');
-      expect(res.body.message).toContain(`${String(LIMITS.OTP_MAX_ATTEMPTS - 1)} attempt`);
-      expect((await OtpRequest.findOne())?.attempts).toBe(1);
-      expect(await UserSession.count()).toBe(0);
+    it('logs the same number into the same account every time, whatever the Firebase user ID', async () => {
+      const first = await login();
+      const again = await phoneLogin(await tokenFor(first.phone, { uid: 'another-firebase-uid' }));
+      expect(again.body.data.user.id).toBe(first.userId);
+      expect(await User.count()).toBe(1);
     });
 
-    it('expired OTP: 400 OTP_EXPIRED and the code can no longer be used', async () => {
+    it('five simultaneous first sign-ins for one number create one account', async () => {
       const phone = newPhone();
-      const code = (await sendOtp(phone)).body.data.devOtp as string;
-      await db().query(
-        `UPDATE otp_requests
-            SET created_at = now() - interval '10 minutes', expires_at = now() - interval '1 second'`,
+      const tokens = await Promise.all([1, 2, 3, 4, 5].map(() => tokenFor(phone)));
+      const results = await Promise.all(tokens.map((token) => phoneLogin(token)));
+      expect(results.map((res) => res.status)).toEqual([200, 200, 200, 200, 200]);
+      expect(new Set(results.map((res) => res.body.data.user.id as string)).size).toBe(1);
+      expect(await User.count()).toBe(1);
+    });
+
+    it('refuses a forged token (valid claims, wrong signing key)', async () => {
+      await expectRefused(await firebase.forgedIdToken({ phone: `+91${newPhone()}` }));
+    });
+
+    it('refuses an expired token', async () => {
+      await expectRefused(await tokenFor(newPhone(), { expiresInSeconds: -30 }));
+    });
+
+    it('refuses a token from another Firebase project', async () => {
+      await expectRefused(await tokenFor(newPhone(), { projectId: 'someone-elses-project' }));
+    });
+
+    it('refuses a token without a verified phone number, or not from a phone sign-in', async () => {
+      await expectRefused(await firebase.idToken({ phone: null }));
+      await expectRefused(await tokenFor(newPhone(), { provider: 'password' }));
+    });
+
+    it('refuses a genuine token that is replayed after the allowed window', async () => {
+      await expectRefused(
+        await tokenFor(newPhone(), { verifiedSecondsAgo: LIMITS.PHONE_TOKEN_MAX_AGE_SECONDS + 5 }),
       );
-
-      const res = await verifyOtp(phone, code);
-
-      expect(res.status).toBe(400);
-      expect(res.body.error.code).toBe('OTP_EXPIRED');
-      expect((await OtpRequest.findOne())?.invalidatedAt).not.toBeNull();
-      expect((await verifyOtp(phone, code)).body.error.code).toBe('OTP_INVALID');
     });
 
-    it('too many attempts: the code is invalidated, even the correct code is then rejected', async () => {
-      const phone = newPhone();
-      const code = (await sendOtp(phone)).body.data.devOtp as string;
+    it('refuses numbers outside India with a clear message', async () => {
+      await expectRefused(
+        await firebase.idToken({ phone: '+14155550123' }),
+        'Only Indian mobile numbers are supported.',
+      );
+    });
 
-      for (let attempt = 1; attempt < LIMITS.OTP_MAX_ATTEMPTS; attempt += 1) {
-        expect((await verifyOtp(phone, wrongCode(code))).body.error.code).toBe('OTP_INVALID');
+    it('takes identity from the token only: a phone, user ID or role in the body is rejected', async () => {
+      const victim = await login();
+      const attacker = newPhone();
+      const token = await tokenFor(attacker);
+
+      for (const extra of [
+        { phone: `+91${victim.phone}` },
+        { phoneNumber: `+91${victim.phone}` },
+        { uid: victim.userId },
+        { userId: victim.userId },
+        { role: 'super_admin' },
+        { isAdmin: true },
+        { phoneVerified: true },
+      ]) {
+        const res = await phoneLogin(token, extra);
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
       }
-      const last = await verifyOtp(phone, wrongCode(code));
-      expect(last.status).toBe(400);
-      expect(last.body.error.code).toBe('OTP_ATTEMPTS_EXCEEDED');
-
-      const withCorrectCode = await verifyOtp(phone, code);
-      expect(withCorrectCode.status).toBe(400);
-      expect(await UserSession.count()).toBe(0);
+      // Without the extras the same token signs in as the attacker's own number, never the victim's.
+      const own = await phoneLogin(token);
+      expect(own.status).toBe(200);
+      expect(own.body.data.user.id).not.toBe(victim.userId);
+      expect(JSON.stringify(own.body.data.user)).not.toMatch(/role|admin/i);
     });
 
-    it('a code cannot be used twice', async () => {
-      const phone = newPhone();
-      const code = (await sendOtp(phone)).body.data.devOtp as string;
-      expect((await verifyOtp(phone, code)).status).toBe(200);
-
-      const replay = await verifyOtp(phone, code);
-
-      expect(replay.status).toBe(400);
-      expect(await UserSession.count()).toBe(1);
+    it('rejects a missing or malformed token with VALIDATION_ERROR, and nonsense with 401', async () => {
+      for (const body of [undefined, null, 12345, '', 'short', 'x'.repeat(5000)]) {
+        const res = await phoneLogin(body);
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+      }
+      await expectRefused('x'.repeat(300));
     });
 
     it('banned accounts cannot log in and get no session', async () => {
@@ -261,13 +226,56 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
         phoneKeyVersion: 1,
         status: 'banned',
       });
-      const code = (await sendOtp(phone)).body.data.devOtp as string;
 
-      const res = await verifyOtp(phone, code);
+      const res = await phoneLogin(await tokenFor(phone));
 
       expect(res.status).toBe(403);
       expect(res.body.error.code).toBe('ACCOUNT_BANNED');
       expect(await UserSession.count()).toBe(0);
+    });
+
+    it('answers 503 when Google’s keys cannot be fetched, and signs nobody in', async () => {
+      const offline = createTestApp({
+        sequelize: db(),
+        env,
+        phoneTokens: firebase.verifier({
+          keys: () => Promise.reject(new TypeError('fetch failed')),
+        }),
+      });
+      const res = await request(offline)
+        .post('/api/v1/auth/phone')
+        .set('X-Forwarded-For', ip)
+        .send({ idToken: await tokenFor(newPhone()) });
+      expect(res.status).toBe(503);
+      expect(res.body.message).toBe('We could not verify your number right now. Please try again.');
+      expect(await UserSession.count()).toBe(0);
+    });
+
+    it('limits how often one address can exchange tokens', async () => {
+      const limited = createTestApp({ sequelize: db(), env, phoneTokens: firebase.verifier() });
+      const attempt = () =>
+        request(limited)
+          .post('/api/v1/auth/phone')
+          .set('X-Forwarded-For', ip)
+          .send({ idToken: 'x'.repeat(300) });
+      for (let i = 0; i < LIMITS.PHONE_LOGINS_PER_IP_PER_15_MIN; i += 1) {
+        expect((await attempt()).status).toBe(401);
+      }
+      const blocked = await attempt();
+      expect(blocked.status).toBe(429);
+      expect(blocked.headers['retry-after']).toBeDefined();
+    });
+
+    it('the old code endpoints are gone', async () => {
+      const phone = newPhone();
+      for (const path of ['/api/v1/auth/send-otp', '/api/v1/auth/verify-otp']) {
+        const res = await request(app)
+          .post(path)
+          .set('X-Forwarded-For', ip)
+          .send({ phone, code: '123456' });
+        expect(res.status).toBe(404);
+      }
+      expect(await User.count()).toBe(0);
     });
   });
 
@@ -331,7 +339,6 @@ describe.skipIf(!hasTestDatabase)('member authentication (integration)', () => {
 
     it('allDevices revokes every session of the account', async () => {
       const first = await login();
-      await OtpRequest.destroy({ where: {} });
       const second = await login(first.phone);
 
       await request(app)

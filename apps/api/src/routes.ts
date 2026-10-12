@@ -83,13 +83,16 @@ import { createSuspiciousActivityDetector } from './modules/safety/suspicious-ac
 import type { MediaStorage } from './providers/media/index.js';
 import type { PaymentGateway } from './providers/payments/index.js';
 import type { RealtimeHub } from './realtime/hub.js';
+import { createWhatsAppWebhookRouter } from './modules/whatsapp/whatsapp-webhook.routes.js';
+import { createWhatsAppWebhookService } from './modules/whatsapp/whatsapp-webhook.service.js';
 import type { MessageProviders } from './providers/messaging/index.js';
-import type { SmsProvider } from './providers/sms/index.js';
+import type { PhoneTokenVerifier } from './providers/firebase/index.js';
 
 /** External dependencies, injected so tests can supply their own (test database, fake SMS). */
 export interface ApiDependencies extends HealthDependencies {
   sequelize: Sequelize;
-  sms: SmsProvider;
+  /** Verifies Firebase Phone Authentication ID tokens (member sign-in). */
+  phoneTokens: PhoneTokenVerifier;
   /** SMS / WhatsApp notification channels. Omitted or `null` per channel = switched off. */
   messaging?: MessageProviders;
   /** Receives one entry per finished request for the `api_logs` table. Omitted = not stored. */
@@ -108,14 +111,14 @@ export function createApiRouter(options: {
   dependencies: ApiDependencies;
 }): Router {
   const { env, logger, dependencies } = options;
-  const { sequelize, sms, media, realtime: hub } = dependencies;
+  const { sequelize, phoneTokens, media, realtime: hub } = dependencies;
 
   const tokens = createTokenService(env);
   const limiters = createAuthRateLimiters();
   const authenticateMember = createAuthenticateMember(tokens);
   const authenticateAdmin = createAuthenticateAdmin(tokens);
 
-  const memberAuth = createMemberAuthService({ sequelize, env, sms, tokens, logger });
+  const memberAuth = createMemberAuthService({ sequelize, env, phoneTokens, tokens, logger });
   const adminAuth = createAdminAuthService({ sequelize, env, tokens, logger });
   const profileController = createProfileController(
     createProfileService({ sequelize, media, logger }),
@@ -128,8 +131,8 @@ export function createApiRouter(options: {
   const notifier = createNotifier({ sequelize, media, hub, logger, channels });
 
   const router = Router();
-  // Global per-IP ceiling (on top of the per-endpoint limits). Signed Razorpay webhooks are
-  // exempt: they come from Razorpay's servers and are verified by signature.
+  // Global per-IP ceiling (on top of the per-endpoint limits). Signed webhooks (Razorpay, Meta)
+  // are exempt: they come from the provider's servers and are verified by signature.
   const globalLimiter = createIpRateLimiter({
     windowMs: 60 * 1000,
     limit: LIMITS.API_REQUESTS_PER_MINUTE,
@@ -142,6 +145,24 @@ export function createApiRouter(options: {
     void globalLimiter(req, res, next);
   });
   router.use('/health', createHealthRouter(dependencies));
+  // WhatsApp delivery reports from Meta. Only exists when Meta is configured.
+  if (
+    env.META_WHATSAPP_APP_SECRET &&
+    env.META_WHATSAPP_VERIFY_TOKEN &&
+    env.META_WHATSAPP_PHONE_NUMBER_ID
+  ) {
+    router.use(
+      createWhatsAppWebhookRouter({
+        service: createWhatsAppWebhookService({
+          sequelize,
+          phoneNumberId: env.META_WHATSAPP_PHONE_NUMBER_ID,
+          logger,
+        }),
+        appSecret: env.META_WHATSAPP_APP_SECRET,
+        verifyToken: env.META_WHATSAPP_VERIFY_TOKEN,
+      }),
+    );
+  }
   router.use('/cities', createLocationsRouter());
   router.use(
     '/auth',

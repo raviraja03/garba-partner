@@ -38,8 +38,14 @@ export interface NotificationUnreadCountDto {
   unread: number;
 }
 
-/** `GET/PUT /api/v1/notifications/preferences`. `safety` is always on and not listed. */
-export type NotificationPreferencesDto = Record<ConfigurableNotificationType, boolean>;
+/**
+ * `GET/PUT /api/v1/notifications/preferences`. `safety` is always on and not listed.
+ * `whatsapp` is the member's consent to also be notified on WhatsApp; it is off until they
+ * turn it on.
+ */
+export type NotificationPreferencesDto = Record<ConfigurableNotificationType, boolean> & {
+  whatsapp: boolean;
+};
 
 /** `GET /api/v1/admin/notifications/stats`: aggregates only, no member data. */
 export interface AdminNotificationStatsDto {

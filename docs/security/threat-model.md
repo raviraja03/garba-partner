@@ -78,7 +78,7 @@ flowchart LR
 
 | Entry point | Auth | Notes |
 |---|---|---|
-| `POST /api/v1/auth/send-otp`, `verify-otp` | None | Per-phone and per-code limits in PostgreSQL + per-IP limits; identical responses |
+| `POST /api/v1/auth/phone` | None (it is the sign-in) | Accepts only a Google-signed Firebase ID token for our project, from a phone sign-in at most 5 minutes old; per-IP limit; reCAPTCHA and per-number limits at Firebase |
 | `POST /api/v1/auth/refresh` | Refresh cookie + CSRF header + Origin | Rotation and reuse detection |
 | `/api/v1/events`, `/api/v1/cities`, `/api/v1/health` | None | Public, non-personal data only |
 | All other member routes | Member JWT + live session | Status checks, block checks, per-member limits |
@@ -96,7 +96,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 
 | # | Threat | Mitigations | Residual |
 |---|---|---|---|
-| S1 | OTP brute force or SMS bombing of a phone number | Hashed OTPs, 5 attempts per code, cooldown and hourly/daily caps per number stored in PostgreSQL (rotating IPs don't help), per-IP limits, global per-IP ceiling | L |
+| S1 | Code brute force or SMS bombing of a phone number | Codes are issued and checked by Firebase Phone Authentication: reCAPTCHA before any SMS, Firebase's per-number, per-device and per-project limits, and an India-only SMS region policy (console setting). Our API accepts only a verified Firebase token and limits exchanges per IP. Residual: SMS cost if Firebase's limits are abused (set a budget alert) | L |
 | S2 | Admin password phishing, reuse or guessing | Argon2id, lockout after 5 failures, generic errors, dummy hash for unknown emails, per-IP limits, audit of sign-ins and lockouts. **No second factor** (TOTP removed on request) | **H** |
 | S5 | Forged or tampered JWT; `alg: none`; cross-use of member/admin tokens | HS256 pinned, issuer/audience checked, separate secrets and audiences, DB session check | L |
 | S6 | Stolen refresh cookie | `HttpOnly`, `Secure`, `SameSite=Strict`, path-scoped; rotation with reuse detection revokes the family | L |
@@ -162,7 +162,7 @@ Residual risk: **L** low, **M** medium, **H** high.
 | Stalking a member met at an event | No exact location, no attendance lists outside reciprocal mode, blocks hide both ways everywhere, report → auto-hide on P0 |
 | Harassment after a block | Blocks enforced in discovery, interests, matches, chat (REST and socket), profile lookups |
 | Romance/money scams | Safety copy ("never send money"), report reasons, moderation queue, message reports |
-| Ban evasion with a new number | A banned number can never sign in again (accounts are matched by phone HMAC); OTP sends are rate-limited; accepted residual risk (new numbers are cheap) |
+| Ban evasion with a new number | A banned number can never sign in again (accounts are matched by phone HMAC); sign-in attempts are rate-limited; accepted residual risk (new numbers are cheap) |
 | Underage users | 18+ date-of-birth check and DOB lock; identity verification (when enabled) is a signal, never a guarantee |
 | Admin snooping | Least-privilege roles, phone hidden by default, audited reveal, audit log review |
 

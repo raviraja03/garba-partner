@@ -449,7 +449,9 @@ Indexes: `user_verifications_one_open_per_type_unique` (UNIQUE `(user_id, type) 
 
 ### 4.6 `otp_requests`
 
-One-time login codes ([OTP flow](../auth/otp-flow.md)). **Only HMACs are stored.** Neither the code nor the phone number is persisted.
+> **No longer used.** Sign-in moved to Firebase Phone Authentication ([guide](../auth/firebase-phone-auth.md)), which sends and checks the code. Nothing writes or reads this table any more. It was kept (no data was deleted) and can be dropped by a later migration.
+
+One-time login codes of the earlier flow. **Only HMACs are stored.** Neither the code nor the phone number is persisted.
 
 | Column | Type | Null | Default | Notes |
 |---|---|---|---|---|

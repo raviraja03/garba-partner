@@ -2,7 +2,7 @@ import type { NotificationType } from '@garba-partner/shared';
 import type { NotificationChannel } from '../../models/index.js';
 
 export interface OutboundMessage {
-  /** Providers that send pre-approved templates (MSG91) pick the template by type. */
+  /** Providers that send pre-approved templates (Meta WhatsApp) pick the template by type. */
   type: NotificationType;
   /** Full phone number in E.164. Implementations must never log it. */
   to: string;

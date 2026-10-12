@@ -4,6 +4,7 @@ import { AppShell } from './components/AppShell';
 import { AuthProvider } from './features/auth/AuthProvider';
 import { ChatRealtime } from './features/chat/ChatRealtime';
 import { PublicOnly, RequireAuth } from './features/auth/guards';
+import { HomeGate } from './features/landing/HomeGate';
 import { RequireProfile } from './features/profile/RequireProfile';
 import { ApiClientError } from './lib/api-client';
 import { BlockedMembersPage } from './pages/BlockedMembersPage';
@@ -18,6 +19,7 @@ import { EventsPage } from './pages/EventsPage';
 import { FindPartnerPage } from './pages/FindPartnerPage';
 import { HomePage } from './pages/HomePage';
 import { InterestsPage } from './pages/InterestsPage';
+import { PrivacyPolicyPage, TermsPage } from './pages/LegalPages';
 import { LoginPage } from './pages/LoginPage';
 import { MatchesPage } from './pages/MatchesPage';
 import { MatchPage } from './pages/MatchPage';
@@ -59,6 +61,16 @@ const router = createBrowserRouter([
       // Public: safety information must be reachable by everyone, signed in or not.
       { path: '/safety', element: <SafetyCenterPage /> },
       { path: '/guidelines', element: <CommunityGuidelinesPage /> },
+      // Public: the rules of the service must be readable before signing up.
+      { path: '/privacy-policy', element: <PrivacyPolicyPage /> },
+      { path: '/terms', element: <TermsPage /> },
+      // Home: the landing page for visitors, the member home for signed-in members.
+      {
+        element: <HomeGate />,
+        children: [
+          { element: <RequireProfile />, children: [{ path: '/', element: <HomePage /> }] },
+        ],
+      },
       {
         element: <RequireAuth />,
         children: [
@@ -66,7 +78,6 @@ const router = createBrowserRouter([
           {
             element: <RequireProfile />,
             children: [
-              { path: '/', element: <HomePage /> },
               { path: '/profile', element: <ProfilePage /> },
               { path: '/profile/edit', element: <EditProfilePage /> },
               { path: '/profile/preferences', element: <PreferencesPage /> },

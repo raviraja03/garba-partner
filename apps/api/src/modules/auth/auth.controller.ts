@@ -1,13 +1,7 @@
 import type { Request, RequestHandler, Response } from 'express';
 import type { ServerEnv } from '@garba-partner/config/server';
-import {
-  MEMBER_REFRESH_COOKIE,
-  logoutSchema,
-  sendOtpSchema,
-  verifyOtpSchema,
-} from '@garba-partner/shared';
+import { MEMBER_REFRESH_COOKIE, logoutSchema, phoneLoginSchema } from '@garba-partner/shared';
 import { AppError } from '../../lib/app-error.js';
-import { requestIdOf } from '../../lib/request-id.js';
 import { readCookie, refreshCookieOptions } from '../../lib/cookies.js';
 import { ok } from '../../lib/response.js';
 import { parseInput } from '../../lib/validation.js';
@@ -18,15 +12,14 @@ import type { ClientContext, IssuedMemberSession, MemberAuthService } from './au
 export const MEMBER_AUTH_COOKIE_PATH = '/api/v1/auth';
 
 export interface MemberAuthController {
-  sendOtp: RequestHandler;
-  verifyOtp: RequestHandler;
+  phoneLogin: RequestHandler;
   refresh: RequestHandler;
   logout: RequestHandler;
   me: RequestHandler;
 }
 
 function clientContext(req: Request): ClientContext {
-  return { ip: req.ip ?? 'unknown', userAgent: req.get('User-Agent'), requestId: requestIdOf(req) };
+  return { ip: req.ip ?? 'unknown', userAgent: req.get('User-Agent') };
 }
 
 export function createMemberAuthController(
@@ -44,16 +37,11 @@ export function createMemberAuthController(
   };
 
   return {
-    async sendOtp(req, res) {
-      const { phone } = parseInput(sendOtpSchema, req.body);
-      const result = await service.sendOtp(phone, clientContext(req));
-      res.setHeader('Cache-Control', 'no-store');
-      ok(res, result, 'If this number can receive codes, one has been sent.');
-    },
-
-    async verifyOtp(req, res) {
-      const { phone, code } = parseInput(verifyOtpSchema, req.body);
-      const issued = await service.verifyOtp(phone, code, clientContext(req));
+    async phoneLogin(req, res) {
+      // The token is the only input. A phone number, user ID or role in the body is rejected
+      // by the schema; identity comes from the verified token alone.
+      const { idToken } = parseInput(phoneLoginSchema, req.body);
+      const issued = await service.loginWithPhoneToken(idToken, clientContext(req));
       sendSession(res, issued, 'Logged in');
     },
 
