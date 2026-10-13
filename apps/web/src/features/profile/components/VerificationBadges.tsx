@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import { Badge } from '../../../components/ui/Badge';
 
 /*
@@ -19,7 +20,7 @@ export function VerificationBadges({
   identityVerified: boolean;
   className?: string;
 }) {
-  if (!photoVerified && !identityVerified) return null;
+  if (!MEMBER_VERIFICATION_ENABLED || (!photoVerified && !identityVerified)) return null;
   return (
     <span className={`inline-flex flex-wrap gap-1.5 ${className ?? ''}`}>
       {photoVerified && (

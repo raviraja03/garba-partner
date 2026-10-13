@@ -13,9 +13,9 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     M->>W: Choose photo
-    W->>W: Pre-check type, size ≤ 5 MB, ≥ 400×400
+    W->>W: Pre-check type, size ≤ 10 MB, ≥ 400×400
     W->>A: POST /me/profile/image (multipart "image")
-    A->>A: multer: 1 file, ≤ 5 MB, in memory only
+    A->>A: multer: 1 file, ≤ 10 MB, in memory only
     A->>A: sharp: decode → verify format & size → rotate → resize ≤ 1600 px → JPEG, ALL metadata dropped
     A->>S: Signed server-side upload (random public ID)
     A->>DB: BEGIN; lock profile; set image_*; revoke photo badge; sync onboarding; COMMIT
@@ -74,7 +74,7 @@ To test real Cloudinary locally, set `MEDIA_STORAGE=cloudinary` and the three cr
 
 | File | Role |
 |---|---|
-| `apps/api/src/middlewares/upload.ts` | multer: memory storage, 1 file, 5 MB, declared-type filter, error mapping |
+| `apps/api/src/middlewares/upload.ts` | multer: memory storage, 1 file, 10 MB, declared-type filter, error mapping |
 | `apps/api/src/lib/image.ts` | `processProfileImage()`: decode, validate, rotate, resize, strip, JPEG |
 | `apps/api/src/providers/media/media.storage.ts` | `MediaStorage` interface (`upload`, `destroy`, `url`) |
 | `apps/api/src/providers/media/cloudinary.storage.ts` | Cloudinary v2 SDK: `upload_stream`, `destroy` (with CDN invalidation), `url` |

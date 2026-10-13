@@ -202,18 +202,33 @@ describe.skipIf(!hasTestDatabase)('interests and matches (integration)', () => {
       expect(detail.status).toBe(200);
     });
 
-    it('rejects silently: the sender just sees it drop out, and the pair stays apart for a while', async () => {
+    it('rejects silently: the sender just sees it drop out, and may send again', async () => {
       const { sender, receiver, interestId } = await pendingInterest();
       await action(receiver, interestId, 'reject').expect(200);
       expect(await sent(sender)).toEqual([]);
       expect(await received(receiver)).toEqual([]);
       expect((await PartnerInterest.findByPk(interestId))?.status).toBe('declined');
 
-      // The sender can't resend, and the receiver no longer appears in their discovery.
-      expect((await send(sender, receiver)).body.error.code).toBe('USER_UNAVAILABLE');
+      // The receiver is back in the sender's discovery, and a new interest goes through.
       const found = (await request(app).get('/api/v1/partners').set(bearer(sender.accessToken)))
         .body.data as PartnerDto[];
-      expect(found.map((p) => p.profile.id)).not.toContain(receiver.userId);
+      expect(found.map((p) => p.profile.id)).toContain(receiver.userId);
+      const again = await send(sender, receiver);
+      expect(again.status).toBe(201);
+      const secondId = again.body.data.interestId as string;
+      expect(secondId).not.toBe(interestId);
+      expect((await received(receiver)).map((i) => i.id)).toEqual([secondId]);
+      // The declined one stays declined: it is a new request, not the old one reopened.
+      expect((await PartnerInterest.findByPk(interestId))?.status).toBe('declined');
+
+      // Declining again and blocking is how the receiver stops it for good.
+      await action(receiver, secondId, 'reject').expect(200);
+      await request(app)
+        .post('/api/v1/blocks')
+        .set(bearer(receiver.accessToken))
+        .send({ userId: sender.userId })
+        .expect(201);
+      expect((await send(sender, receiver)).body.error.code).toBe('USER_UNAVAILABLE');
     });
 
     it('withdraws: only the sender, only while pending', async () => {

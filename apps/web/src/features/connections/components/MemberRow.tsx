@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import type { PublicProfileDto, SharedEventDto } from '@garba-partner/shared';
@@ -24,7 +25,7 @@ export function MemberRow({
   note?: ReactNode;
   children?: ReactNode;
 }) {
-  const verified = member.photoVerified || member.identityVerified;
+  const verified = MEMBER_VERIFICATION_ENABLED && (member.photoVerified || member.identityVerified);
   return (
     <Card as="li" padding="sm" className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <Link to={to} className="group flex min-w-0 flex-1 items-center gap-3 rounded-control">

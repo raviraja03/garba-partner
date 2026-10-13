@@ -193,7 +193,7 @@ Processing: decoded and verified → metadata (EXIF/GPS) removed → resized →
 | 400 | `INVALID_IMAGE` | Not a real JPEG/PNG/WebP, smaller than 400×400, larger than 8000 px, or an unsupported declared type |
 | 400 | `VALIDATION_ERROR` | No file, or a file in the wrong field |
 | 409 | `PROFILE_NOT_STARTED` | No profile yet |
-| 413 | `PAYLOAD_TOO_LARGE` | File > 5 MB |
+| 413 | `PAYLOAD_TOO_LARGE` | File > 10 MB |
 | 429 | `RATE_LIMITED` | More than 20 uploads per member per hour |
 | 503 | `SERVICE_UNAVAILABLE` | Storage failed. The profile is unchanged |
 
@@ -354,6 +354,8 @@ Forms validate with the **same shared schemas** as the API, then map any server 
 Run with `npm run test` (integration tests need `TEST_DATABASE_URL`).
 
 ## 8. Known limitations
+
+- **Member verification is hidden.** Members cannot get photo- or ID-verified yet (there is no selfie step and no review screen), so the badges, the "Photo-verified members only" preference and the "Verified members only" Discover filter are not shown (`MEMBER_VERIFICATION_ENABLED = false` in `packages/shared/src/constants/app.ts`). Migration `20261013120000-turn-off-verified-only` cleared the preference for members who had turned it on, because it matched nobody and emptied their Discover. The database columns and API fields remain. Event and organizer verification is unaffected.
 
 - **Extra photos cannot be reordered or made the main photo directly.** To change the main photo, upload a new one, or remove it so the oldest extra photo takes its place.
 - **The stricter rules apply when a profile is saved, not retroactively.** Members who joined before bio, Instagram username and a date became required keep a `complete` profile and stay visible; they are asked for the missing details the next time they edit their profile. Profile status and the completion percentage are unchanged (dates expire, so requiring an upcoming date for "complete" would hide every profile after the season).

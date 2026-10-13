@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import { useState, type FormEvent } from 'react';
 import {
   LIMITS,
@@ -76,13 +77,15 @@ export function PreferencesForm({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const result = updatePreferencesSchema.safeParse(values);
+    // While verification is hidden the switch cannot be shown, so it must never stay on.
+    const input = MEMBER_VERIFICATION_ENABLED ? values : { ...values, verifiedOnly: false };
+    const result = updatePreferencesSchema.safeParse(input);
     if (!result.success) {
       setErrors(fieldErrorsFromIssues(result.error.issues));
       return;
     }
     try {
-      await mutation.mutateAsync(values);
+      await mutation.mutateAsync(input);
       setSaved(true);
       onSaved?.();
     } catch (error) {
@@ -146,15 +149,17 @@ export function PreferencesForm({
           </Field>
         </div>
 
-        <Toggle
-          id="verifiedOnly"
-          label="Photo-verified members only"
-          description="Only suggest members whose selfie was checked by our team."
-          checked={values.verifiedOnly}
-          onChange={(checked) => {
-            set('verifiedOnly', checked);
-          }}
-        />
+        {MEMBER_VERIFICATION_ENABLED && (
+          <Toggle
+            id="verifiedOnly"
+            label="Photo-verified members only"
+            description="Only suggest members whose selfie was checked by our team."
+            checked={values.verifiedOnly}
+            onChange={(checked) => {
+              set('verifiedOnly', checked);
+            }}
+          />
+        )}
       </Card>
 
       <Card as="section" aria-labelledby="pr-visible">

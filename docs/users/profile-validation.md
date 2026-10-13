@@ -58,7 +58,7 @@ A profile needs **at least one photo** (the main photo): onboarding cannot conti
 | Rule | Where |
 |---|---|
 | Declared type `image/jpeg`, `image/png` or `image/webp` | Upload middleware (first filter) |
-| ≤ 5 MB | Upload middleware (`413 PAYLOAD_TOO_LARGE`) |
+| ≤ 10 MB | Upload middleware (`413 PAYLOAD_TOO_LARGE`) |
 | **Decodes** as JPEG, PNG or WebP (the extension and Content-Type are never trusted) | `processProfileImage()` |
 | ≥ 400×400 and ≤ 8000×8000 after orientation. Decompression bombs are refused (`limitInputPixels`) | `processProfileImage()` |
 | One file per request, field name `image`, no other fields | Upload middleware |

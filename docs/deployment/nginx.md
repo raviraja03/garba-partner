@@ -69,7 +69,7 @@ Neither domain proxies the API: a request for `/api/...` there returns the app p
 | `/socket.io/` | Proxied with WebSocket upgrade, buffering off, 75 s read timeout (longer than Socket.IO's ping cycle) |
 | everything else | `404` |
 
-`client_max_body_size 6m`: images are at most 5 MB (enforced by the API); the rest is multipart overhead.
+`client_max_body_size 11m`: images are at most 10 MB (enforced by the API); the rest is multipart overhead.
 
 ## 5. Security settings
 
@@ -122,7 +122,7 @@ The configuration assumes clients connect to Nginx directly. If you put Cloudfla
 |---|---|
 | `render-nginx.sh`: "no certificate for … yet" | Run it with `--http-only`, issue the certificate ([ssl.md](ssl.md)), then run it again |
 | `502 Bad Gateway` on the API domain | The API is not running: `pm2 status`, `pm2 logs gp-api` |
-| `413` on photo upload | Image above 5 MB (the app also says so) |
+| `413` on photo upload | Image above 10 MB (the app also says so) |
 | Browser console: "blocked by CORS policy" | `WEB_ORIGIN`/`ADMIN_ORIGIN` in the env file do not match the address in the browser exactly (scheme, host, no trailing slash) |
 | Browser console: "Refused to connect … Content Security Policy" | The bundles were built for another `API_DOMAIN` than Nginx was rendered for: deploy again, render again |
 | Sign-in works but the session is lost on reload | The API domain is not under the same registrable domain as the app, or the page is not served over HTTPS |
