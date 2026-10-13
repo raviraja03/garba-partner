@@ -84,7 +84,7 @@ Runs in one transaction under the pair lock: the interest is re-read with `FOR U
 
 ## 4. Rules
 
-- **Declines are never revealed.** A declined interest just drops out of the sender's Sent list. For 30 days (`INTEREST_DECLINE_COOLDOWN_DAYS`) the receiver doesn't appear in the sender's discovery, and a new interest returns the generic `USER_UNAVAILABLE`.
+- **Declines are never revealed.** A declined interest just drops out of the sender's Sent list. The sender is not locked out: the receiver appears in their discovery again and they may send a new interest (there was a 30-day cooldown until 2026-10-13; it was removed). A member who does not want further requests from someone **blocks** them, which stops interests in both directions. The daily limit (`INTERESTS_PER_DAY`) still applies.
 - **Expiry:** pending interests expire after 14 days. Expiry is applied lazily. Expired interests are hidden from lists, refused at accept (and marked `expired`), and cleared before a new interest between the same pair.
 - **Discovery:** members you have a pending interest to, or are matched with, leave your Discover list; their profile still opens with its `connection` status (`interest_sent`, `interest_received`, `matched`).
 - **Blocks and reports** cancel pending interests in both directions ([matches §4](matches.md#4-how-matches-end)).

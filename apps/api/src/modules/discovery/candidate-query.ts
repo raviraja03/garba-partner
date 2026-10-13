@@ -117,7 +117,6 @@ export function buildCandidateQuery(query: CandidateQuery): {
     minAge: query.minAge,
     maxAgePlusOne: query.maxAge + 1,
     similarAge: LIMITS.SIMILAR_AGE_YEARS,
-    declineCooldownDays: LIMITS.INTEREST_DECLINE_COOLDOWN_DAYS,
     limit: query.limit,
   };
 
@@ -141,10 +140,8 @@ export function buildCandidateQuery(query: CandidateQuery): {
           OR (r.reporter_id = u.id AND r.reported_user_id = :viewerId))`,
     // Not under an admin interaction restriction (they can't send or accept interests).
     'u.interactions_restricted_at IS NULL',
-    // The viewer's interest to this member was declined recently: leave them out silently.
-    `NOT EXISTS (SELECT 1 FROM partner_interests di
-       WHERE di.sender_id = :viewerId AND di.receiver_id = u.id AND di.status = 'declined'
-         AND di.responded_at > now() - make_interval(days => :declineCooldownDays))`,
+    // A declined interest does NOT hide the member: the sender may send again (product
+    // decision, 2026-10-13). Someone who does not want to hear from a member blocks them.
     // Mutual gender preference.
     'p.gender IN (:acceptedGenders)',
     'pr.partner_gender_preference IN (:acceptingPreferences)',
