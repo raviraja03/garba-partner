@@ -106,7 +106,7 @@ Details: [nginx.md](../deployment/nginx.md).
 - TLS 1.2+ with Let's Encrypt (certbot auto-renew), HTTP → HTTPS redirect, HSTS.
 - Security headers for the static apps: `Content-Security-Policy`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy` (camera only for the web app, geolocation denied), no framing.
 - Long cache headers for hashed Vite assets (`/assets/*`); `index.html` is revalidated.
-- `client_max_body_size 6m` on the API domain (photo uploads ≤ 5 MB plus multipart overhead).
+- `client_max_body_size 11m` on the API domain (photo uploads ≤ 10 MB plus multipart overhead).
 - A coarse per-IP rate limit (`limit_req`) on `/api/`. The fine-grained limits live in the API.
 - `X-Forwarded-For` is replaced with the address Nginx saw. Express `trust proxy` is `loopback`.
 - Access logs without query strings (admin searches carry phone numbers).

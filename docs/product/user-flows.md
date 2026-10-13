@@ -94,7 +94,7 @@ Onboarding is a single multi-step form. Progress is kept on the client and submi
 | 4. Dance | Garba level (`beginner`, `intermediate`, `advanced`), dates free for Garba (optional, up to 30 upcoming dates), Instagram ID (optional, private) | Level required |
 | 5. Partner preferences | Interested in partnering with (`women`, `men`, `everyone`), preferred age range | Age range 18–80, min ≤ max |
 | 6. About | Bio (optional) | ≤ `LIMITS.BIO_MAX_LENGTH` = 300 characters. Phone number/URL/email patterns are rejected with a friendly message |
-| 7. Photos | 1–6 photos, first one is primary | JPEG/PNG/WebP, ≤ 5 MB, ≥ 400×400 px. Server re-encodes and strips EXIF/GPS |
+| 7. Photos | 1–6 photos, first one is primary | JPEG/PNG/WebP, ≤ 10 MB, ≥ 400×400 px. Server re-encodes and strips EXIF/GPS |
 | 8. Visibility & terms | **Visibility:** an explicit yes/no choice: "Show my profile in partner discovery (adult members in my city, and at events where I turn on 'looking for a partner')". Nothing is pre-selected, and choosing "no" means browsing events only. **Terms:** accept Terms of Service, Privacy Policy and Community Guidelines (current versions) | Visibility choice required (`discoveryEnabled`). Terms required. Version and timestamp are stored |
 | 9. Safety intro | Three-card safety introduction with a link to the safety centre | Informational |
 

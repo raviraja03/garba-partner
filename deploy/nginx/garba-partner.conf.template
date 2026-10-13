@@ -138,8 +138,8 @@ server {
   access_log /var/log/nginx/gp-api.access.log gp_main;
   error_log  /var/log/nginx/gp-api.error.log warn;
 
-  # Images are at most 5 MB (the API enforces it); allow multipart overhead, nothing more.
-  client_max_body_size 6m;
+  # Images are at most 10 MB (the API enforces it); allow multipart overhead, nothing more.
+  client_max_body_size 11m;
 
   # The API sets its own security headers (helmet). HSTS is added here instead (and hidden
   # from the upstream response in gp-proxy.conf) so Nginx's own error pages carry it too.

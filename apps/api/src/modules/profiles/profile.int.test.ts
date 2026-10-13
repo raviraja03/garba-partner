@@ -421,7 +421,7 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
         'INVALID_IMAGE',
       ],
       [
-        'a file over 5 MB',
+        'a file over 10 MB',
         () => Promise.resolve(Buffer.alloc(LIMITS.PROFILE_IMAGE_MAX_BYTES + 1, 1)),
         'image/png',
         413,

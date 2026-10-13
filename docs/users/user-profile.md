@@ -193,7 +193,7 @@ Processing: decoded and verified → metadata (EXIF/GPS) removed → resized →
 | 400 | `INVALID_IMAGE` | Not a real JPEG/PNG/WebP, smaller than 400×400, larger than 8000 px, or an unsupported declared type |
 | 400 | `VALIDATION_ERROR` | No file, or a file in the wrong field |
 | 409 | `PROFILE_NOT_STARTED` | No profile yet |
-| 413 | `PAYLOAD_TOO_LARGE` | File > 5 MB |
+| 413 | `PAYLOAD_TOO_LARGE` | File > 10 MB |
 | 429 | `RATE_LIMITED` | More than 20 uploads per member per hour |
 | 503 | `SERVICE_UNAVAILABLE` | Storage failed. The profile is unchanged |
 

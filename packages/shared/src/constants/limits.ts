@@ -16,7 +16,7 @@ export const LIMITS = {
   AVAILABLE_DATES_HORIZON_DAYS: 365,
 
   // Profile image (docs/users/cloudinary.md)
-  PROFILE_IMAGE_MAX_BYTES: 5 * 1024 * 1024,
+  PROFILE_IMAGE_MAX_BYTES: 10 * 1024 * 1024,
   PROFILE_IMAGE_MIN_DIMENSION: 400,
   PROFILE_IMAGE_MAX_DIMENSION: 8000,
   PROFILE_IMAGE_UPLOADS_PER_HOUR: 20,
@@ -101,8 +101,6 @@ export const LIMITS = {
   /** Rolling 24 hours, enforced in the database. */
   INTERESTS_PER_DAY: 25,
   INTEREST_EXPIRY_DAYS: 14,
-  /** After a decline, the sender can't see or contact that member again for this long. */
-  INTEREST_DECLINE_COOLDOWN_DAYS: 30,
   INTEREST_ACTIONS_PER_MINUTE: 30,
   INTERESTS_PAGE_SIZE_DEFAULT: 20,
   INTERESTS_PAGE_SIZE_MAX: 50,

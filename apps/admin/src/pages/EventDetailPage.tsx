@@ -189,7 +189,7 @@ function ImageManager({ event, canManage }: { event: AdminEventDetailDto; canMan
             </Button>
           )}
           <span className="text-xs text-muted">
-            JPEG, PNG or WebP, up to 5 MB. Location data is removed automatically.
+            JPEG, PNG or WebP, up to 10 MB. Location data is removed automatically.
           </span>
         </div>
       )}
