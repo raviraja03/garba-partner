@@ -37,6 +37,23 @@ export function ProfileCard({
           </div>
         )}
       </div>
+      {profile.photos.length > 0 && (
+        <ul aria-label="More photos" className="grid grid-cols-3 gap-1 pt-1">
+          {profile.photos.map((photo, index) => (
+            <li key={photo.id} className="aspect-[4/5] bg-brand-100">
+              <a href={photo.url} target="_blank" rel="noreferrer" className="block size-full">
+                <img
+                  src={photo.url}
+                  alt={`${profile.name} (${String(index + 2)})`}
+                  loading="lazy"
+                  decoding="async"
+                  className="size-full object-cover"
+                />
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className="space-y-4 p-5">
         <div className="space-y-1.5">
           <Heading className="text-h2">

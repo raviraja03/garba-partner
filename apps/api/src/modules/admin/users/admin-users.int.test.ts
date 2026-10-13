@@ -40,6 +40,8 @@ describe.skipIf(!hasTestDatabase)('admin user management (integration)', () => {
         gender: 'woman',
         cityId: AHMEDABAD,
         garbaLevel: 'beginner',
+        bio: 'Here for the Garba.',
+        availableDates: [addDays(todayInIndia(), 30)],
         instagramId: 'private.handle',
         confirmsAdult: true,
         acceptTerms: true,
@@ -86,7 +88,7 @@ describe.skipIf(!hasTestDatabase)('admin user management (integration)', () => {
     expect(byId.get(complete.userId)).toMatchObject({
       name: 'Kavya',
       profileStatus: 'complete',
-      completionPercentage: 75, // required fields (70) + Instagram (5)
+      completionPercentage: 95, // required fields (70) + Instagram (5)
       accountStatus: 'active',
       city: 'Ahmedabad',
     });
@@ -151,7 +153,7 @@ describe.skipIf(!hasTestDatabase)('admin user management (integration)', () => {
       profileStatus: 'complete',
       activeSessionCount: 1,
       profile: { name: 'Kavya', instagramId: 'private.handle' },
-      preferences: { discoveryEnabled: false },
+      preferences: { discoveryEnabled: true },
       verifications: [],
     });
     expect(JSON.stringify(res.body)).not.toContain(member.phone);

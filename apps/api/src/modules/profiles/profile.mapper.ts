@@ -5,9 +5,10 @@ import {
   type PreferencesDto,
   type ProfileCompletion,
   type ProfileImageDto,
+  type ProfilePhotoDto,
   type PublicProfileDto,
 } from '@garba-partner/shared';
-import type { User, UserPreference, UserProfile } from '../../models/index.js';
+import type { User, UserPreference, UserProfile, UserProfilePhoto } from '../../models/index.js';
 import type { MediaStorage } from '../../providers/media/index.js';
 import { toAreaDto, toCityDto } from '../locations/locations.service.js';
 
@@ -25,6 +26,18 @@ export function toImageDto(
     url: storage.url(profile.imagePublicId, 'card'),
     thumbnailUrl: storage.url(profile.imagePublicId, 'thumbnail'),
   };
+}
+
+/** Extra photos, oldest first. */
+export function toPhotoDtos(
+  photos: readonly Pick<UserProfilePhoto, 'id' | 'publicId'>[],
+  storage: MediaStorage,
+): ProfilePhotoDto[] {
+  return photos.map((photo) => ({
+    id: photo.id,
+    url: storage.url(photo.publicId, 'card'),
+    thumbnailUrl: storage.url(photo.publicId, 'thumbnail'),
+  }));
 }
 
 /** Upcoming dates only — past dates are never shown. */
@@ -67,6 +80,7 @@ export function toOwnProfileDto(
   profile: UserProfile,
   storage: MediaStorage,
   today: string,
+  photos: readonly Pick<UserProfilePhoto, 'id' | 'publicId'>[] = [],
 ): OwnProfileDto {
   if (!profile.city) throw new Error('Profile city must be loaded');
   return {
@@ -81,6 +95,7 @@ export function toOwnProfileDto(
     garbaLevel: profile.garbaLevel,
     availableDates: upcomingDates(profile.availableDates, today),
     image: toImageDto(profile, storage),
+    photos: toPhotoDtos(photos, storage),
     updatedAt: profile.updatedAt.toISOString(),
   };
 }
@@ -96,6 +111,8 @@ export function toPublicProfileDto(
   preferences: UserPreference | null | undefined,
   storage: MediaStorage,
   today: string,
+  /** Only loaded for a full profile page; lists and cards show the main photo alone. */
+  photos: readonly Pick<UserProfilePhoto, 'id' | 'publicId'>[] = [],
 ): PublicProfileDto {
   if (!profile.city) throw new Error('Profile city must be loaded');
   const showArea = preferences?.showArea === true && profile.area;
@@ -110,6 +127,7 @@ export function toPublicProfileDto(
     garbaLevel: profile.garbaLevel,
     availableDates: upcomingDates(profile.availableDates, today),
     image: toImageDto(profile, storage),
+    photos: toPhotoDtos(photos, storage),
     // Every member signs in with a one-time code, so the phone number is always verified.
     phoneVerified: true,
     identityVerified: user.identityVerifiedAt !== null,

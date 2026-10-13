@@ -8,6 +8,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Icon } from '../components/ui/Icon';
 import { updateNotificationPreferences } from '../features/notifications/notifications-api';
 import { ImageUpload } from '../features/profile/components/ImageUpload';
+import { PhotoGallery } from '../features/profile/components/PhotoGallery';
 import { PreferencesForm } from '../features/profile/components/PreferencesForm';
 import { ProfileForm } from '../features/profile/components/ProfileForm';
 import { useCreateProfile, useMyProfile } from '../features/profile/hooks';
@@ -20,7 +21,7 @@ const STEPS: readonly { id: Step; label: string; intro: string }[] = [
     id: 'photo',
     label: 'Photo',
     intro:
-      'Add a clear photo of yourself. Your profile is only shown to other members once it has a photo.',
+      'Add at least one clear photo of yourself: it is required. You can add more photos after the first one.',
   },
   {
     id: 'preferences',
@@ -124,11 +125,21 @@ export function OnboardingPage() {
           <Card>
             <ImageUpload
               image={data.profile?.image ?? null}
-              onDone={() => {
-                setStep('preferences');
-              }}
+              canRemove={(data.profile?.photos.length ?? 0) > 0}
             />
           </Card>
+          {data.profile?.image ? (
+            <Card as="section" aria-labelledby="more-photos-title" className="space-y-4">
+              <h2 id="more-photos-title" className="text-h3">
+                More photos <span className="font-normal text-muted">(optional)</span>
+              </h2>
+              <PhotoGallery photos={data.profile.photos} />
+            </Card>
+          ) : (
+            <p className="text-small font-medium text-ink">
+              Choose a photo and press “Upload photo” to continue.
+            </p>
+          )}
           {data.profile?.image && (
             <Button
               size="lg"

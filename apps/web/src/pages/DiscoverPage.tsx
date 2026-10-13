@@ -1,6 +1,14 @@
 import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
-import { GARBA_LEVELS, isIsoDate, todayInIndia, type GarbaLevel } from '@garba-partner/shared';
+import {
+  GARBA_LEVELS,
+  PARTNER_GENDER_PREFERENCES,
+  isIsoDate,
+  todayInIndia,
+  type GarbaLevel,
+  type PartnerGenderPreference,
+} from '@garba-partner/shared';
 import { PageHeader } from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
 import { Button, LinkButton } from '../components/ui/Button';
@@ -13,11 +21,11 @@ import { Icon } from '../components/ui/Icon';
 import { Input, Select } from '../components/ui/Input';
 import { LoadingRegion, SkeletonCard } from '../components/ui/Skeleton';
 import { PartnerCard } from '../features/partners/components/PartnerCard';
-import { useMyEvents, usePartnerList } from '../features/partners/hooks';
+import { partnerKeys, useMyEvents, usePartnerList } from '../features/partners/hooks';
 import type { PartnerFilters } from '../features/partners/partners-api';
-import { useCities, useMyProfile } from '../features/profile/hooks';
+import { useCities, useMyProfile, useUpdatePreferences } from '../features/profile/hooks';
 import { ApiClientError } from '../lib/api-client';
-import { GARBA_LEVEL_LABELS } from '../lib/labels';
+import { GARBA_LEVEL_LABELS, PREFERRED_GENDER_LABELS } from '../lib/labels';
 import { useIsDesktop } from '../lib/use-media-query';
 
 const ALL_CITIES = 'all';
@@ -32,6 +40,9 @@ function isGarbaLevel(value: string): value is GarbaLevel {
  * Partner discovery. Filters live in the URL (`?city=…&event=…&level=beginner,advanced&date=…
  * &minAge=…&maxAge=…&verified=1`). Results are ranked by the server; no score is shown.
  *
+ * "I'd like to dance with" is different: it is the member's saved preference (matching is
+ * mutual, so the server only ever reads it from the profile). Changing it here saves it.
+ *
  * Desktop: filters in a side panel next to the results. Phones and tablets: a "Filters"
  * button opens them in a bottom sheet. Filters apply as soon as they change.
  */
@@ -42,6 +53,9 @@ export function DiscoverPage() {
   const myEvents = useMyEvents();
   const isDesktop = useIsDesktop();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const updatePreferences = useUpdatePreferences();
+  const preferences = myProfile.data?.preferences ?? null;
   const ownCityId = myProfile.data?.profile?.city.id ?? '';
 
   const cityParam = params.get('city');
@@ -78,6 +92,17 @@ export function DiscoverPage() {
     update({ level: levels.join(',') || null });
   }
 
+  function changePreferredGender(preferredGender: PartnerGenderPreference) {
+    updatePreferences.mutate(
+      { preferredGender },
+      {
+        onSuccess: () => {
+          void queryClient.invalidateQueries({ queryKey: partnerKeys.all });
+        },
+      },
+    );
+  }
+
   const clearAll = () => {
     update(Object.fromEntries(FILTER_KEYS.map((key) => [key, null])));
   };
@@ -93,6 +118,38 @@ export function DiscoverPage() {
         e.preventDefault();
       }}
     >
+      {preferences && (
+        <Field
+          id="filter-preferred-gender"
+          label="I'd like to dance with"
+          error={updatePreferences.isError ? 'Could not save. Please try again.' : undefined}
+          hint={
+            <>
+              Saved to your preferences.{' '}
+              <LinkButton to="/profile/preferences" variant="link">
+                All preferences
+              </LinkButton>
+            </>
+          }
+        >
+          <Select
+            id="filter-preferred-gender"
+            value={updatePreferences.variables?.preferredGender ?? preferences.preferredGender}
+            disabled={updatePreferences.isPending}
+            aria-describedby="filter-preferred-gender-hint"
+            onChange={(e) => {
+              changePreferredGender(e.target.value as PartnerGenderPreference);
+            }}
+          >
+            {PARTNER_GENDER_PREFERENCES.map((option) => (
+              <option key={option} value={option}>
+                {PREFERRED_GENDER_LABELS[option]}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      )}
+
       <Field id="filter-city" label="City">
         <Select
           id="filter-city"
@@ -184,7 +241,9 @@ export function DiscoverPage() {
           />
         </div>
         <p id="filter-age-hint" className="mt-1.5 text-caption text-muted">
-          Narrows, but never widens, the age range in your preferences.
+          {preferences
+            ? `Within the ${String(preferences.minAge)}–${String(preferences.maxAge)} range in your preferences.`
+            : 'Narrows, but never widens, the age range in your preferences.'}
         </p>
       </fieldset>
 

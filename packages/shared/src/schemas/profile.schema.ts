@@ -76,6 +76,34 @@ export const instagramIdSchema = z.nullable(
   ),
 );
 
+/** A bio that must be filled in (profile forms). `bioSchema` still describes stored values. */
+export const requiredBioSchema = z.pipe(
+  bioSchema,
+  z.transform((bio, ctx) => {
+    if (bio === null) {
+      ctx.issues.push({
+        code: 'custom',
+        message: 'Tell other members a little about yourself.',
+        input: bio,
+      });
+      return '';
+    }
+    return bio;
+  }),
+);
+
+/** An Instagram username that must be filled in (profile forms). */
+export const requiredInstagramIdSchema = z.pipe(
+  instagramIdSchema,
+  z.transform((handle, ctx) => {
+    if (handle === null) {
+      ctx.issues.push({ code: 'custom', message: 'Enter your Instagram username.', input: handle });
+      return '';
+    }
+    return handle;
+  }),
+);
+
 export const availableDatesSchema = z
   .array(isoDateSchema)
   .check(
@@ -85,15 +113,20 @@ export const availableDatesSchema = z
     ),
   );
 
+/** At least one date (profile forms). */
+export const requiredAvailableDatesSchema = availableDatesSchema.check(
+  z.minLength(1, "Add at least one date you're free for Garba."),
+);
+
 const profileFields = {
   name: nameSchema,
-  gender: z.enum(GENDERS),
+  gender: z.enum(GENDERS, 'Choose your gender.'),
   cityId: z.uuid('Choose a city.'),
   areaId: z.optional(z.nullable(z.uuid('Choose an area.'))),
-  bio: z.optional(bioSchema),
-  instagramId: z.optional(instagramIdSchema),
-  garbaLevel: z.enum(GARBA_LEVELS),
-  availableDates: z.optional(availableDatesSchema),
+  bio: requiredBioSchema,
+  instagramId: requiredInstagramIdSchema,
+  garbaLevel: z.enum(GARBA_LEVELS, 'Choose your Garba level.'),
+  availableDates: requiredAvailableDatesSchema,
 };
 
 /** `POST /api/v1/me/profile` (onboarding). */
@@ -106,16 +139,20 @@ export const createProfileSchema = z.strictObject({
 export type CreateProfileInput = z.input<typeof createProfileSchema>;
 export type CreateProfileData = z.output<typeof createProfileSchema>;
 
-/** `PATCH /api/v1/me/profile`. Date of birth cannot be changed (strict: the key is rejected). */
+/**
+ * `PATCH /api/v1/me/profile`. Date of birth cannot be changed (strict: the key is rejected).
+ * Every key is optional, but a key that is sent must be valid: the bio, the Instagram username
+ * and the dates cannot be cleared.
+ */
 export const updateProfileSchema = z.strictObject({
   name: z.optional(profileFields.name),
   gender: z.optional(profileFields.gender),
   cityId: z.optional(profileFields.cityId),
   areaId: profileFields.areaId,
-  bio: profileFields.bio,
-  instagramId: profileFields.instagramId,
+  bio: z.optional(profileFields.bio),
+  instagramId: z.optional(profileFields.instagramId),
   garbaLevel: z.optional(profileFields.garbaLevel),
-  availableDates: profileFields.availableDates,
+  availableDates: z.optional(profileFields.availableDates),
 });
 export type UpdateProfileInput = z.input<typeof updateProfileSchema>;
 export type UpdateProfileData = z.output<typeof updateProfileSchema>;

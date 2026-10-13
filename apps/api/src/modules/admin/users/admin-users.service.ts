@@ -26,6 +26,7 @@ import {
   User,
   UserPreference,
   UserProfile,
+  UserProfilePhoto,
   UserSession,
   UserVerification,
 } from '../../../models/index.js';
@@ -225,7 +226,18 @@ export function createAdminUsersService(deps: {
       onboardingCompletedAt: user.onboardingCompletedAt?.toISOString() ?? null,
       deletionRequestedAt: user.deletionRequestedAt?.toISOString() ?? null,
       activeSessionCount,
-      profile: profile ? toOwnProfileDto(profile, media, today) : null,
+      profile: profile
+        ? toOwnProfileDto(
+            profile,
+            media,
+            today,
+            // Moderators see every photo a member has on their profile.
+            await UserProfilePhoto.findAll({
+              where: { userId: profile.userId },
+              order: [['createdAt', 'ASC']],
+            }),
+          )
+        : null,
       preferences: toPreferencesDto(preferences),
       verifications: verifications.map((v) => ({
         type: v.type,

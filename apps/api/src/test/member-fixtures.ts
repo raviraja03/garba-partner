@@ -63,7 +63,12 @@ export async function createMember(app: Express, options: MemberOptions = {}): P
       cityId: options.cityId ?? AHMEDABAD,
       areaId: options.areaId ?? null,
       garbaLevel: options.garbaLevel ?? 'beginner',
-      availableDates: options.availableDates ?? [],
+      // A profile needs a bio and at least one date. The default date is far off and different
+      // for each member, so it never creates a "free on the same day" signal between two of them.
+      bio: 'Here for the Garba.',
+      availableDates: options.availableDates?.length
+        ? options.availableDates
+        : [addDays(todayInIndia(), 200 + (counter % 150))],
       instagramId: options.instagramId ?? 'private.insta',
       confirmsAdult: true,
       acceptTerms: true,

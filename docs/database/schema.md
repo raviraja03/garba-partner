@@ -373,6 +373,20 @@ Indexes: `user_profiles_city_id_idx`, `user_profiles_area_id_idx` (partial), `us
 
 Migration `20260928100100-extend-user-profiles` renamed `experience` → `garba_level`, dropped the unused `styles` column and backfilled pre-existing development rows with the first launch city.
 
+### 4.2a `user_profile_photos`
+
+Extra profile photos (migration `20261013100000-create-user-profile-photos`). The main photo stays on `user_profiles.image_public_id`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `user_id` | uuid NOT NULL → `users(id)` ON DELETE CASCADE | Owner |
+| `public_id` | varchar(255) NOT NULL, UNIQUE | Opaque storage ID, never a URL |
+| `width`, `height` | integer NOT NULL | `CHECK (width > 0 AND height > 0)` |
+| `created_at` | timestamptz | Display order (oldest first) |
+
+Indexes: `user_profile_photos_public_id_unique`, `user_profile_photos_user_created_idx (user_id, created_at)`. The limit of 5 per member is enforced by the service under a row lock on the profile.
+
 ### 4.3 `user_preferences`
 
 | Column | Type | Null | Default | Notes |

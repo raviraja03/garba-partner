@@ -27,6 +27,14 @@ export function createMyProfileRouter(deps: {
     controller.uploadImage,
   );
   router.delete('/profile/image', ...canEdit, controller.deleteImage);
+  router.post(
+    '/profile/photos',
+    ...canEdit,
+    uploadLimiter,
+    singleImageUpload('image'),
+    controller.addPhoto,
+  );
+  router.delete('/profile/photos/:photoId', ...canEdit, controller.deletePhoto);
   router.put('/preferences', ...canEdit, controller.updatePreferences);
 
   return router;

@@ -21,6 +21,9 @@ const validCreate = {
   gender: 'woman',
   cityId: 'c1000000-0000-4000-8000-000000000001',
   garbaLevel: 'advanced',
+  bio: 'Dancing since school.',
+  instagramId: 'priya.garba',
+  availableDates: ['2030-10-01'],
   confirmsAdult: true,
   acceptTerms: true,
 };
@@ -157,6 +160,37 @@ describe('profile schemas', () => {
     ['unknown key', { phone: '9876543210' }],
   ])('rejects %s', (_label, override) => {
     expect(createProfileSchema.safeParse({ ...validCreate, ...override }).success).toBe(false);
+  });
+
+  it.each([
+    ['no bio', { bio: undefined }, 'bio'],
+    ['an empty bio', { bio: '   ' }, 'bio'],
+    ['no Instagram username', { instagramId: undefined }, 'instagramId'],
+    ['an empty Instagram username', { instagramId: '@' }, 'instagramId'],
+    ['no dates', { availableDates: undefined }, 'availableDates'],
+    ['an empty list of dates', { availableDates: [] }, 'availableDates'],
+    ['no city', { cityId: undefined }, 'cityId'],
+    ['no gender', { gender: undefined }, 'gender'],
+  ])('a new profile is rejected with %s', (_label, overrides, path) => {
+    const result = createProfileSchema.safeParse({ ...validCreate, ...overrides });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues.map((issue) => issue.path.join('.'))).toEqual([path]);
+  });
+
+  it('an update may leave the required details out, but cannot clear them', () => {
+    expect(updateProfileSchema.safeParse({ garbaLevel: 'beginner' }).success).toBe(true);
+    for (const body of [
+      { bio: '' },
+      { bio: null },
+      { instagramId: '' },
+      { instagramId: null },
+      { availableDates: [] },
+    ]) {
+      expect(updateProfileSchema.safeParse(body).success, JSON.stringify(body)).toBe(false);
+    }
+    expect(
+      updateProfileSchema.parse({ bio: ' Hi there ', instagramId: '@New.Name' }),
+    ).toMatchObject({ bio: 'Hi there', instagramId: 'new.name' });
   });
 
   it('never allows changing the date of birth on update', () => {

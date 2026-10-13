@@ -32,6 +32,16 @@ export function uploadProfileImage(file: File): Promise<MyProfileDto> {
 export const deleteProfileImage = () =>
   api<MyProfileDto>('/me/profile/image', { method: 'DELETE', authenticated: true });
 
+/** Adds an extra photo (the first photo of a profile becomes its main photo). */
+export function addProfilePhoto(file: File): Promise<MyProfileDto> {
+  const formData = new FormData();
+  formData.append('image', file);
+  return api<MyProfileDto>('/me/profile/photos', { method: 'POST', formData, authenticated: true });
+}
+
+export const deleteProfilePhoto = (photoId: string) =>
+  api<MyProfileDto>(`/me/profile/photos/${photoId}`, { method: 'DELETE', authenticated: true });
+
 export const fetchCities = () => api<CityDto[]>('/cities');
 
 export const fetchAreas = (cityId: string) => api<AreaDto[]>(`/cities/${cityId}/areas`);

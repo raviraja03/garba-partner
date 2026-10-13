@@ -19,6 +19,8 @@ export interface ProfileController {
   updatePreferences: RequestHandler;
   uploadImage: RequestHandler;
   deleteImage: RequestHandler;
+  addPhoto: RequestHandler;
+  deletePhoto: RequestHandler;
   getPublic: RequestHandler;
 }
 
@@ -60,6 +62,16 @@ export function createProfileController(service: ProfileService): ProfileControl
 
     async deleteImage(req, res) {
       ok(res, await service.deleteImage(memberAuth(req).userId), 'Photo removed');
+    },
+
+    async addPhoto(req, res) {
+      if (!req.file) throw new AppError('VALIDATION_ERROR', { message: 'No image received.' });
+      ok(res, await service.addPhoto(memberAuth(req).userId, req.file.buffer), 'Photo added', 201);
+    },
+
+    async deletePhoto(req, res) {
+      const photoId = parseInput(uuidParamSchema, req.params.photoId);
+      ok(res, await service.deletePhoto(memberAuth(req).userId, photoId), 'Photo removed');
     },
 
     async getPublic(req, res) {

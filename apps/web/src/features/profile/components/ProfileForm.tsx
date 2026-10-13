@@ -240,7 +240,7 @@ export function ProfileForm(props: Props) {
           </div>
           {errors.gender && (
             <p role="alert" className="mt-1.5 text-small font-medium text-danger">
-              Choose your gender.
+              {errors.gender}
             </p>
           )}
         </fieldset>
@@ -261,6 +261,7 @@ export function ProfileForm(props: Props) {
                 setErrors((current) => ({ ...current, cityId: undefined, areaId: undefined }));
               }}
               aria-invalid={Boolean(errors.cityId)}
+              aria-required="true"
               className={INPUT_CLASS}
             >
               <option value="">Choose a city</option>
@@ -277,7 +278,7 @@ export function ProfileForm(props: Props) {
             label="Area"
             optional
             error={errors.areaId}
-            hint="Neighbourhood only — never your address. Hidden unless you choose to show it."
+            hint="Neighbourhood only — never your address. You can hide it in your preferences."
           >
             <select
               id="areaId"
@@ -335,7 +336,7 @@ export function ProfileForm(props: Props) {
           </div>
           {errors.garbaLevel && (
             <p role="alert" className="mt-1.5 text-small font-medium text-danger">
-              Choose your level.
+              {errors.garbaLevel}
             </p>
           )}
         </fieldset>
@@ -343,9 +344,8 @@ export function ProfileForm(props: Props) {
         <Field
           id="availableDates"
           label="Dates you're free for Garba"
-          optional
           error={errors.availableDates}
-          hint={`Up to ${String(LIMITS.AVAILABLE_DATES_MAX)} dates in the next 12 months.`}
+          hint={`Add at least one date, up to ${String(LIMITS.AVAILABLE_DATES_MAX)}, in the next 12 months.`}
         >
           <AvailableDatesInput
             id="availableDates"
@@ -365,7 +365,6 @@ export function ProfileForm(props: Props) {
         <Field
           id="bio"
           label="About you"
-          optional
           error={
             errors.bio ??
             (bioHasContact ? 'Please remove phone numbers, emails and links.' : undefined)
@@ -381,6 +380,7 @@ export function ProfileForm(props: Props) {
               set('bio', event.target.value);
             }}
             aria-invalid={Boolean(errors.bio) || bioHasContact}
+            aria-required="true"
             aria-describedby={describedBy('bio', errors.bio, true)}
             className={INPUT_CLASS}
           />
@@ -389,7 +389,6 @@ export function ProfileForm(props: Props) {
         <Field
           id="instagramId"
           label="Instagram username"
-          optional
           error={errors.instagramId}
           hint="Private — never shown on your profile."
         >
@@ -405,6 +404,7 @@ export function ProfileForm(props: Props) {
               set('instagramId', event.target.value);
             }}
             aria-invalid={Boolean(errors.instagramId)}
+            aria-required="true"
             aria-describedby={describedBy('instagramId', errors.instagramId, true)}
             className={INPUT_CLASS}
           />

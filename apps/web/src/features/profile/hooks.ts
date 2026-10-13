@@ -2,8 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { MyProfileDto } from '@garba-partner/shared';
 import { useAuth } from '../auth/auth-context';
 import {
+  addProfilePhoto,
   createProfile,
   deleteProfileImage,
+  deleteProfilePhoto,
   fetchAreas,
   fetchCities,
   fetchMyProfile,
@@ -63,3 +65,5 @@ export const useUpdateProfile = () => useProfileMutation(updateProfile);
 export const useUpdatePreferences = () => useProfileMutation(updatePreferences);
 export const useUploadProfileImage = () => useProfileMutation(uploadProfileImage);
 export const useDeleteProfileImage = () => useProfileMutation(() => deleteProfileImage());
+export const useAddProfilePhoto = () => useProfileMutation(addProfilePhoto);
+export const useDeleteProfilePhoto = () => useProfileMutation(deleteProfilePhoto);

@@ -25,8 +25,8 @@ Every member has one profile (`user_profiles`) and one set of preferences (`user
 | Minimum age | `minAge` | `user_preferences.age_min` | 18 |
 | Maximum age | `maxAge` | `user_preferences.age_max` | 80 |
 | Verified only | `verifiedOnly` | `user_preferences.verified_only` | `false` |
-| Discoverable | `discoveryEnabled` | `user_preferences.discovery_enabled` | `false` (opt-in) |
-| Show area | `showArea` | `user_preferences.show_area` | `false` (opt-in) |
+| Discoverable | `discoveryEnabled` | `user_preferences.discovery_enabled` | `true` (can be paused) |
+| Show area | `showArea` | `user_preferences.show_area` | `true` (can be hidden) |
 
 Preferences are stored now and will be applied by matching and discovery (a later phase). **Matching isn't implemented yet.**
 
@@ -121,8 +121,8 @@ Returns the member's own profile, including private fields.
       "minAge": 18,
       "maxAge": 80,
       "verifiedOnly": false,
-      "discoveryEnabled": false,
-      "showArea": false
+      "discoveryEnabled": true,
+      "showArea": true
     }
   }
 }
@@ -152,7 +152,7 @@ Creates the profile (onboarding step 1) and the default preferences, and records
 }
 ```
 
-`areaId`, `bio`, `instagramId` and `availableDates` are optional. **201 Created**: same shape as `GET /me/profile` (`profileStatus: "incomplete"` until a photo is uploaded).
+Only `areaId` is optional. `bio`, `instagramId` and at least one entry in `availableDates` are **required**, like `gender` and `cityId` ([validation](profile-validation.md)). **201 Created**: same shape as `GET /me/profile` (`profileStatus: "incomplete"` until a photo is uploaded).
 
 **Errors**
 
@@ -164,7 +164,7 @@ Creates the profile (onboarding step 1) and the default preferences, and records
 
 ### 3.3 `PATCH /api/v1/me/profile`
 
-Partial update. Accepts `name`, `gender`, `cityId`, `areaId`, `bio`, `instagramId`, `garbaLevel` and `availableDates`. **`dateOfBirth` can't be changed** (the key is rejected with `400`). Changing `cityId` without `areaId` clears the area. `bio: ""` / `instagramId: ""` clear those fields.
+Partial update. Accepts `name`, `gender`, `cityId`, `areaId`, `bio`, `instagramId`, `garbaLevel` and `availableDates`. **`dateOfBirth` can't be changed** (the key is rejected with `400`). Changing `cityId` without `areaId` clears the area. Every key is optional, but a key that is sent must be valid: `bio`, `instagramId` and `availableDates` cannot be cleared (`bio: ""`, `instagramId: ""` and `availableDates: []` are rejected with `400`).
 
 **200 OK**: `MyProfileDto`. **Errors:** `400 VALIDATION_ERROR`, `409 PROFILE_NOT_STARTED`.
 
@@ -199,7 +199,29 @@ Processing: decoded and verified → metadata (EXIF/GPS) removed → resized →
 
 ### 3.6 `DELETE /api/v1/me/profile/image`
 
-Removes the photo (the profile becomes `incomplete`) and revokes the photo-verified badge. **200 OK**: `MyProfileDto`.
+Removes the **main** photo and revokes the photo-verified badge. A profile always keeps at least one photo:
+
+- with extra photos (§3.6a), the oldest one becomes the main photo. **200 OK**: `MyProfileDto`;
+- with no extra photo the request is refused: **400 `VALIDATION_ERROR`** "Your profile needs at least one photo. Upload a new photo to replace this one." To change the only photo, upload a new one (§3.5), which replaces it.
+
+### 3.6a Extra photos: `POST /api/v1/me/profile/photos` and `DELETE /api/v1/me/profile/photos/:photoId`
+
+A member can add up to **5 extra photos** (`LIMITS.PROFILE_EXTRA_PHOTOS_MAX`) besides the main one. The main photo is the one on cards, in chats and in search, and the one photo verification refers to; extra photos are shown on the profile page only.
+
+`POST` takes one file in the multipart field `image`, with the same rules, processing (EXIF removed) and upload rate limit as the main photo. **201 Created**: `MyProfileDto`, where `profile.photos` lists the extra photos oldest first:
+
+```json
+"photos": [
+  { "id": "5b0e…", "url": "https://…/card/…", "thumbnailUrl": "https://…/thumbnail/…" }
+]
+```
+
+- If the profile has no main photo yet, the uploaded photo becomes the main photo instead.
+- **400 `VALIDATION_ERROR`** "You can add up to 5 extra photos. Remove one first." at the limit; `400 INVALID_IMAGE` / `413` as for the main photo; `409 PROFILE_NOT_STARTED` without a profile.
+
+`DELETE` removes one extra photo from the profile and from storage. **200 OK**: `MyProfileDto`. **404** if the photo does not exist **or belongs to another member** (the lookup is scoped to the caller).
+
+Other members receive the extra photos in `photos` of the public profile (§3.8) and of the preview (§3.7). Lists and cards (discovery, matches, chats) carry the main photo only.
 
 ### 3.7 `GET /api/v1/me/profile/preview`
 
@@ -333,7 +355,9 @@ Run with `npm run test` (integration tests need `TEST_DATABASE_URL`).
 
 ## 8. Known limitations
 
-- **One photo per profile.** Multiple photos and moderator photo review are planned.
+- **Extra photos cannot be reordered or made the main photo directly.** To change the main photo, upload a new one, or remove it so the oldest extra photo takes its place.
+- **The stricter rules apply when a profile is saved, not retroactively.** Members who joined before bio, Instagram username and a date became required keep a `complete` profile and stay visible; they are asked for the missing details the next time they edit their profile. Profile status and the completion percentage are unchanged (dates expire, so requiring an upcoming date for "complete" would hide every profile after the season).
+- Extra photos are visible to moderators in the admin user detail response (`profile.photos`), but the admin screen does not display them yet.
 - **No photo moderation queue yet.** Photos are visible immediately (post-moderation by design). Admins can suspend accounts, but can't yet reject a single photo.
 - Reference cities and areas are managed by migration until the admin locations screens exist.
 - Blocking isn't implemented yet, so the public profile doesn't apply the block check. It's documented as a requirement for the safety phase.

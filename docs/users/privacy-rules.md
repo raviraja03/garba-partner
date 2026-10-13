@@ -30,8 +30,8 @@ These rules are **mandatory** for every endpoint, DTO, log line and UI that touc
 4. **Viewer requirements.** Only active, onboarded members can view other profiles. Public profiles are never available to anonymous visitors or search engines.
 5. **Strict input schemas.** Unknown keys are rejected, so no one can smuggle `phone` or `status` into their profile.
 6. **Contact details kept out of profiles.** Names can't contain digits. Bios can't contain phone numbers, emails or links. Instagram is a separate, private field.
-7. **Location minimisation.** City and neighbourhood only, from an admin-managed list (no free text, no GPS). Area visibility is opt-in (`showArea` defaults to `false`). Photos lose their GPS EXIF.
-8. **Discovery is opt-in.** `discoveryEnabled` defaults to `false`, so members choose to be found.
+7. **Location minimisation.** City and neighbourhood only, from an admin-managed list (no free text, no GPS). The area is shown by default (`showArea` defaults to `true` since 2026-10-13) and the member can hide it in preferences. Photos lose their GPS EXIF.
+8. **Discovery is on by default, and can be paused.** `discoveryEnabled` defaults to `true` for new members (product decision, 2026-10-13; it was opt-in before). The switch is shown, turned on, on the last onboarding step, and members can pause it at any time. Members who joined earlier keep the setting they had.
 9. **Logging.** Request and response bodies aren't logged. Pino redacts `authorization`, `cookie`, `set-cookie`, `phone`, `otp`, `code`, `password` and `token*`. Admin audit metadata holds reasons and IDs only. The end-to-end check confirmed no phone number, DOB, Instagram handle or password appears in the API log.
 10. **Admin searches by phone** compare HMACs. The number searched for isn't stored or logged.
 11. **Suspension takes effect immediately:** sessions are revoked, the profile disappears for others, and the member can still see and correct their own data.
