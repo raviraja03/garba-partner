@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { CONFIGURABLE_NOTIFICATION_TYPES, type NotificationDto } from '@garba-partner/shared';
@@ -40,7 +41,9 @@ function Preferences() {
         Notify me when…
       </h2>
       <div className="mt-1">
-        {CONFIGURABLE_NOTIFICATION_TYPES.map((type) => (
+        {CONFIGURABLE_NOTIFICATION_TYPES.filter(
+          (type) => MEMBER_VERIFICATION_ENABLED || type !== 'verification_completed',
+        ).map((type) => (
           <Choice
             key={type}
             label={PREFERENCE_LABELS[type]}

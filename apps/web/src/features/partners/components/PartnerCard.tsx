@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import { Link } from 'react-router';
 import type { MatchHighlight, PartnerDto } from '@garba-partner/shared';
 import { Badge } from '../../../components/ui/Badge';
@@ -27,7 +28,8 @@ export function Highlights({ highlights }: { highlights: MatchHighlight[] }) {
  */
 export function PartnerCard({ partner }: { partner: PartnerDto }) {
   const { profile } = partner;
-  const verified = profile.photoVerified || profile.identityVerified;
+  const verified =
+    MEMBER_VERIFICATION_ENABLED && (profile.photoVerified || profile.identityVerified);
   return (
     <article
       className={`${CARD_CLASS} overflow-hidden transition-[box-shadow,transform] duration-200 ease-soft hover:-translate-y-0.5 hover:shadow-raised`}
