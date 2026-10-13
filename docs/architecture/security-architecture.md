@@ -265,7 +265,7 @@ Failures return `USER_UNAVAILABLE` (actions) or `NOT_FOUND` (reads). The respons
 | Control | Specification |
 |---|---|
 | Accepted types | JPEG, PNG, WebP, detected by **decoding with sharp**, not by extension or MIME header |
-| Size | ≤ 5 MB upload (Nginx 6 MB, multer 5 MB) |
+| Size | ≤ 10 MB upload (Nginx 11 MB, multer 10 MB) |
 | Dimensions | ≥ 400×400 and ≤ 8000×8000. Guards against decompression bombs via sharp `limitInputPixels` |
 | Metadata | Auto-rotate, then **re-encode without metadata**. EXIF/GPS/XMP never reach storage. Covered by an automated test with a GPS-tagged fixture |
 | Storage | Cloudinary. Profile photos and event covers as `upload` type with random public IDs. **Verification selfies as `authenticated` (private)** type, viewable only through short-lived (5 min) signed URLs generated for admins with `verifications:review` |

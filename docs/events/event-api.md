@@ -109,7 +109,7 @@ Admin access token required (`Authorization: Bearer …`). Member tokens → `40
 | GET | `/admin/events/:eventId` | `events:view` | Detail |
 | POST | `/admin/events` | `events:manage` | Create a **draft** → `201` |
 | PATCH | `/admin/events/:eventId` | `events:manage` | Partial update (not archived) |
-| POST | `/admin/events/:eventId/image` | `events:manage` | Multipart field `image` (JPEG/PNG/WebP ≤5 MB) |
+| POST | `/admin/events/:eventId/image` | `events:manage` | Multipart field `image` (JPEG/PNG/WebP ≤10 MB) |
 | DELETE | `/admin/events/:eventId/image` | `events:manage` | Remove image |
 | POST | `/admin/events/:eventId/publish` | `events:manage` | draft → published |
 | POST | `/admin/events/:eventId/unpublish` | `events:manage` | published → draft |

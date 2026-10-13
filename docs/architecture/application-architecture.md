@@ -234,7 +234,7 @@ apps/api/src/
 
 1. `request-id` → 2. `pino-http` logger (redacted) → 3. `helmet` → 4. `host-guard` → 5. `cors` (allow-list, credentials, dev only in practice) → 6. `express.json({ limit: '100kb' })` → 7. `cookie-parser` → 8. global `rate-limit` → 9. routers (`/api/v1`, `/api/v1/admin`) → 10. `not-found` → 11. `error-handler`.
 
-Uploads skip the JSON parser and use `multer` (memory storage, `limits: { fileSize: 5 MB, files: 1 }`) on the specific route.
+Uploads skip the JSON parser and use `multer` (memory storage, `limits: { fileSize: 10 MB, files: 1 }`) on the specific route.
 
 ### 4.4 Response envelope
 
@@ -341,7 +341,7 @@ Side effects outside the DB (Socket.IO emits, Cloudinary deletes) run **after co
 
 ### 4.10 File uploads
 
-1. `multer` memory storage, max 5 MB, 1 file, field `photo`/`selfie`/`cover`.
+1. `multer` memory storage, max 10 MB, 1 file, field `photo`/`selfie`/`cover`.
 2. `lib/image.ts` uses **sharp**: decode (rejects non-images and polyglots), check format ∈ {jpeg, png, webp}, check dimensions ≥ 400×400 and ≤ 8000×8000, auto-rotate from EXIF orientation, resize to max 1600 px on the long edge, **re-encode to JPEG/WebP without metadata** (sharp drops EXIF/GPS unless `withMetadata()` is called, and **we never call it**).
 3. Upload the processed buffer to Cloudinary through `MediaStorage.upload({ folder, type })`:
    - Profile photos: `type: 'upload'`, folder `${prefix}/profile-photos/${userId}`, random public ID.
