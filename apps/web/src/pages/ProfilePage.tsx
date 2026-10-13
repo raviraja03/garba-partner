@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import { Link } from 'react-router';
 import { PageHeader } from '../components/PageHeader';
 import { Alert } from '../components/ui/Alert';
@@ -118,7 +119,7 @@ export function ProfilePage() {
                   ],
                   [
                     'Dance with',
-                    `${PREFERRED_GENDER_LABELS[preferences.preferredGender]}, aged ${String(preferences.minAge)}–${String(preferences.maxAge)}${preferences.verifiedOnly ? ', photo-verified only' : ''}`,
+                    `${PREFERRED_GENDER_LABELS[preferences.preferredGender]}, aged ${String(preferences.minAge)}–${String(preferences.maxAge)}${MEMBER_VERIFICATION_ENABLED && preferences.verifiedOnly ? ', photo-verified only' : ''}`,
                   ],
                   ['Discovery', preferences.discoveryEnabled ? 'Visible in discovery' : 'Paused'],
                 ] as const

@@ -1,3 +1,4 @@
+import { MEMBER_VERIFICATION_ENABLED } from '@garba-partner/shared';
 import { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
@@ -30,7 +31,15 @@ import { useIsDesktop } from '../lib/use-media-query';
 
 const ALL_CITIES = 'all';
 /** URL parameters that are filters (for "Clear all" and the active-filter count). */
-const FILTER_KEYS = ['event', 'city', 'date', 'minAge', 'maxAge', 'level', 'verified'] as const;
+const FILTER_KEYS = [
+  'event',
+  'city',
+  'date',
+  'minAge',
+  'maxAge',
+  'level',
+  ...(MEMBER_VERIFICATION_ENABLED ? (['verified'] as const) : []),
+] as const;
 
 function isGarbaLevel(value: string): value is GarbaLevel {
   return (GARBA_LEVELS as readonly string[]).includes(value);
@@ -68,7 +77,7 @@ export function DiscoverPage() {
     maxAge: params.get('maxAge') ?? '',
     garbaLevels: (params.get('level') ?? '').split(',').filter(isGarbaLevel),
     date: isIsoDate(rawDate) ? rawDate : '',
-    verifiedOnly: params.get('verified') === '1',
+    verifiedOnly: MEMBER_VERIFICATION_ENABLED && params.get('verified') === '1',
   };
   // Wait for the profile so the first search already uses the member's city.
   const list = usePartnerList(filters, !myProfile.isPending);
@@ -278,17 +287,19 @@ export function DiscoverPage() {
         </div>
       </fieldset>
 
-      <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold text-ink">
-        <input
-          type="checkbox"
-          checked={filters.verifiedOnly}
-          onChange={(e) => {
-            update({ verified: e.target.checked ? '1' : null });
-          }}
-          className="size-5 shrink-0 accent-brand-600"
-        />
-        Verified members only
-      </label>
+      {MEMBER_VERIFICATION_ENABLED && (
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 font-semibold text-ink">
+          <input
+            type="checkbox"
+            checked={filters.verifiedOnly}
+            onChange={(e) => {
+              update({ verified: e.target.checked ? '1' : null });
+            }}
+            className="size-5 shrink-0 accent-brand-600"
+          />
+          Verified members only
+        </label>
+      )}
     </form>
   );
 
