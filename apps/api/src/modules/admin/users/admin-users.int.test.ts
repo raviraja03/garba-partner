@@ -153,7 +153,7 @@ describe.skipIf(!hasTestDatabase)('admin user management (integration)', () => {
       profileStatus: 'complete',
       activeSessionCount: 1,
       profile: { name: 'Kavya', instagramId: 'private.handle' },
-      preferences: { discoveryEnabled: false },
+      preferences: { discoveryEnabled: true },
       verifications: [],
     });
     expect(JSON.stringify(res.body)).not.toContain(member.phone);

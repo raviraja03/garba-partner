@@ -173,8 +173,8 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
         minAge: 18,
         maxAge: 80,
         verifiedOnly: false,
-        discoveryEnabled: false,
-        showArea: false,
+        discoveryEnabled: true,
+        showArea: true,
       });
       const user = await User.findByPk(userId);
       expect(user?.termsVersion).toBe('2026-09-01');
@@ -690,11 +690,17 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
     const discoverable = (userId: string, extra: Record<string, unknown> = {}) =>
       UserPreference.update({ discoveryEnabled: true, ...extra }, { where: { userId } });
 
-    it('hides members who have not opted into discovery', async () => {
+    it('new members are visible by default, and hidden once they pause discovery', async () => {
       const viewer = await completeMember();
       const target = await completeMember();
       const view = () =>
         request(app).get(`/api/v1/users/${target.userId}/profile`).set(auth(viewer.accessToken));
+      expect((await view()).status).toBe(200);
+      await request(app)
+        .put('/api/v1/me/preferences')
+        .set(auth(target.accessToken))
+        .send({ discoveryEnabled: false })
+        .expect(200);
       expect((await view()).status).toBe(404);
       await discoverable(target.userId);
       expect((await view()).status).toBe(200);
@@ -715,7 +721,8 @@ describe.skipIf(!hasTestDatabase)('profiles (integration)', () => {
         id: target.userId,
         name: 'Rohan',
         age: 26,
-        area: null,
+        // The neighbourhood is shown by default (the member can hide it).
+        area: { name: 'Navrangpura' },
       });
       const serialized = JSON.stringify(res.body);
       expect(serialized).not.toContain(target.phone);

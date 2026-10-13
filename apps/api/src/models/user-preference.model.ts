@@ -23,8 +23,10 @@ import { User } from './user.model.js';
 
 /**
  * Partner preferences and visibility settings. One row per user.
- * Privacy by default: `discoveryEnabled` and `showArea` default to false and are only turned
- * on by an explicit member choice. Hard-deleted on account erasure.
+ * New members start visible: `discoveryEnabled` and `showArea` default to true. Both are shown
+ * on the last onboarding step, where the member can turn them off, and can be changed at any
+ * time. `verifiedOnly` stays off by default: it would hide every member who has not been
+ * photo-verified yet. Hard-deleted on account erasure.
  */
 @Table({
   tableName: 'user_preferences',
@@ -74,11 +76,11 @@ export class UserPreference extends Model<
   verifiedOnly!: CreationOptional<boolean>;
 
   /** Whether the member can be found in partner discovery ("pause profile" when false). */
-  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: true })
   discoveryEnabled!: CreationOptional<boolean>;
 
   /** Whether the neighbourhood area is shown on the profile (city is always shown). */
-  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: false })
+  @Column({ type: DataType.BOOLEAN, allowNull: false, defaultValue: true })
   showArea!: CreationOptional<boolean>;
 
   @CreatedAt

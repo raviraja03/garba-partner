@@ -76,8 +76,8 @@ describe.skipIf(!hasTestDatabase)('database schema (integration)', () => {
       expect(loaded?.profile?.displayName).toBe('Test');
       expect(loaded?.status).toBe('active');
       // Privacy by default.
-      expect(loaded?.preferences?.discoveryEnabled).toBe(false);
-      expect(loaded?.preferences?.showArea).toBe(false);
+      expect(loaded?.preferences?.discoveryEnabled).toBe(true);
+      expect(loaded?.preferences?.showArea).toBe(true);
     });
 
     it('hides phone columns by default and exposes them only through the withPhone scope', async () => {

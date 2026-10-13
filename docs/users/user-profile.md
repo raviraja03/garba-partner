@@ -25,8 +25,8 @@ Every member has one profile (`user_profiles`) and one set of preferences (`user
 | Minimum age | `minAge` | `user_preferences.age_min` | 18 |
 | Maximum age | `maxAge` | `user_preferences.age_max` | 80 |
 | Verified only | `verifiedOnly` | `user_preferences.verified_only` | `false` |
-| Discoverable | `discoveryEnabled` | `user_preferences.discovery_enabled` | `false` (opt-in) |
-| Show area | `showArea` | `user_preferences.show_area` | `false` (opt-in) |
+| Discoverable | `discoveryEnabled` | `user_preferences.discovery_enabled` | `true` (can be paused) |
+| Show area | `showArea` | `user_preferences.show_area` | `true` (can be hidden) |
 
 Preferences are stored now and will be applied by matching and discovery (a later phase). **Matching isn't implemented yet.**
 
@@ -121,8 +121,8 @@ Returns the member's own profile, including private fields.
       "minAge": 18,
       "maxAge": 80,
       "verifiedOnly": false,
-      "discoveryEnabled": false,
-      "showArea": false
+      "discoveryEnabled": true,
+      "showArea": true
     }
   }
 }

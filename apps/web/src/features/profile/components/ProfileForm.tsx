@@ -278,7 +278,7 @@ export function ProfileForm(props: Props) {
             label="Area"
             optional
             error={errors.areaId}
-            hint="Neighbourhood only — never your address. Hidden unless you choose to show it."
+            hint="Neighbourhood only — never your address. You can hide it in your preferences."
           >
             <select
               id="areaId"
