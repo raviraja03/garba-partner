@@ -4,7 +4,7 @@ import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
 import { buttonClass } from '../../../components/ui/button-styles';
 import { useDeleteProfileImage, useUploadProfileImage } from '../hooks';
-import { PHOTO_ACCEPT, PHOTO_MAX_MB, checkPhotoFile } from '../photo-file';
+import { PHOTO_ACCEPT, PHOTO_MAX_MB, preparePhotoFile } from '../photo-file';
 
 /**
  * The main profile photo. A profile always keeps one: it can be replaced at any time, and
@@ -42,13 +42,13 @@ export function ImageUpload({
     event.target.value = '';
     setError(null);
     if (!chosen) return;
-    const problem = await checkPhotoFile(chosen);
-    if (problem) {
+    const prepared = await preparePhotoFile(chosen);
+    if (!prepared.file) {
       setSelected(null);
-      setError(problem);
+      setError(prepared.error);
       return;
     }
-    setSelected({ file: chosen, previewUrl: URL.createObjectURL(chosen) });
+    setSelected({ file: prepared.file, previewUrl: URL.createObjectURL(prepared.file) });
   }
 
   async function handleUpload() {

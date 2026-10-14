@@ -4,7 +4,7 @@ import { Alert } from '../../../components/ui/Alert';
 import { Button } from '../../../components/ui/Button';
 import { buttonClass } from '../../../components/ui/button-styles';
 import { useAddProfilePhoto, useDeleteProfilePhoto } from '../hooks';
-import { PHOTO_ACCEPT, checkPhotoFile } from '../photo-file';
+import { PHOTO_ACCEPT, preparePhotoFile } from '../photo-file';
 
 /**
  * The member's extra photos (besides the main one): a grid with "Remove" under each photo and
@@ -23,13 +23,13 @@ export function PhotoGallery({ photos }: { photos: ProfilePhotoDto[] }) {
     event.target.value = '';
     setError(null);
     if (!chosen) return;
-    const problem = await checkPhotoFile(chosen);
-    if (problem) {
-      setError(problem);
+    const prepared = await preparePhotoFile(chosen);
+    if (!prepared.file) {
+      setError(prepared.error);
       return;
     }
     try {
-      await add.mutateAsync(chosen);
+      await add.mutateAsync(prepared.file);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
     }
